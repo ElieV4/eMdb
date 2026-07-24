@@ -2,21 +2,23 @@
 
 ## Décisions stratégiques
 
-| Question | Décision |
-|----------|----------|
-| 1. Algorithme similarité | **Jaccard pondéré** : Genres (0.6) + Acteurs top 10 (0.3) + Réalisateurs (0.1) |
-| 2. Top N recommandations | **10** par titre/personne |
-| 3. Où exécuter | **Script** (exécutable manuellement) + **Worker BullMQ** (cron mensuel) |
-| 4. Endpoint déclenchement | **POST /admin/compute-recommendations** (authentifié admin) |
-| 5. Découpage | 5.1 (algorithme + script) → 5.2 (API + worker) → 5.3 (fallback TMDB) |
+| Question                  | Décision                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------ |
+| 1. Algorithme similarité  | **Jaccard pondéré** : Genres (0.6) + Acteurs top 10 (0.3) + Réalisateurs (0.1) |
+| 2. Top N recommandations  | **10** par titre/personne                                                      |
+| 3. Où exécuter            | **Script** (exécutable manuellement) + **Worker BullMQ** (cron mensuel)        |
+| 4. Endpoint déclenchement | **POST /admin/compute-recommendations** (authentifié admin)                    |
+| 5. Découpage              | 5.1 (algorithme + script) → 5.2 (API + worker) → 5.3 (fallback TMDB)           |
 
 ## Dépendances
 
 ### Externes
+
 - `@emdb/db` — Prisma client pour lecture titles, title_genres, credits, people + écriture title_recommendations, person_recommendations
 - Aucune dépendance réseau (TMDB, Wikidata) — calcul 100% local
 
 ### Schéma Prisma concerné
+
 ```prisma
 model titles {
   id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -71,6 +73,7 @@ model person_recommendations {
 ## Algorithme détaillé : computeTitleRecommendations
 
 ### Étape 1 — Chargement des données (1 requête par table)
+
 ```typescript
 // 1a. Charger tous les titres avec leurs genres
 const titlesWithGenres = await prisma.titles.findMany({
@@ -86,7 +89,7 @@ const titlesWithGenres = await prisma.titles.findMany({
 // 1b. Indexer : Map<title_id, Set<genre_id>>
 const titleGenres = new Map<string, Set<string>>();
 for (const t of titlesWithGenres) {
-  titleGenres.set(t.id, new Set(t.title_genres.map(tg => tg.genre_id)));
+  titleGenres.set(t.id, new Set(t.title_genres.map((tg) => tg.genre_id)));
 }
 
 // 1c. Charger les credits pour acteurs (top 10 par ordre) + réalisateurs
@@ -114,18 +117,22 @@ for (const c of credits) {
 ```
 
 ### Étape 2 — Calcul Jaccard pour une paire de titres
+
 ```typescript
 function jaccardSimilarity(setA: Set<string>, setB: Set<string>): number {
   if (setA.size === 0 && setB.size === 0) return 0;
-  const intersection = new Set([...setA].filter(x => setB.has(x)));
+  const intersection = new Set([...setA].filter((x) => setB.has(x)));
   const union = new Set([...setA, ...setB]);
   return intersection.size / union.size;
 }
 
 function computeScore(
-  genresA: Set<string>, genresB: Set<string>,
-  actorsA: Set<string>, actorsB: Set<string>,
-  directorsA: Set<string>, directorsB: Set<string>,
+  genresA: Set<string>,
+  genresB: Set<string>,
+  actorsA: Set<string>,
+  actorsB: Set<string>,
+  directorsA: Set<string>,
+  directorsB: Set<string>,
 ): number {
   const genreScore = jaccardSimilarity(genresA, genresB) * 0.6;
   const actorScore = jaccardSimilarity(actorsA, actorsB) * 0.3;
@@ -135,6 +142,7 @@ function computeScore(
 ```
 
 ### Étape 3 — Parcours par batch
+
 ```typescript
 async function computeTitleRecommendations(batchSize = 100) {
   const allTitleIds = Array.from(titleGenres.keys());
@@ -160,9 +168,12 @@ async function computeTitleRecommendations(batchSize = 100) {
 
         const creditsB = titleCredits.get(titleIdB) ?? { actors: new Set(), directors: new Set() };
         const score = computeScore(
-          genresA, genresB,
-          creditsA.actors, creditsB.actors,
-          creditsA.directors, creditsB.directors,
+          genresA,
+          genresB,
+          creditsA.actors,
+          creditsB.actors,
+          creditsA.directors,
+          creditsB.directors,
         );
 
         if (score > 0) {
@@ -184,7 +195,7 @@ async function computeTitleRecommendations(batchSize = 100) {
       await prisma.$transaction(async (tx) => {
         // Supprimer les anciennes recommandations pour les titres du batch
         await tx.title_recommendations.deleteMany({
-          where: { title_id: { in: batch.map(t => t) } },
+          where: { title_id: { in: batch.map((t) => t) } },
         });
 
         // Insérer les nouvelles
@@ -196,7 +207,9 @@ async function computeTitleRecommendations(batchSize = 100) {
     }
 
     totalInserted += records.length;
-    console.log(`[batch ${i / batchSize + 1}] ${batch.length} titles processed, ${records.length} recs`);
+    console.log(
+      `[batch ${i / batchSize + 1}] ${batch.length} titles processed, ${records.length} recs`,
+    );
   }
 
   return totalInserted;
@@ -204,6 +217,7 @@ async function computeTitleRecommendations(batchSize = 100) {
 ```
 
 ### Optimisation : `hasCommonGenre`
+
 ```typescript
 function hasCommonGenre(setA: Set<string>, setB: Set<string>): boolean {
   if (setA.size === 0 || setB.size === 0) return false;
@@ -306,12 +320,14 @@ packages/recommender/
 ## Plan de tests
 
 ### jaccard.ts
+
 - Jaccard similarity entre deux sets identiques → 1
 - Jaccard similarity entre deux sets disjoints → 0
 - Jaccard similarity entre deux sets avec intersection partielle → valeur correcte
 - Jaccard avec un ou deux sets vides → 0
 
 ### recommender.ts
+
 - `hasCommonGenre` retourne true si intersection, false sinon
 - `computeScore` pondère correctement les 3 facteurs
 - `computeTitleRecommendations` pour un titre : retourne max 10 résultats
@@ -319,4 +335,3 @@ packages/recommender/
 - `computeTitleRecommendations` ignore les crédits avec episode_id != null
 - `computePersonRecommendations` symétrique (si A recommande B, B recommande A)
 - `computePersonRecommendations` bonus genre
-

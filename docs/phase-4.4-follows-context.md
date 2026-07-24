@@ -1,8 +1,8 @@
 # Phase 4.4 - Module Follows (Suivi de Séries)
 
-*Documentation technique du module Follows - eMDB Backend*
-*Dernière mise à jour : 24 juillet 2026*
-*Statut : ✅ **COMPLET** (Intégré dans le module Watches)*
+_Documentation technique du module Follows - eMDB Backend_
+_Dernière mise à jour : 24 juillet 2026_
+_Statut : ✅ **COMPLET** (Intégré dans le module Watches)_
 
 ---
 
@@ -29,11 +29,11 @@ Le module **Follows** permet aux utilisateurs de **suivre des séries** pour rec
 
 ### Fonctionnalités Implémentées
 
-| Fonctionnalité | Endpoint | Méthode | Statut |
-|---------------|----------|---------|--------|
-| Suivre une série | `POST /follows` | `follow()` | ✅ |
-| Ne plus suivre une série | `DELETE /follows/:titleId` | `unfollow()` | ✅ |
-| Lister les séries suivies | `GET /follows` | `getFollowedSeries()` | ✅ |
+| Fonctionnalité            | Endpoint                   | Méthode               | Statut |
+| ------------------------- | -------------------------- | --------------------- | ------ |
+| Suivre une série          | `POST /follows`            | `follow()`            | ✅     |
+| Ne plus suivre une série  | `DELETE /follows/:titleId` | `unfollow()`          | ✅     |
+| Lister les séries suivies | `GET /follows`             | `getFollowedSeries()` | ✅     |
 
 ### Dépendances
 
@@ -49,6 +49,7 @@ Le module **Follows** permet aux utilisateurs de **suivre des séries** pour rec
 **Décision** : Le module `follows` a été intégré dans le module `watches` plutôt que d'être un module séparé.
 
 **Justification** :
+
 1. **Couplage fort** : Le calendrier des épisodes non vus (`GET /calendar`) et la progression série (`GET /titles/:titleId/progress`) **dépendent directement** des séries suivies
 2. **Simplification** : Évite la duplication des dépendances (Prisma, Auth, Titles)
 3. **Cohérence** : Les fonctionnalités de visionnage et de suivi sont conceptuellement liées (toutes deux gèrent l'activité utilisateur sur les séries)
@@ -77,6 +78,7 @@ watches/
 **Description** : Suivre une série (ajouter à sa liste de séries suivies)
 
 **Request** :
+
 ```typescript
 // Body
 {
@@ -85,11 +87,13 @@ watches/
 ```
 
 **Validation** :
+
 - `title_id` : UUID valide (via `@IsUUID()`)
 - `title_id` : Doit exister en base
 - `title_id` : Doit être de type `'serie'` (validation applicative)
 
 **Response - Success (201)** :
+
 ```typescript
 {
   "user_id": "uuid",
@@ -106,6 +110,7 @@ watches/
 ```
 
 **Response - Errors** :
+
 - `400 Bad Request` : `title_id` invalide ou n'est pas une série
 - `401 Unauthorized` : Non authentifié
 - `404 Not Found` : Titre introuvable
@@ -118,21 +123,25 @@ watches/
 **Description** : Ne plus suivre une série
 
 **Request** :
+
 ```typescript
 // URL Params
 :titleId  // Required - UUID du titre
 ```
 
 **Validation** :
+
 - `titleId` : UUID valide
 - Le follow doit exister et appartenir à l'utilisateur connecté
 
 **Response - Success (204)** :
+
 ```typescript
 // No Content
 ```
 
 **Response - Errors** :
+
 - `401 Unauthorized` : Non authentifié
 - `404 Not Found` : Série non suivie par l'utilisateur
 
@@ -143,12 +152,14 @@ watches/
 **Description** : Lister toutes les séries suivies par l'utilisateur
 
 **Request** :
+
 ```typescript
 // Query Params (optionnels)
 // Aucun pour l'instant - pourrait ajouter pagination/filtres plus tard
 ```
 
 **Response - Success (200)** :
+
 ```typescript
 [
   {
@@ -168,6 +179,7 @@ watches/
 **Tri** : Par `followed_at` décroissant (plus récent en premier)
 
 **Response - Errors** :
+
 - `401 Unauthorized` : Non authentifié
 
 ---
@@ -179,6 +191,7 @@ watches/
 #### `follow(userId: string, titleId: string)`
 
 **Algorithme** :
+
 1. Vérifier que le titre existe (`prisma.titles.findUnique`)
 2. Vérifier que le titre est de type `'serie'` (validation applicative)
 3. Créer le follow (`prisma.user_follows_serie.create`)
@@ -187,6 +200,7 @@ watches/
 **Contrainte** : La contrainte UNIQUE `(user_id, title_id)` en base empêche les doublons.
 
 **Code** :
+
 ```typescript
 async follow(userId: string, titleId: string) {
   const title = await this.prisma.titles.findUnique({
@@ -214,10 +228,12 @@ async follow(userId: string, titleId: string) {
 #### `unfollow(userId: string, titleId: string)`
 
 **Algorithme** :
+
 1. Vérifier que le follow existe (`prisma.user_follows_serie.findUnique`)
 2. Supprimer le follow (`prisma.user_follows_serie.delete`)
 
 **Code** :
+
 ```typescript
 async unfollow(userId: string, titleId: string): Promise<void> {
   const follow = await this.prisma.user_follows_serie.findUnique({
@@ -239,12 +255,14 @@ async unfollow(userId: string, titleId: string): Promise<void> {
 #### `getFollowedSeries(userId: string)`
 
 **Algorithme** :
+
 1. Récupérer tous les follows de l'utilisateur (`prisma.user_follows_serie.findMany`)
 2. Inclure les infos du titre (avec select pour optimiser)
 3. Trier par `followed_at` décroissant
 4. Formater le résultat (fusionner title + followed_at)
 
 **Code** :
+
 ```typescript
 async getFollowedSeries(userId: string) {
   const follows = await this.prisma.user_follows_serie.findMany({
@@ -293,11 +311,11 @@ export class FollowSerieDto {
 
 ### Validation Applicative
 
-| Validation | Méthode | Message d'erreur |
-|------------|---------|------------------|
-| Titre existe | `prisma.titles.findUnique` | "Titre introuvable." (404) |
-| Titre est une série | `title.type === 'serie'` | "Seules les séries peuvent être suivies." (400) |
-| Follow existe (unfollow) | `prisma.user_follows_serie.findUnique` | "Vous ne suivez pas cette série." (404) |
+| Validation               | Méthode                                | Message d'erreur                                |
+| ------------------------ | -------------------------------------- | ----------------------------------------------- |
+| Titre existe             | `prisma.titles.findUnique`             | "Titre introuvable." (404)                      |
+| Titre est une série      | `title.type === 'serie'`               | "Seules les séries peuvent être suivies." (400) |
+| Follow existe (unfollow) | `prisma.user_follows_serie.findUnique` | "Vous ne suivez pas cette série." (404)         |
 
 ---
 
@@ -369,6 +387,7 @@ describe('getFollowedSeries', () => {
 **Dépendance** : Validation que le titre est de type `'serie'`
 
 **Appel** :
+
 ```typescript
 const title = await this.prisma.titles.findUnique({
   where: { id: titleId },
@@ -387,6 +406,7 @@ if (title.type !== 'serie') {
 **Dépendance** : Le calendrier (`GET /calendar`) utilise `user_follows_serie`
 
 **Appel dans `getCalendar()`** :
+
 ```typescript
 const followedSeries = await this.prisma.user_follows_serie.findMany({
   where: { user_id: userId },
@@ -406,6 +426,7 @@ for (const follow of followedSeries) {
 **Dépendance** : Tous les endpoints nécessitent une authentification JWT
 
 **Configuration** :
+
 ```typescript
 @UseGuards(JwtAuthGuard)
 @Controller()
@@ -423,18 +444,21 @@ export class WatchesController {
 **Question** : Faut-il créer un module `follows` séparé ou garder l'intégration dans `watches` ?
 
 **Option A - Garder dans Watches (Actuel)** :
+
 - ✅ Simplifie l'architecture
 - ✅ Évite la duplication
 - ✅ Couplage naturel (calendrier dépend des follows)
 - ⚠️ Moins conforme à la roadmap initiale
 
 **Option B - Extraire en module séparé** :
+
 - ✅ Conforme à la roadmap initiale
 - ✅ Meilleure séparation des préoccupations
 - ⚠️ Nécessite de refactorer le code existant
 - ⚠️ Peut créer des dépendances circulaires
 
 **💡 Recommandation** : **Garder l'Option A** (intégré dans watches) car :
+
 - Le code est déjà implémenté et testé
 - L'intégration est logique et propre
 - La séparation introduirait de la complexité sans bénéfice clair
@@ -448,10 +472,12 @@ export class WatchesController {
 **Actuel** : Retourne toutes les séries suivies sans pagination
 
 **Pour** :
+
 - Utilisateur avec beaucoup de séries suivies (>100)
 - Cohérence avec les autres endpoints de liste
 
 **Contre** :
+
 - Un utilisateur aura rarement >50 séries suivies
 - Ajoute de la complexité pour un cas edge
 
@@ -472,6 +498,7 @@ export class WatchesController {
 ## ✅ Checklist de Validation
 
 ### Code
+
 - [x] `follow()` implémentée dans WatchesService
 - [x] `unfollow()` implémentée dans WatchesService
 - [x] `getFollowedSeries()` implémentée dans WatchesService
@@ -481,6 +508,7 @@ export class WatchesController {
 - [x] Gestion des erreurs (NotFound, BadRequest)
 
 ### Tests
+
 - [x] Tests unitaires pour `follow()`
 - [x] Tests unitaires pour `unfollow()`
 - [x] Tests unitaires pour `getFollowedSeries()`
@@ -488,6 +516,7 @@ export class WatchesController {
 - [x] Couverture > 90%
 
 ### Documentation
+
 - [x] Documentation technique (ce fichier)
 - [ ] Mettre à jour la roadmap backend (marquer [x] au lieu de [])
 - [ ] Mettre à jour ARCHITECTURE_OVERVIEW.md
@@ -495,6 +524,7 @@ export class WatchesController {
 - [ ] Mettre à jour README.md de docs/
 
 ### Intégration
+
 - [x] Intégration avec Auth (JwtAuthGuard)
 - [x] Intégration avec Titles (validation type)
 - [x] Intégration avec Watches (calendrier)
@@ -503,8 +533,8 @@ export class WatchesController {
 
 ## 📝 Historique des Modifications
 
-| Date | Auteur | Modification |
-|------|--------|--------------|
+| Date       | Auteur       | Modification                                       |
+| ---------- | ------------ | -------------------------------------------------- |
 | 2026-07-24 | Mistral Vibe | Création du document - module intégré dans watches |
 
 ---
@@ -520,5 +550,5 @@ export class WatchesController {
 
 ---
 
-*Document généré à partir du code existant et de la roadmap technique.*
-*Pour toute question ou clarification, consulter les documents sources.*
+_Document généré à partir du code existant et de la roadmap technique._
+_Pour toute question ou clarification, consulter les documents sources._

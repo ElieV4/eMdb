@@ -26,12 +26,12 @@ npm run docker:up
 
 Cela démarre 4 services :
 
-| Service    | Port  | Rôle                                                        |
-|------------|-------|--------------------------------------------------------------|
-| `postgres` | 5432  | Base Postgres vierge, `db_init.sql` appliqué au 1er démarrage |
-| `redis`    | 6379  | Cache TMDB + queues BullMQ                                    |
-| `api`      | 3001  | NestJS (placeholder `/health` en Phase 0)                     |
-| `worker`   | —     | Process BullMQ (placeholder en Phase 0, connexion Redis only) |
+| Service    | Port | Rôle                                                          |
+| ---------- | ---- | ------------------------------------------------------------- |
+| `postgres` | 5432 | Base Postgres vierge, `db_init.sql` appliqué au 1er démarrage |
+| `redis`    | 6379 | Cache TMDB + queues BullMQ                                    |
+| `api`      | 3001 | NestJS (placeholder `/health` en Phase 0)                     |
+| `worker`   | —    | Process BullMQ (placeholder en Phase 0, connexion Redis only) |
 
 Vérifier que tout tourne :
 

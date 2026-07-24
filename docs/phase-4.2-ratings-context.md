@@ -2,20 +2,22 @@
 
 ## Décisions stratégiques
 
-| Question | Décision |
-|----------|----------|
-| 5. Upsert : PUT vs POST | **PUT /ratings** — body { title_id?, episode_id?, note_perso?, commentaire? }, comportement upsert |
-| 6. GET /titles/:id/ratings public ou auth ? | **Public** — accessible sans JWT (page publique film) |
-| 7. Suppression : hard vs soft delete | **Hard delete** — DELETE FROM user_ratings WHERE id = ... |
+| Question                                    | Décision                                                                                           |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 5. Upsert : PUT vs POST                     | **PUT /ratings** — body { title_id?, episode_id?, note_perso?, commentaire? }, comportement upsert |
+| 6. GET /titles/:id/ratings public ou auth ? | **Public** — accessible sans JWT (page publique film)                                              |
+| 7. Suppression : hard vs soft delete        | **Hard delete** — DELETE FROM user_ratings WHERE id = ...                                          |
 
 ## Dépendances
 
 ### Externes
+
 - `auth` → `JwtAuthGuard`, `@CurrentUser()` pour les endpoints d'écriture
 - `titles` → validation d'existence des titres + récupération du type pour le filtre
 - `Prisma` → `user_ratings` (déjà dans PrismaService)
 
 ### Schéma Prisma concerné
+
 ```prisma
 model user_ratings {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -38,12 +40,12 @@ model user_ratings {
 
 ## Endpoints
 
-| Method | Path | Auth | DTO | Description |
-|--------|------|------|-----|-------------|
-| `PUT` | `/ratings` | ✅ | `UpsertRatingDto` | Créer ou mettre à jour une note (upsert via contrainte UNIQUE) |
-| `DELETE` | `/ratings/:id` | ✅ | — | Supprimer une note (vérifie appartenance) |
-| `GET` | `/ratings` | ✅ | `ListRatingsFilterDto` | Liste des notes de l'utilisateur, paginée, filtrée par type |
-| `GET` | `/titles/:id/ratings` | ❌ (public) | — | Résumé public des notes d'un titre (moyenne, répartition, count) |
+| Method   | Path                  | Auth        | DTO                    | Description                                                      |
+| -------- | --------------------- | ----------- | ---------------------- | ---------------------------------------------------------------- |
+| `PUT`    | `/ratings`            | ✅          | `UpsertRatingDto`      | Créer ou mettre à jour une note (upsert via contrainte UNIQUE)   |
+| `DELETE` | `/ratings/:id`        | ✅          | —                      | Supprimer une note (vérifie appartenance)                        |
+| `GET`    | `/ratings`            | ✅          | `ListRatingsFilterDto` | Liste des notes de l'utilisateur, paginée, filtrée par type      |
+| `GET`    | `/titles/:id/ratings` | ❌ (public) | —                      | Résumé public des notes d'un titre (moyenne, répartition, count) |
 
 ## DTOs
 
@@ -102,16 +104,16 @@ class RatingsService {
   // Upsert : cherche existant par (user_id, title_id) ou (user_id, episode_id)
   // Si trouvé → UPDATE (note_perso, commentaire)
   // Si non trouvé → CREATE
-  upsertRating(userId: string, dto: UpsertRatingDto): Promise<any>
+  upsertRating(userId: string, dto: UpsertRatingDto): Promise<any>;
 
   // Hard delete avec vérification d'appartenance
-  deleteRating(id: string, userId: string): Promise<void>
+  deleteRating(id: string, userId: string): Promise<void>;
 
   // Liste des notes de l'utilisateur, avec jointure titles pour le type
-  listUserRatings(userId: string, filters: ListRatingsFilterDto): Promise<PaginatedRatings>
+  listUserRatings(userId: string, filters: ListRatingsFilterDto): Promise<PaginatedRatings>;
 
   // Résumé public : moyenne, count, répartition des notes (1-10)
-  getTitleRatingsSummary(titleId: string): Promise<TitleRatingsSummary>
+  getTitleRatingsSummary(titleId: string): Promise<TitleRatingsSummary>;
 }
 ```
 
@@ -125,7 +127,14 @@ interface PaginatedRatings {
     commentaire: string | null;
     created_at: Date;
     updated_at: Date;
-    title?: { id: string; tmdb_id: number | null; titre_vo: string; titre_vf: string | null; affiche_url: string | null; type: string };
+    title?: {
+      id: string;
+      tmdb_id: number | null;
+      titre_vo: string;
+      titre_vf: string | null;
+      affiche_url: string | null;
+      type: string;
+    };
     episode?: { id: string; numero: number; titre: string | null; season?: { numero: number } };
   }>;
   total: number;
@@ -157,6 +166,7 @@ apps/api/src/ratings/
 ## Plan de tests
 
 ### upsertRating
+
 - Crée un rating (title_id fourni, aucun existant)
 - Met à jour un rating existant (même user_id + title_id)
 - Crée un rating pour un épisode
@@ -166,17 +176,19 @@ apps/api/src/ratings/
 - Lève BadRequest si les deux sont fournis
 
 ### deleteRating
+
 - Supprime un rating existant
 - Lève NotFound si le rating n'existe pas
 - Lève Forbidden si le rating appartient à un autre user
 
 ### listUserRatings
+
 - Retourne la liste paginée de l'utilisateur
 - Filtre par type (film/serie)
 - Vérifie la jointure titles.type pour le filtre
 
 ### getTitleRatingsSummary
+
 - Retourne moyenne + count + répartition pour un titre existant
 - Retourne moyenne=null, count=0 si aucune note
 - Lève NotFound si le titre n'existe pas
-

@@ -2,24 +2,26 @@
 
 ## Décisions stratégiques (tranchées)
 
-| Question | Décision | Justification |
-|----------|----------|---------------|
-| 1. Auth admin | **(b) Email fixe dans .env** | Pas de champ `is_admin` dans le schéma actuel → migration lourde. Un email fixe via `ADMIN_EMAILS` est immédiat, réversible, et suffisant pour une app à 2 utilisateurs. |
-| 2. Exécution | **(b) BullMQ uniquement** | Le calcul peut prendre plusieurs minutes pour 10 000 titres. Synchrone = timeout HTTP, mauvaise UX. BullMQ permet de lancer le job et suivre le statut (pattern async classique). |
-| 3. Module NestJS | **(a) `apps/api/src/recommender/`** | Cohérent avec la structure existante (1 module = 1 fonctionnalité). Pas besoin d'une abstraction `admin` prématurée. |
-| 4. BullMQ | **(a) Installer BullMQ** | Déjà prévu dans la roadmap (Phase 2.4). Sans BullMQ, pas de file d'attente, pas de cron, pas de suivi de job. À installer dans `apps/worker` pour les jobs, dans `apps/api` pour le déclenchement. |
-| 5. Stats endpoint | **(a) Oui, dans 5.2** | Simple endpoint GET qui lit `tmdb_sync_log` pour les actions `import*` et donne la date du dernier run, le nombre de recommandations. Utile pour le debug. |
+| Question          | Décision                            | Justification                                                                                                                                                                                      |
+| ----------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Auth admin     | **(b) Email fixe dans .env**        | Pas de champ `is_admin` dans le schéma actuel → migration lourde. Un email fixe via `ADMIN_EMAILS` est immédiat, réversible, et suffisant pour une app à 2 utilisateurs.                           |
+| 2. Exécution      | **(b) BullMQ uniquement**           | Le calcul peut prendre plusieurs minutes pour 10 000 titres. Synchrone = timeout HTTP, mauvaise UX. BullMQ permet de lancer le job et suivre le statut (pattern async classique).                  |
+| 3. Module NestJS  | **(a) `apps/api/src/recommender/`** | Cohérent avec la structure existante (1 module = 1 fonctionnalité). Pas besoin d'une abstraction `admin` prématurée.                                                                               |
+| 4. BullMQ         | **(a) Installer BullMQ**            | Déjà prévu dans la roadmap (Phase 2.4). Sans BullMQ, pas de file d'attente, pas de cron, pas de suivi de job. À installer dans `apps/worker` pour les jobs, dans `apps/api` pour le déclenchement. |
+| 5. Stats endpoint | **(a) Oui, dans 5.2**               | Simple endpoint GET qui lit `tmdb_sync_log` pour les actions `import*` et donne la date du dernier run, le nombre de recommandations. Utile pour le debug.                                         |
 
 ## Dépendances
 
 ### Packages
-- `@emdb/recommender` (Phase 5.1) — `computeTitleRecommendations()` et `computePersonRecommendations()` 
+
+- `@emdb/recommender` (Phase 5.1) — `computeTitleRecommendations()` et `computePersonRecommendations()`
 - `@emdb/db` — Prisma, pour les stats (tmdb_sync_log, title_recommendations, person_recommendations)
 - `@nestjs/bullmq` + `bullmq` — queue de jobs (nouvelle dépendance)
 - `ioredis` — Redis client (déjà présent via tmdb-client)
 - `auth` — `JwtAuthGuard`, `@CurrentUser()`
 
 ### BullMQ setup
+
 ```typescript
 // apps/worker/package.json
 {
@@ -42,14 +44,16 @@
 ```
 
 ### Queue `recommendations`
-| Configuration | Valeur | Justification |
-|--------------|--------|---------------|
-| Queue name | `recommendations` | — |
-| Concurrency | **1** | Calcul lourd, pas parallélisable sans risque de conflit sur les écritures |
-| Timeout | **30 min** | Évite le kill du worker pour les longs calculs (10 000 titres = ~5 min) |
-| Retry | **0** | Inutile de retry : le calcul est déterministe, si ça échoue c'est un bug |
+
+| Configuration | Valeur            | Justification                                                             |
+| ------------- | ----------------- | ------------------------------------------------------------------------- |
+| Queue name    | `recommendations` | —                                                                         |
+| Concurrency   | **1**             | Calcul lourd, pas parallélisable sans risque de conflit sur les écritures |
+| Timeout       | **30 min**        | Évite le kill du worker pour les longs calculs (10 000 titres = ~5 min)   |
+| Retry         | **0**             | Inutile de retry : le calcul est déterministe, si ça échoue c'est un bug  |
 
 ### Jobs
+
 ```typescript
 type ComputeRecommendationsJob = {
   mode: 'titles' | 'people' | 'all';
@@ -57,6 +61,7 @@ type ComputeRecommendationsJob = {
 ```
 
 ### Worker
+
 ```typescript
 // apps/worker/src/recommendations.worker.ts
 import { Worker } from 'bullmq';
@@ -87,6 +92,7 @@ const worker = new Worker<ComputeRecommendationsJob>(
 ```
 
 ### Cron mensuel (BullMQ QueueScheduler)
+
 ```typescript
 // apps/worker/src/cron.ts
 import { Queue } from 'bullmq';
@@ -99,7 +105,7 @@ async function scheduleMonthlyRecs() {
   // Planifier le 1er de chaque mois à 03:00
   await queue.upsertJobScheduler(
     'compute-recommendations-cron',
-    { pattern: '0 3 1 * *' },  // cron: 1er du mois à 3h
+    { pattern: '0 3 1 * *' }, // cron: 1er du mois à 3h
     { data: { mode: 'all' }, opts: { jobId: 'compute-recommendations-cron' } },
   );
 }
@@ -107,13 +113,14 @@ async function scheduleMonthlyRecs() {
 
 ## Endpoints
 
-| Method | Path | Auth | DTO | Description |
-|--------|------|------|-----|-------------|
-| `POST` | `/admin/compute-recommendations` | ✅ JWT + admin | `ComputeRecsDto` | Lance le calcul via BullMQ, retourne { jobId } |
-| `GET` | `/admin/compute-recommendations/:jobId/status` | ✅ JWT + admin | — | Statut du job (waiting/active/completed/failed) + résultat |
-| `GET` | `/admin/recommendations/stats` | ✅ JWT + admin | — | Stats globales (total recs, dernier run, durée) |
+| Method | Path                                           | Auth           | DTO              | Description                                                |
+| ------ | ---------------------------------------------- | -------------- | ---------------- | ---------------------------------------------------------- |
+| `POST` | `/admin/compute-recommendations`               | ✅ JWT + admin | `ComputeRecsDto` | Lance le calcul via BullMQ, retourne { jobId }             |
+| `GET`  | `/admin/compute-recommendations/:jobId/status` | ✅ JWT + admin | —                | Statut du job (waiting/active/completed/failed) + résultat |
+| `GET`  | `/admin/recommendations/stats`                 | ✅ JWT + admin | —                | Stats globales (total recs, dernier run, durée)            |
 
 ### DTOs
+
 ```typescript
 // ComputeRecsDto
 class ComputeRecsDto {
@@ -148,6 +155,7 @@ class JobStatusResponse {
 ```
 
 ### Auth admin guard
+
 ```typescript
 // apps/api/src/auth/admin.guard.ts
 import { Injectable, ForbiddenException } from '@nestjs/common';
@@ -172,6 +180,7 @@ export class AdminGuard extends AuthGuard('jwt') {
 ```
 
 ### Stats format
+
 ```typescript
 // GET /admin/recommendations/stats → response
 {
@@ -193,11 +202,13 @@ export class AdminGuard extends AuthGuard('jwt') {
 ## Dépendances npm à ajouter
 
 ### apps/api
+
 ```
 npm install @nestjs/bullmq bullmq
 ```
 
 ### apps/worker
+
 ```
 npm install @nestjs/bullmq bullmq ioredis
 ```
@@ -226,19 +237,21 @@ apps/worker/src/
 ## Plan de tests
 
 ### admin.guard.ts
+
 - Autorise l'accès si l'email de l'utilisateur est dans ADMIN_EMAILS
 - Refuse avec ForbiddenException si l'email n'est pas dans ADMIN_EMAILS
 - Refuse si ADMIN_EMAILS est vide ou non défini
 
 ### recommender.service.ts
+
 - `startRecommendations(mode)` : ajoute un job BullMQ et retourne un jobId
 - `getJobStatus(jobId)` : retourne le statut complet du job
 - `getStats()` : retourne les stats formatées correctement
 
 ### recomender.controller.ts
+
 - POST /admin/compute-recommendations → 201 + jobId
 - GET /admin/compute-recommendations/:jobId/status → 200 + statut
 - GET /admin/recommendations/stats → 200 + stats
 - Tous les endpoints admin retournent 403 si l'utilisateur n'est pas admin
 - Tous les endpoints admin retournent 401 si non authentifié
-

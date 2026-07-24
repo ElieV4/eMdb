@@ -1,12 +1,14 @@
 /**
- * Header global de l’application.
+ * Header global de l'application.
  * Navigation responsive + thème + auth.
+ * Redirige vers /login après déconnexion.
  */
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useLogout } from "@/hooks/auth/useLogout";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,15 @@ import { Menu, X, User, LogOut } from "lucide-react";
 export function Header() {
   const { isAuthenticated, user } = useAuth();
   const logout = useLogout();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Redirect to login after successful logout
+  useEffect(() => {
+    if (logout.isSuccess) {
+      router.push("/login");
+    }
+  }, [logout.isSuccess, router]);
 
   const navLinks = [
     { href: "/", label: "Accueil" },

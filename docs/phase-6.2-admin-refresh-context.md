@@ -3,6 +3,7 @@
 ## État des lieux
 
 ### Ce qui existe déjà (phase 6.2 pré-créée dans worker.ts)
+
 - ✅ Fonction `refreshMaterializedViews()` dans `worker.ts` — boucle sur les 8 vues matérialisées avec `REFRESH MATERIALIZED VIEW CONCURRENTLY`
 - ✅ Job cron BullMQ `refresh-materialized-views` planifié chaque nuit à 4h du matin dans `worker.ts` (`getCronRepeatJobs`)
 - ✅ Worker `createCronWorker` dans `worker.ts` gère déjà ce job
@@ -10,32 +11,35 @@
 
 ### Ce qu'il reste à développer
 
-| Composant | Statut | Description |
-|-----------|--------|-------------|
-| Module `admin` NestJS | ❌ À créer | `admin.module.ts`, `admin.controller.ts` |
-| `POST /admin/refresh-materialized-views` | ❌ À créer | Déclenchement manuel du refresh via BullMQ |
-| Admin guard (rôle admin) | ❌ À créer | Vérification par email fixe dans `ADMIN_EMAILS` (`.env`) |
-| BullMQ queue `dataviz` | ❌ À créer | Nouvelle queue dédiée (ou réutilisation queue cron ?) |
-| Tests | ❌ À créer | Tests unitaires controller + service admin |
+| Composant                                | Statut     | Description                                              |
+| ---------------------------------------- | ---------- | -------------------------------------------------------- |
+| Module `admin` NestJS                    | ❌ À créer | `admin.module.ts`, `admin.controller.ts`                 |
+| `POST /admin/refresh-materialized-views` | ❌ À créer | Déclenchement manuel du refresh via BullMQ               |
+| Admin guard (rôle admin)                 | ❌ À créer | Vérification par email fixe dans `ADMIN_EMAILS` (`.env`) |
+| BullMQ queue `dataviz`                   | ❌ À créer | Nouvelle queue dédiée (ou réutilisation queue cron ?)    |
+| Tests                                    | ❌ À créer | Tests unitaires controller + service admin               |
 
 ## Dépendances
 
 ### Externes
+
 - `@emdb/db` → `refreshMaterializedViews()` déjà dans worker
 - `bullmq` → Queue, Worker, JobScheduler (déjà présent dans `apps/worker`)
 - `auth` → `JwtAuthGuard`, `@CurrentUser()`
 - `PrismaService` → via `@emdb/db`
 
 ### Schéma concerné
+
 Aucun schéma Prisma — les vues matérialisées vivent en SQL pur.
 
 ## Endpoint prévu
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
+| Method | Path                                | Auth        | Description                            |
+| ------ | ----------------------------------- | ----------- | -------------------------------------- |
 | `POST` | `/admin/refresh-materialized-views` | JWT + admin | Déclenchement manuel du refresh BullMQ |
 
 ### Réponse attendue
+
 ```json
 {
   "jobId": "abc-123",
@@ -56,6 +60,7 @@ apps/api/src/admin/
 ```
 
 ### BullMQ
+
 - **Option A** : Queue `dataviz` dédiée + nouveau Worker dans le worker service
 - **Option B** : Réutilisation de la queue `tmdb-cron` existante (le job `refresh-materialized-views` y est déjà défini)
 
@@ -70,6 +75,7 @@ apps/api/src/admin/
 # TODO — Phase 6.2 : Admin Refresh BullMQ
 
 ## Décisions stratégiques
+
 - ✅ **Queue** : Réutilisation de `tmdb-cron` existante (Option B)
 - ✅ **Mécanisme admin** : `ADMIN_EMAILS` en `.env` (Option A)
 - ✅ **Communication** : BullMQ Queue standard depuis l'API (Option C)
@@ -77,6 +83,7 @@ apps/api/src/admin/
 - ✅ **Timeout** : 5 minutes (roadmap)
 
 ## Étapes
+
 - [x] 1. Créer `admin.guard.ts` — Guard vérifiant ADMIN_EMAILS
 - [x] 2. Créer `admin.service.ts` — Service BullMQ (add job to tmdb-cron)
 - [x] 3. Créer `admin.controller.ts` — POST /admin/refresh-materialized-views

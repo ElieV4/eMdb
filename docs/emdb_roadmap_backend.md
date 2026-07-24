@@ -5,6 +5,7 @@ Basé sur `README.md` et sur `db_init_v2.sql` (schéma finalisé, intégrant les
 **Stack retenue** : Node.js + TypeScript + NestJS + **Prisma** + PostgreSQL + Redis + BullMQ.
 
 Répartition Prisma / SQL brut :
+
 - **Prisma** pour ~90% de l'API : tout le CRUD standard (`users`, `titles`, `credits`, `people`, `seasons`, `episodes`, `user_lists`, `notifications`...) → client type-safe généré, migrations gérées via `prisma migrate`.
 - **`prisma.$queryRaw` / `$executeRaw`** pour les ~10% de requêtes lourdes ou spécifiques : appel des fonctions PL/pgSQL (`fn_episodes_non_vus`, `fn_progress_serie`), lecture des vues matérialisées dataviz, `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
 - Le trigger (`trg_user_ratings_updated_at`) et les vues matérialisées vivent en SQL pur dans une migration Prisma "custom" (Prisma permet d'ajouter du SQL brut dans ses fichiers de migration générés, ou via une migration `prisma migrate dev --create-only` éditée à la main).
@@ -25,6 +26,7 @@ Répartition Prisma / SQL brut :
 Base = `db_init_v2.sql` (schéma finalisé). Il intègre déjà : `is_animation`, `next_episode_air_date`, `user_follows_serie`, `tmdb_sync_log`, le trigger `updated_at`, les fonctions PL/pgSQL et les vues matérialisées dataviz.
 
 ### 1.1 Mise en place initiale
+
 - [x] Exécuter `db_init_v2.sql` sur une base Postgres vierge (locale, via docker-compose)
 - [x] `prisma db pull` → génère `schema.prisma` par introspection
 - [x] `prisma generate` → client TS type-safe
@@ -34,20 +36,24 @@ Base = `db_init_v2.sql` (schéma finalisé). Il intègre déjà : `is_animation`
   - `seed_countries.ts` → insère la liste ISO 3166-1 alpha-2 complète
 
 ### 1.2 Gestion des objets "hors Prisma" (triggers, fonctions, vues matérialisées)
+
 - [x] Garder `db_init_v2.sql` comme unique source de vérité pour ces objets
 - [x] Documenter clairement dans le repo (`prisma/README.md`) que `trg_user_ratings_updated_at`, `fn_episodes_non_vus`, `fn_progress_serie` et les 8 `mv_*` sont en SQL pur
 
 ### 1.3 Fonctions PL/pgSQL
+
 - [x] `fn_episodes_non_vus(user_id, title_id) RETURNS INT` — appelée via `prisma.$queryRaw` pour le calendrier
 - [x] `fn_progress_serie(user_id, title_id) RETURNS TABLE(saison, vus, total)` — appelée via `$queryRaw` pour la page série
 
 ### 1.4 Vues matérialisées (dataviz)
+
 - **Vues "watch_time" (durée)** : `mv_watch_time_by_period`, `mv_watch_time_by_genre`, `mv_watch_time_by_country`, `mv_watch_time_by_animation`
 - **Vues "watch_count" (compte)** : `mv_watch_count_by_genre`, `mv_watch_count_by_period`, `mv_watch_count_by_country`, `mv_watch_count_by_animation`
 - [x] Job worker `refreshMaterializedViews()` : `REFRESH MATERIALIZED VIEW CONCURRENTLY mv_xxx` pour chacune, cron nocturne
 - [x] Script `packages/db/scripts/refresh-materialized-views.ts` implémenté et testé
 
 ### 1.5 Contraintes de cohérence à vérifier en tests d'intégration
+
 - [x] `user_ratings` : double `UNIQUE (user_id, title_id)` / `UNIQUE (user_id, episode_id)`
 - [x] `list_items.position` : pas de contrainte d'unicité par liste → gestion applicative
 - [x] `user_follows_serie.chk_follow_is_serie` : validation applicative côté service
@@ -60,6 +66,7 @@ Base = `db_init_v2.sql` (schéma finalisé). Il intègre déjà : `is_animation`
 ## Phase 2 — Intégration API TMDB (détail à la maille fonction)
 
 ### 2.1 Client TMDB (module `tmdb-client`)
+
 - [x] `tmdbClient.ts` : wrapper HTTP (fetch) avec :
   - base URL `https://api.themoviedb.org/3`
   - auth via header `Authorization: Bearer <TMDB_API_KEY>` (v4) ou `api_key` query param (v3)
@@ -72,6 +79,7 @@ Base = `db_init_v2.sql` (schéma finalisé). Il intègre déjà : `is_animation`
 - [x] Erreurs TMDB gérées : 401 (clé invalide), 404 (ne pas retry), 429/5xx (retry)
 
 ### 2.2 Mapping TMDB → modèle interne (module `tmdb-mapper`)
+
 - [x] `mapTmdbMovieToTitle(tmdbMovie): TitleInsert`
 - [x] `mapTmdbTvToTitle(tmdbTv): TitleInsert`
 - [x] `mapTmdbGenres(tmdbGenres): GenreInsert[]`
@@ -84,6 +92,7 @@ Base = `db_init_v2.sql` (schéma finalisé). Il intègre déjà : `is_animation`
 - [x] `mapTmdbPersonExternalIds(tmdbExternalIds): { imdb_id, wikidata_id }`
 
 ### 2.3 Orchestration / import (module `tmdb-sync`, exécuté par le worker)
+
 - [x] `importTitleByTmdbId(tmdbId, type)` — upsert titre + genres + pays + credits + saisons/épisodes + log
 - [x] `importPersonByTmdbId(tmdbId)` — upsert personne + résolution wikidata_id → wiki_url
 - [x] `importSeasonsForSerie(titleId)` — upsert saisons + épisodes pour une série
@@ -96,12 +105,14 @@ Base = `db_init_v2.sql` (schéma finalisé). Il intègre déjà : `is_animation`
 - [x] `bootstrapPersonRecommendationsFromTmdb(personId)` — pré-remplit person_recommendations via TMDB
 
 ### 2.4 File de jobs (BullMQ + Redis)
+
 - [x] Queue `tmdb-import` : jobs `import-title`, `import-seasons`, `refresh-title`
 - [x] Queue `tmdb-cron` : jobs planifiés `daily-sync-new-episodes`, `weekly-resync-changes`, `refresh-materialized-views`
 - [x] Concurrency limitée (ex: 5 jobs parallèles max) pour respecter le rate limit TMDB
 - [ ] Dashboard de monitoring (Bull Board) pour debug en dev
 
 ### 2.5 Gestion des erreurs / robustesse
+
 - [x] Codes d'erreur TMDB gérés explicitement
 - [x] Idempotence via upserts basés sur `tmdb_id` (contrainte UNIQUE)
 - [ ] Tests avec mocks HTTP (nock/msw) sur les réponses TMDB
@@ -120,6 +131,7 @@ Base = `db_init_v2.sql` (schéma finalisé). Il intègre déjà : `is_animation`
 Convention : chaque module NestJS = module / controller / service / dto, connecté à @emdb/db (Prisma) et, quand nécessaire, à tmdb-client / tmdb-sync (Phase 2).
 
 ### 3.0 Socle transverse (préalable à tous les modules)
+
 - [x] Dépendances : class-validator, class-transformer, @nestjs/jwt, @nestjs/passport, passport, passport-jwt, bcrypt
 - [x] `main.ts` : `app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))`
 - [ ] `main.ts` : configurer Swagger (@nestjs/swagger déjà présent — DocumentBuilder + SwaggerModule.setup('/docs', app, document))
@@ -128,6 +140,7 @@ Convention : chaque module NestJS = module / controller / service / dto, connect
 - [ ] DTOs communs : `PaginationDto { page, limit }`, `PaginatedResult<T> { data, total, page, limit }`
 
 ### 3.1 Module auth
+
 - [x] POST /auth/register — RegisterDto { email, password, pseudo } → hash bcrypt, retourne { user, accessToken, refreshToken }
 - [x] POST /auth/login — LoginDto { email, password } → vérifie hash, retourne tokens
 - [x] POST /auth/refresh — RefreshDto { refreshToken } → vérifie signature, émet nouvel access token
@@ -137,6 +150,7 @@ Convention : chaque module NestJS = module / controller / service / dto, connect
 - [x] Décorateur @CurrentUser() pour extraire req.user
 
 ### 3.2 Module users
+
 - [x] GET /users/me — profil complet
 - [x] PATCH /users/me — UpdateProfileDto { pseudo?, avatar_url? }
 - [x] POST /users/me/avatar — upload multer, validation MIME + 5 Mo
@@ -144,6 +158,7 @@ Convention : chaque module NestJS = module / controller / service / dto, connect
 - [x] DELETE /users/me — suppression compte (cascade FK)
 
 ### 3.3 Module titles
+
 - [x] GET /titles/search?q=&type=film|serie — TMDB + fusion locale
 - [x] GET /titles/tmdb/:tmdbId — get or import synchrone
 - [x] GET /titles/:id — détail complet (genres, pays, studios, saisons)
@@ -153,6 +168,7 @@ Convention : chaque module NestJS = module / controller / service / dto, connect
 - [x] DELETE /titles/:id — suppression si orphelin
 
 ### 3.4 Module people
+
 - [x] GET /people/search?q= — TMDB + fusion locale
 - [x] GET /people/tmdb/:tmdbId — get or import
 - [x] GET /people/:id — détail complet (bio, photo, wiki_url, pays)
@@ -162,12 +178,14 @@ Convention : chaque module NestJS = module / controller / service / dto, connect
 - [x] PATCH /people/:id/refresh — refresh TMDB
 
 ### 3.5 Module seasons-episodes
+
 - [x] GET /titles/:titleId/seasons — liste des saisons avec nombre d'épisodes
 - [x] GET /titles/:titleId/seasons/:numero — détail saison + épisodes
 - [x] GET /episodes/:id — détail épisode avec saison parente
 - [x] GET /episodes/:id/credits — credits spécifiques épisode groupés par rôle
 
 ### 3.6 Module credits
+
 - [x] GET /titles/:titleId/credits — cast/crew groupés par rôle
 
 ---
@@ -179,9 +197,10 @@ La Phase 4 implémente les fonctionnalités liées à un utilisateur connecté :
 Découpage en 4 sous-phases indépendantes (ordre recommandé par dépendances croissantes) :
 
 ### 4.1 Module `watches` — user_watches + user_follows_serie + calendrier
-  *Dépend de :* auth, titles, seasons-episodes (Phase 3)
-  *Fonctions PL/pgSQL utilisées :* `fn_progress_serie`, `fn_episodes_non_vus` (appel via `$queryRaw`)
-  *Note :* `user_follows_serie` (suivi de séries) inclus dans ce module plutôt qu'en sous-phase séparée, car le calendrier et la progression en dépendent directement.
+
+_Dépend de :_ auth, titles, seasons-episodes (Phase 3)
+_Fonctions PL/pgSQL utilisées :_ `fn_progress_serie`, `fn_episodes_non_vus` (appel via `$queryRaw`)
+_Note :_ `user_follows_serie` (suivi de séries) inclus dans ce module plutôt qu'en sous-phase séparée, car le calendrier et la progression en dépendent directement.
 
 - [x] `POST /watches` — CreateWatchDto { title_id?, episode_id?, date_vue? } — marquer vu
 - [x] `DELETE /watches/:id` — supprimer un watch
@@ -193,7 +212,8 @@ Découpage en 4 sous-phases indépendantes (ordre recommandé par dépendances c
 - [x] `GET /follows` — liste des séries suivies
 
 ### 4.2 Module `ratings` — user_ratings
-  *Dépend de :* auth, titles
+
+_Dépend de :_ auth, titles
 
 - [x] `PUT /ratings` — UpsertRatingDto { title_id?, episode_id?, note_perso? (0-10), commentaire? }
 - [x] `DELETE /ratings/:id` — supprime une note (vérifie appartenance)
@@ -201,7 +221,8 @@ Découpage en 4 sous-phases indépendantes (ordre recommandé par dépendances c
 - [x] `GET /titles/:id/ratings` — ratings publics d'un titre (moyenne, répartition)
 
 ### 4.3 Module `lists` — user_lists + list_items + list_shares
-  *Dépend de :* auth, users (pour le partage), titles
+
+_Dépend de :_ auth, users (pour le partage), titles
 
 - [x] `POST /lists` — CreateListDto { nom, type (watchlist|favoris|custom), description? }
 - [x] `GET /lists` — liste des listes de l'utilisateur connecté
@@ -217,8 +238,9 @@ Découpage en 4 sous-phases indépendantes (ordre recommandé par dépendances c
 - [x] `GET /shared-lists` — listes partagées avec l'utilisateur connecté
 
 ### 4.4 Module `follows` — user_follows_serie
-  *Dépend de :* auth, titles
-  *Implémentation :* Intégré dans le module `watches` (couplage fort avec calendrier et progression)
+
+_Dépend de :_ auth, titles
+_Implémentation :_ Intégré dans le module `watches` (couplage fort avec calendrier et progression)
 
 - [x] `POST /follows` — FollowSerieDto { title_id } — suivre une série
 - [x] `DELETE /follows/:titleId` — ne plus suivre une série
@@ -231,34 +253,38 @@ Découpage en 4 sous-phases indépendantes (ordre recommandé par dépendances c
 Découpage en 3 sous-phases :
 
 ### 5.1 Algorithme de similarité + script de calcul (`packages/recommender`)
-  *Dépend de :* titles, genres, credits, people (Phase 3), title_recommendations, person_recommendations (schéma)
-  *Status: ✅ Implémenté*
 
-  **Algorithme retenu :** Similarité par Jaccard pondéré :
-  - Genres partagés : poids 0.6 (Jaccard sur title_genres)
-  - Acteurs partagés : poids 0.3 (Jaccard sur credits avec role='acteur', top 10 par ordre)
-  - Réalisateurs partagés : poids 0.1 (Jaccard sur credits avec role='realisateur')
-  - Score final = 0.6 × genre_jaccard + 0.3 × actor_jaccard + 0.1 × director_jaccard
-  - Normalisé entre 0 et 1, stocké dans score DECIMAL(5,4)
+_Dépend de :_ titles, genres, credits, people (Phase 3), title_recommendations, person_recommendations (schéma)
+_Status: ✅ Implémenté_
 
-  - [x] `computeTitleRecommendations()` : calcule les top 10 titres similaires pour chaque titre
-  - [x] `computePersonRecommendations()` : calcule les top 10 personnes similaires pour chaque personne
-  - [x] Script exécutable `packages/recommender/scripts/run-recommendations.ts`
-  - [x] 12/12 tests unitaires passés
+**Algorithme retenu :** Similarité par Jaccard pondéré :
+
+- Genres partagés : poids 0.6 (Jaccard sur title_genres)
+- Acteurs partagés : poids 0.3 (Jaccard sur credits avec role='acteur', top 10 par ordre)
+- Réalisateurs partagés : poids 0.1 (Jaccard sur credits avec role='realisateur')
+- Score final = 0.6 × genre_jaccard + 0.3 × actor_jaccard + 0.1 × director_jaccard
+- Normalisé entre 0 et 1, stocké dans score DECIMAL(5,4)
+
+- [x] `computeTitleRecommendations()` : calcule les top 10 titres similaires pour chaque titre
+- [x] `computePersonRecommendations()` : calcule les top 10 personnes similaires pour chaque personne
+- [x] Script exécutable `packages/recommender/scripts/run-recommendations.ts`
+- [x] 12/12 tests unitaires passés
 
 ### 5.2 Module API + intégration worker
-  *Dépend de :* Phase 5.1 (algorithme), auth, admin
 
-  - [x] Endpoint `POST /admin/compute-recommendations` — déclenchement manuel
-  - [x] BullMQ : Queue `recommendations` avec job `compute-recommendations`
-  - [x] Cron mensuel : job planifié `compute-recommendations-cron` (1er du mois à 03:00)
-  - [x] Module API `recommender` dans NestJS (3 endpoints)
+_Dépend de :_ Phase 5.1 (algorithme), auth, admin
+
+- [x] Endpoint `POST /admin/compute-recommendations` — déclenchement manuel
+- [x] BullMQ : Queue `recommendations` avec job `compute-recommendations`
+- [x] Cron mensuel : job planifié `compute-recommendations-cron` (1er du mois à 03:00)
+- [x] Module API `recommender` dans NestJS (3 endpoints)
 
 ### 5.3 Fallback TMDB pour person_recommendations
-  *Dépend de :* Phase 2.3 (tmdb-sync), Phase 5.1 (algorithme maison)
 
-  - [x] `bootstrapPersonRecommendationsFromTmdb(personId)` — symétrique de `bootstrapRecommendationsFromTmdb` pour les titres
-  - [x] Fallback dans `GET /people/:id/recommendations` : si `person_recommendations` est vide, appeler TMDB
+_Dépend de :_ Phase 2.3 (tmdb-sync), Phase 5.1 (algorithme maison)
+
+- [x] `bootstrapPersonRecommendationsFromTmdb(personId)` — symétrique de `bootstrapRecommendationsFromTmdb` pour les titres
+- [x] Fallback dans `GET /people/:id/recommendations` : si `person_recommendations` est vide, appeler TMDB
 
 ---
 
@@ -267,13 +293,15 @@ Découpage en 3 sous-phases :
 Découpage en 2 sous-phases :
 
 ### 6.1 Module API `dataviz` — endpoints NestJS
-*Dépend de :* Phase 1.4 (vues matérialisées + wrappers dans `packages/db/src/functions.ts`), auth (JWT)
+
+_Dépend de :_ Phase 1.4 (vues matérialisées + wrappers dans `packages/db/src/functions.ts`), auth (JWT)
 
 - [x] `GET /dataviz/watch-time?groupBy=genre|period|country|animation&yearFrom=&yearTo=`
 - [x] `GET /dataviz/watch-count?groupBy=genre|period|country|animation&yearFrom=&yearTo=`
 
 ### 6.2 Endpoint admin + refresh BullMQ
-*Dépend de :* Phase 6.1 (module API), Phase 2.4 (BullMQ), Phase 1.4 (refresh script)
+
+_Dépend de :_ Phase 6.1 (module API), Phase 2.4 (BullMQ), Phase 1.4 (refresh script)
 
 - [x] `POST /admin/refresh-materialized-views` — déclenchement manuel du refresh
 - [x] Cron nocturne (BullMQ) : job planifié chaque nuit à 3h
@@ -288,246 +316,265 @@ La Phase 7 implémente le système de notifications utilisateur : génération a
 Découpage en 3 sous-phases (ordre recommandé par dépendances croissantes) :
 
 ### 7.1 Module API `notifications` — endpoints NestJS
-  *Dépend de :* auth (JWT), Phase 1 (table `notifications` dans le schéma Prisma)
-  *Status: ❌ À implémenter*
 
-  **Contexte :** La table `notifications` existe déjà dans le schéma Prisma (modèle `notifications` avec `id`, `user_id`, `episode_id?`, `type`, `lu`, `created_at`). Le delegate `prisma.notifications` est déjà exposé dans `PrismaService`. Il manque le module NestJS et les endpoints API.
+_Dépend de :_ auth (JWT), Phase 1 (table `notifications` dans le schéma Prisma)
+_Status: ❌ À implémenter_
 
-  **Endpoints :**
+**Contexte :** La table `notifications` existe déjà dans le schéma Prisma (modèle `notifications` avec `id`, `user_id`, `episode_id?`, `type`, `lu`, `created_at`). Le delegate `prisma.notifications` est déjà exposé dans `PrismaService`. Il manque le module NestJS et les endpoints API.
 
-  | Method | Path | Auth | DTO | Description |
-  |--------|------|------|-----|-------------|
-  | `GET` | `/notifications` | ✅ JWT | `ListNotificationsFilterDto` | Liste des notifications (non lues en priorité, paginée) |
-  | `PATCH` | `/notifications/:id/read` | ✅ JWT | — | Marquer une notification comme lue |
-  | `PATCH` | `/notifications/read-all` | ✅ JWT | — | Marquer toutes les notifications comme lues |
-  | `GET` | `/notifications/unread-count` | ✅ JWT | — | Compteur de non lues |
+**Endpoints :**
 
-  **DTOs :**
-  ```typescript
-  // ListNotificationsFilterDto (extends PaginationDto)
-  class ListNotificationsFilterDto {
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    @Min(1)
-    page?: number = 1;
+| Method  | Path                          | Auth   | DTO                          | Description                                             |
+| ------- | ----------------------------- | ------ | ---------------------------- | ------------------------------------------------------- |
+| `GET`   | `/notifications`              | ✅ JWT | `ListNotificationsFilterDto` | Liste des notifications (non lues en priorité, paginée) |
+| `PATCH` | `/notifications/:id/read`     | ✅ JWT | —                            | Marquer une notification comme lue                      |
+| `PATCH` | `/notifications/read-all`     | ✅ JWT | —                            | Marquer toutes les notifications comme lues             |
+| `GET`   | `/notifications/unread-count` | ✅ JWT | —                            | Compteur de non lues                                    |
 
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    @Min(1)
-    @Max(100)
-    limit?: number = 20;
-  }
-  ```
+**DTOs :**
 
-  **Fonctions NotificationsService :**
-  ```typescript
-  class NotificationsService {
-    listNotifications(userId: string, filters: ListNotificationsFilterDto): Promise<PaginatedNotifications>
-    markAsRead(notificationId: string, userId: string): Promise<void>
-    markAllAsRead(userId: string): Promise<void>
-    getUnreadCount(userId: string): Promise<number>
-  }
-  ```
+```typescript
+// ListNotificationsFilterDto (extends PaginationDto)
+class ListNotificationsFilterDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
 
-  **Types de retour :**
-  ```typescript
-  interface PaginatedNotifications {
-    data: Array<{
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+}
+```
+
+**Fonctions NotificationsService :**
+
+```typescript
+class NotificationsService {
+  listNotifications(
+    userId: string,
+    filters: ListNotificationsFilterDto,
+  ): Promise<PaginatedNotifications>;
+  markAsRead(notificationId: string, userId: string): Promise<void>;
+  markAllAsRead(userId: string): Promise<void>;
+  getUnreadCount(userId: string): Promise<number>;
+}
+```
+
+**Types de retour :**
+
+```typescript
+interface PaginatedNotifications {
+  data: Array<{
+    id: string;
+    type: string;
+    lu: boolean;
+    created_at: Date;
+    episode?: {
       id: string;
-      type: string;
-      lu: boolean;
-      created_at: Date;
-      episode?: {
-        id: string;
-        numero: number;
-        titre: string | null;
-        season?: { numero: number };
-        titles?: { id: string; titre_vo: string; affiche_url: string | null };
-      };
-    }>;
-    total: number;
-    page: number;
-    limit: number;
-  }
-  ```
+      numero: number;
+      titre: string | null;
+      season?: { numero: number };
+      titles?: { id: string; titre_vo: string; affiche_url: string | null };
+    };
+  }>;
+  total: number;
+  page: number;
+  limit: number;
+}
+```
 
-  **Structure :**
-  ```
-  apps/api/src/notifications/
-  ├── notifications.module.ts
-  ├── notifications.controller.ts
-  ├── notifications.service.ts
-  ├── dto/
-  │   └── list-notifications-filter.dto.ts
-  └── notifications.service.spec.ts
-  ```
+**Structure :**
 
-  **Tests :**
-  - `listNotifications` : retourne la liste paginée, triée par non lues en priorité
-  - `listNotifications` : retourne un tableau vide si aucune notification
-  - `markAsRead` : marque une notification comme lue
-  - `markAsRead` : lève NotFound si la notification n'existe pas
-  - `markAsRead` : lève Forbidden si la notification appartient à un autre user
-  - `markAllAsRead` : marque toutes les notifications de l'utilisateur comme lues
-  - `getUnreadCount` : retourne le nombre de notifications non lues
+```
+apps/api/src/notifications/
+├── notifications.module.ts
+├── notifications.controller.ts
+├── notifications.service.ts
+├── dto/
+│   └── list-notifications-filter.dto.ts
+└── notifications.service.spec.ts
+```
+
+**Tests :**
+
+- `listNotifications` : retourne la liste paginée, triée par non lues en priorité
+- `listNotifications` : retourne un tableau vide si aucune notification
+- `markAsRead` : marque une notification comme lue
+- `markAsRead` : lève NotFound si la notification n'existe pas
+- `markAsRead` : lève Forbidden si la notification appartient à un autre user
+- `markAllAsRead` : marque toutes les notifications de l'utilisateur comme lues
+- `getUnreadCount` : retourne le nombre de notifications non lues
 
 ---
 
 ### 7.2 Génération des notifications (worker + tmdb-sync)
-  *Dépend de :* Phase 7.1 (module API), Phase 2.3 (tmdb-sync), Phase 4.1 (watches/follows)
-  *Status: ✅ Implémenté*
 
-  **Contexte :** La fonction `dailySyncNewEpisodes()` existe déjà dans `packages/tmdb-sync/src/index.ts` et rafraîchit les titres en cours. Elle doit être enrichie pour créer des notifications dans la table `notifications` lorsqu'un nouvel épisode est détecté.
+_Dépend de :_ Phase 7.1 (module API), Phase 2.3 (tmdb-sync), Phase 4.1 (watches/follows)
+_Status: ✅ Implémenté_
 
-  **Algorithme de génération :**
+**Contexte :** La fonction `dailySyncNewEpisodes()` existe déjà dans `packages/tmdb-sync/src/index.ts` et rafraîchit les titres en cours. Elle doit être enrichie pour créer des notifications dans la table `notifications` lorsqu'un nouvel épisode est détecté.
 
-  ```typescript
-  async function generateNewEpisodeNotifications(): Promise<number> {
-    // 1. Récupérer tous les titres de type 'serie' avec next_episode_air_date <= aujourd'hui
-    //    et dont le statut est 'en_cours' ou 'retourne'
-    const series = await prisma.titles.findMany({
-      where: {
-        type: 'serie',
-        statut_serie: { in: ['en_cours', 'retourne'] },
-        next_episode_air_date: { lte: new Date() },
-      },
-      select: { id: true, titre_vo: true },
+**Algorithme de génération :**
+
+```typescript
+async function generateNewEpisodeNotifications(): Promise<number> {
+  // 1. Récupérer tous les titres de type 'serie' avec next_episode_air_date <= aujourd'hui
+  //    et dont le statut est 'en_cours' ou 'retourne'
+  const series = await prisma.titles.findMany({
+    where: {
+      type: 'serie',
+      statut_serie: { in: ['en_cours', 'retourne'] },
+      next_episode_air_date: { lte: new Date() },
+    },
+    select: { id: true, titre_vo: true },
+  });
+
+  let totalNotifications = 0;
+
+  for (const serie of series) {
+    // 2. Pour chaque série, trouver les utilisateurs qui la suivent
+    const followers = await prisma.user_follows_serie.findMany({
+      where: { title_id: serie.id },
+      select: { user_id: true },
     });
 
-    let totalNotifications = 0;
+    if (followers.length === 0) continue;
 
-    for (const serie of series) {
-      // 2. Pour chaque série, trouver les utilisateurs qui la suivent
-      const followers = await prisma.user_follows_serie.findMany({
-        where: { title_id: serie.id },
-        select: { user_id: true },
-      });
+    // 3. Trouver le dernier épisode non encore notifié
+    //    (on vérifie qu'une notification n'existe pas déjà pour cet épisode)
+    const latestEpisode = await prisma.episodes.findFirst({
+      where: {
+        season: { title_id: serie.id },
+        date_sortie: { lte: new Date() },
+      },
+      orderBy: { date_sortie: 'desc' },
+      select: { id: true, numero: true, titre: true },
+    });
 
-      if (followers.length === 0) continue;
+    if (!latestEpisode) continue;
 
-      // 3. Trouver le dernier épisode non encore notifié
-      //    (on vérifie qu'une notification n'existe pas déjà pour cet épisode)
-      const latestEpisode = await prisma.episodes.findFirst({
-        where: {
-          season: { title_id: serie.id },
-          date_sortie: { lte: new Date() },
-        },
-        orderBy: { date_sortie: 'desc' },
-        select: { id: true, numero: true, titre: true },
-      });
-
-      if (!latestEpisode) continue;
-
-      // 4. Vérifier si une notification existe déjà pour cet épisode
-      const existingNotif = await prisma.notifications.findFirst({
-        where: {
-          episode_id: latestEpisode.id,
-          type: 'new_episode',
-        },
-      });
-
-      if (existingNotif) continue; // Déjà notifié
-
-      // 5. Créer une notification pour chaque follower
-      const notifications = followers.map((f) => ({
-        user_id: f.user_id,
+    // 4. Vérifier si une notification existe déjà pour cet épisode
+    const existingNotif = await prisma.notifications.findFirst({
+      where: {
         episode_id: latestEpisode.id,
         type: 'new_episode',
-        lu: false,
-      }));
+      },
+    });
 
-      await prisma.notifications.createMany({ data: notifications });
-      totalNotifications += notifications.length;
-    }
+    if (existingNotif) continue; // Déjà notifié
 
-    return totalNotifications;
+    // 5. Créer une notification pour chaque follower
+    const notifications = followers.map((f) => ({
+      user_id: f.user_id,
+      episode_id: latestEpisode.id,
+      type: 'new_episode',
+      lu: false,
+    }));
+
+    await prisma.notifications.createMany({ data: notifications });
+    totalNotifications += notifications.length;
   }
-  ```
 
-  **Intégration dans le worker :**
-  - La fonction `dailySyncNewEpisodes()` dans `packages/tmdb-sync` doit être enrichie pour appeler `generateNewEpisodeNotifications()` après le refresh des titres
-  - Le job `daily-sync-new-episodes` dans `apps/worker/src/worker.ts` doit être mis à jour pour inclure la génération de notifications
-  - Un nouveau job `generate-notifications` peut être ajouté à la queue `tmdb-cron` pour une exécution séparée (recommandé)
+  return totalNotifications;
+}
+```
 
-  **Types de notifications :**
-  | Type | Déclencheur | Contenu |
-  |------|-------------|---------|
-  | `new_episode` | Nouvel épisode d'une série suivie | "Nouvel épisode de [Série] : S[XX]E[YY] - [Titre]" |
-  | `season_premiere` | Première d'une nouvelle saison | "La saison [N] de [Série] est disponible" |
-  | `series_return` | Retour d'une série en pause | "[Série] est de retour ! Nouvel épisode disponible" |
+**Intégration dans le worker :**
 
-  **Fichiers modifiés :**
-  - `packages/tmdb-sync/src/index.ts` — Ajout de `generateNewEpisodeNotifications()`
-  - `apps/worker/src/worker.ts` — Intégration dans le job `daily-sync-new-episodes`
-  - `packages/tmdb-sync/src/index.spec.ts` — Tests de la génération
+- La fonction `dailySyncNewEpisodes()` dans `packages/tmdb-sync` doit être enrichie pour appeler `generateNewEpisodeNotifications()` après le refresh des titres
+- Le job `daily-sync-new-episodes` dans `apps/worker/src/worker.ts` doit être mis à jour pour inclure la génération de notifications
+- Un nouveau job `generate-notifications` peut être ajouté à la queue `tmdb-cron` pour une exécution séparée (recommandé)
 
-  **Tests :**
-  - `generateNewEpisodeNotifications` : crée des notifications pour les followers
-  - `generateNewEpisodeNotifications` : ne crée pas de doublon (vérification existante)
-  - `generateNewEpisodeNotifications` : ignore les séries sans followers
-  - `generateNewEpisodeNotifications` : ignore les séries sans nouvel épisode
-  - `dailySyncNewEpisodes` : intègre la génération de notifications après le refresh
+**Types de notifications :**
+
+| Type              | Déclencheur                       | Contenu                                             |
+| ----------------- | --------------------------------- | --------------------------------------------------- |
+| `new_episode`     | Nouvel épisode d'une série suivie | "Nouvel épisode de [Série] : S[XX]E[YY] - [Titre]"  |
+| `season_premiere` | Première d'une nouvelle saison    | "La saison [N] de [Série] est disponible"           |
+| `series_return`   | Retour d'une série en pause       | "[Série] est de retour ! Nouvel épisode disponible" |
+
+**Fichiers modifiés :**
+
+- `packages/tmdb-sync/src/index.ts` — Ajout de `generateNewEpisodeNotifications()`
+- `apps/worker/src/worker.ts` — Intégration dans le job `daily-sync-new-episodes`
+- `packages/tmdb-sync/src/index.spec.ts` — Tests de la génération
+
+**Tests :**
+
+- `generateNewEpisodeNotifications` : crée des notifications pour les followers
+- `generateNewEpisodeNotifications` : ne crée pas de doublon (vérification existante)
+- `generateNewEpisodeNotifications` : ignore les séries sans followers
+- `generateNewEpisodeNotifications` : ignore les séries sans nouvel épisode
+- `dailySyncNewEpisodes` : intègre la génération de notifications après le refresh
 
 ---
 
 ### 7.3 Nettoyage et maintenance des notifications
-  *Dépend de :* Phase 7.1 (module API), Phase 7.2 (génération)
-  *Status: ✅ Implémenté*
 
-  **Contexte :** Les notifications s'accumulent dans la table `notifications`. Sans nettoyage, la table peut devenir volumineuse. Un job de maintenance périodique est nécessaire.
+_Dépend de :_ Phase 7.1 (module API), Phase 7.2 (génération)
+_Status: ✅ Implémenté_
 
-  **Fonctionnalités :**
+**Contexte :** Les notifications s'accumulent dans la table `notifications`. Sans nettoyage, la table peut devenir volumineuse. Un job de maintenance périodique est nécessaire.
 
-  - **Cron hebdomadaire** : suppression des notifications lues de plus de 30 jours
-    ```typescript
-    async function cleanOldNotifications(): Promise<number> {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 30);
+**Fonctionnalités :**
 
-      const result = await prisma.notifications.deleteMany({
-        where: {
-          lu: true,
-          created_at: { lt: cutoff },
-        },
-      });
+- **Cron hebdomadaire** : suppression des notifications lues de plus de 30 jours
 
-      return result.count;
-    }
-    ```
+  ```typescript
+  async function cleanOldNotifications(): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
 
-  - **Cron mensuel** : suppression des notifications non lues de plus de 90 jours (obsolètes)
-    ```typescript
-    async function cleanStaleNotifications(): Promise<number> {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 90);
+    const result = await prisma.notifications.deleteMany({
+      where: {
+        lu: true,
+        created_at: { lt: cutoff },
+      },
+    });
 
-      const result = await prisma.notifications.deleteMany({
-        where: {
-          lu: false,
-          created_at: { lt: cutoff },
-        },
-      });
+    return result.count;
+  }
+  ```
 
-      return result.count;
-    }
-    ```
+- **Cron mensuel** : suppression des notifications non lues de plus de 90 jours (obsolètes)
 
-  - **Job BullMQ** : `clean-notifications` dans la queue `tmdb-cron`
-    - Exécution hebdomadaire (nettoyage) + mensuelle (obsolètes)
-    - Log : nombre de notifications supprimées
+  ```typescript
+  async function cleanStaleNotifications(): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 90);
 
-  **Fichiers modifiés :**
-  - `apps/worker/src/worker.ts` — Ajout du job `clean-notifications`, des fonctions `cleanOldNotifications` et `cleanStaleNotifications`, et de la planification cron
-  - `apps/worker/src/worker.spec.ts` — Tests du job de nettoyage
-  - `docs/emdb_roadmap_backend.md` — Statut Phase 7.3 marqué comme implémenté
+    const result = await prisma.notifications.deleteMany({
+      where: {
+        lu: false,
+        created_at: { lt: cutoff },
+      },
+    });
 
-  **Tests :**
-  - `cleanOldNotifications` : supprime les notifications lues de plus de 30 jours
-  - `cleanOldNotifications` : ne supprime pas les notifications récentes
-  - `cleanStaleNotifications` : supprime les notifications non lues de plus de 90 jours
-  - `cleanStaleNotifications` : ne supprime pas les notifications récentes non lues
+    return result.count;
+  }
+  ```
+
+- **Job BullMQ** : `clean-notifications` dans la queue `tmdb-cron`
+  - Exécution hebdomadaire (nettoyage) + mensuelle (obsolètes)
+  - Log : nombre de notifications supprimées
+
+**Fichiers modifiés :**
+
+- `apps/worker/src/worker.ts` — Ajout du job `clean-notifications`, des fonctions `cleanOldNotifications` et `cleanStaleNotifications`, et de la planification cron
+- `apps/worker/src/worker.spec.ts` — Tests du job de nettoyage
+- `docs/emdb_roadmap_backend.md` — Statut Phase 7.3 marqué comme implémenté
+
+**Tests :**
+
+- `cleanOldNotifications` : supprime les notifications lues de plus de 30 jours
+- `cleanOldNotifications` : ne supprime pas les notifications récentes
+- `cleanStaleNotifications` : supprime les notifications non lues de plus de 90 jours
+- `cleanStaleNotifications` : ne supprime pas les notifications récentes non lues
 
 ---
 
@@ -557,11 +604,13 @@ Fichiers de référence : `db_init_v3.sql` (schéma complet avec 8 vues matéria
 ## 📊 Résumé des modifications apportées
 
 ### Phase 7 — Notifications (Complétée)
+
 - **7.1** : Module API NestJS `notifications` (4 endpoints)
 - **7.2** : Génération automatique dans le worker + tmdb-sync
 - **7.3** : Nettoyage et maintenance (cron hebdomadaire/mensuel)
 
 ### Phases antérieures (complétées)
+
 - **Phase 0** : Socle technique ✅
 - **Phase 1** : Base de données (schéma + MV + fonctions) ✅
 - **Phase 2** : Intégration TMDB (client + mapping + sync) ✅
@@ -572,4 +621,4 @@ Fichiers de référence : `db_init_v3.sql` (schéma complet avec 8 vues matéria
 
 ---
 
-*Dernière mise à jour : 24 juillet 2026*
+_Dernière mise à jour : 24 juillet 2026_

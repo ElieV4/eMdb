@@ -7,12 +7,15 @@
 ## 1. Palette de couleurs
 
 ### Question
+
 Quelle palette exacte utiliser pour le thème sombre et light, au-delà de la couleur primaire rouge ?
 
 ### État actuel
+
 La roadmap mentionne "Couleurs personnalisées (primary, secondary, accent)" mais sans définition précise.
 
 ### Recommandation (basée sur Trakt.tv,Adaptée)
+
 - **Primary** : Rouge eMDB `#e50914` (Trakt.tv utilise `#ed1f24` ou proche violet → on garde le rouge)
 - **Secondary** : Gris bleuté `#2a2a2a` (dark) / `#f5f5f5` (light)
 - **Accent** : Jaune/or pour les ratings `#ffc107` (étoiles Dorées)
@@ -32,12 +35,15 @@ La roadmap mentionne "Couleurs personnalisées (primary, secondary, accent)" mai
 ## 2. Typographie
 
 ### Question
+
 Quelle font stack et quelle échelle typographique utiliser ?
 
 ### État actuel
+
 Non spécifié dans la roadmap.
 
 ### Recommandation (basée sur Trakt.tv)
+
 - **Font principale** : Inter (Google Fonts) — moderne, lisible, excellente pour les data
 - **Font secondaire** : system-ui (fallback)
 - **Font mono** : JetBrains Mono (pour les données, ratings)
@@ -58,12 +64,15 @@ Non spécifié dans la roadmap.
 ## 3. Système de spacing
 
 ### Question
+
 Quelle base de spacing utiliser pour les paddings, margins, gaps ?
 
 ### État actuel
+
 Non spécifié.
 
 ### Recommandation (basée sur Trakt.tv)
+
 - **Base** : 4px
 - **Échelle** : 4, 8, 12, 16, 20, 24, 32, 40, 48, 64
 - **Usage** :
@@ -79,12 +88,15 @@ Non spécifié.
 ## 4. Border radius & Elevations
 
 ### Question
+
 Quelle philosophie de coins arrondis et d'ombres ?
 
 ### État actuel
+
 Non spécifié.
 
 ### Recommandation (basée sur Trakt.tv)
+
 - **Border radius** :
   - `rounded-sm` : 2px
   - `rounded-md` : 6px
@@ -104,14 +116,17 @@ Non spécifié.
 ## 5. Design du système de notation (ratings 0-10)
 
 ### Question
+
 Comment afficher les étoiles/numerals pour les ratings 0-10 avec demi-étoiles ?
 
 ### État actuel
+
 La roadmap prévoit `RatingInput.tsx` avec "étoiles 0-10, demi-étoiles" mais sans direction visuelle.
 
 ### Recommandation (basée sur Trakt.tv + IMDB)
+
 - **Affichage public** : Numéral `8.5/10` en texte + petite barre visuelle (optionnel)
-- **Input utilisateur** : 
+- **Input utilisateur** :
   - 5 étoiles pleines = 10 points → chaque étoile = 2 points
   - Click gauche = +1, click droit = -1 (ou toggle 0.5)
   - Hover : preview de la note
@@ -129,12 +144,15 @@ La roadmap prévoit `RatingInput.tsx` avec "étoiles 0-10, demi-étoiles" mais s
 ## 6. Watch Button & États visuels
 
 ### Question
+
 Comment représenter visuellement les états "vu / non-vu / en cours" ?
 
 ### État actuel
+
 Les endpoints existent (`POST /watches`, `DELETE /watches/:id`) mais le design n'est pas défini.
 
 ### Recommandation (basée sur Trakt.tv)
+
 - **Bouton "Marquer comme vu"** :
   - Défaut : outline_button avec icône œeil + "Marquer comme vu"
   - Actif (vu) : filled_button vert avec icône check + "Vu"
@@ -153,12 +171,15 @@ Les endpoints existent (`POST /watches`, `DELETE /watches/:id`) mais le design n
 ## 7. Cards & Layout
 
 ### Question
+
 Quel style pour les cards titre/personne et la grid layout ?
 
 ### État actuel
+
 `TitleCard`, `PersonCard` sont prévus mais sans spécification visuelle.
 
 ### Recommandation (basée sur Trakt.tv)
+
 - **TitleCard** :
   - Affiche 2:3 (poster mode) avec border-radius 6px
   - Hover : zoom léger (scale 1.05) + ombre portée
@@ -183,16 +204,19 @@ Quel style pour les cards titre/personne et la grid layout ?
 ## 8. Animations & micro-interactions
 
 ### Question
+
 Quelles animations utiliser pour les transitions, loaders, toasts ?
 
 ### État actuel
+
 La roadmap mentionne Framer Motion mais pas les cas d'usage précis.
 
 ### Recommandation (basée sur Trakt.tv)
+
 - **Transitions de page** : Fade in/out (200ms)
 - **Modals/Dialogs** : Slide up + fade (300ms)
 - **Cards hover** : Scale 1.03 + shadow (200ms)
-- **Buttons** : 
+- **Buttons** :
   - Hover : background darken 10% (100ms)
   - Active : scale 0.98 (50ms)
 - **Loaders** :
@@ -208,12 +232,15 @@ La roadmap mentionne Framer Motion mais pas les cas d'usage précis.
 ## 9. Empty states & Illustrations
 
 ### Question
+
 Comment afficher les listes vides (pas de watchlist, pas de résultats) ?
 
 ### État actuel
+
 Non spécifié.
 
 ### Recommandation (basée sur Trakt.tv)
+
 - **Style** : Illustration SVG simple + texte + CTA
 - **Exemples** :
   - Watchlist vide : "Votre watchlist est vide" + bouton "Explorer les films"
@@ -228,12 +255,15 @@ Non spécifié.
 ## 10. Responsive breakpoints
 
 ### Question
+
 Quels breakpoints utiliser pour le responsive design ?
 
 ### État actuel
+
 Non spécifié.
 
 ### Recommandation (basée sur Tailwind + Trakt.tv)
+
 - **Mobile** : < 640px (sm) — 1 colonne, menu hamburger
 - **Tablet** : 640px - 1024px (md/lg) — 2-3 colonnes
 - **Desktop** : > 1024px (lg) — 4-6 colonnes, sidebar visible
@@ -246,12 +276,15 @@ Non spécifié.
 ## 11. Dark mode & Thème
 
 ### Question
+
 Comment gérer le dark/light mode ? Default ? Persistance ?
 
 ### État actuel
+
 La roadmap mentionne "Thème sombre/light avec class strategy" et "Dark mode toggle (persistant dans le store)".
 
 ### Recommandation (basée sur Trakt.tv)
+
 - **Default** : Dark mode par défaut (cohérent avec Trakt.tv et l'univers cinéma)
 - **Persistance** : localStorage + Zustand store
 - **Toggle** : Dans le header, icône lune/soleil
@@ -265,12 +298,15 @@ La roadmap mentionne "Thème sombre/light avec class strategy" et "Dark mode tog
 ## 12. Wording & Ton de la voix
 
 ### Question
+
 Quel ton utiliser pour les labels, messages d'erreur, tooltips ?
 
 ### État actuel
+
 Non spécifié.
 
 ### Recommandation (basée sur Trakt.tv, français)
+
 - **Ton** : Neutre, concis, informatif
 - **Forme** : Tutoiement ("Votre watchlist", "Connectez-vous")
 - **Exemples** :
@@ -279,7 +315,7 @@ Non spécifié.
   - "Notifications" (pas "Alertes")
   - "Supprimer" (pas "Éliminer")
   - "Créer une liste" (pas "Nouvelle liste")
-- **Messages d'erreur** : 
+- **Messages d'erreur** :
   - "Email ou mot de passe incorrect"
   - "Cette liste n'existe pas"
   - "Vous n'avez pas les droits"
@@ -292,13 +328,16 @@ Non spécifié.
 ## 13. Accessibilité visuelle
 
 ### Question
+
 Quels standards d'accessibilité visuelle appliquer ?
 
 ### État actuel
+
 La roadmap mentionne "Contrast ratio ≥ 4.5:1" mais pas les autres détails.
 
 ### Recommandation (basée sur WCAG 2.1 AA)
-- **Contrastes** : 
+
+- **Contrastes** :
   - Texte normal : ≥ 4.5:1
   - Texte large (≥18px) : ≥ 3:1
 - **Focus visible** : Ring 2px solid primary sur tous les éléments interactifs
@@ -313,21 +352,21 @@ La roadmap mentionne "Contrast ratio ≥ 4.5:1" mais pas les autres détails.
 
 ## Résumé des points à trancher
 
-| # | Point de design | Priorité | Décision recommandée |
-|---|---|---|---|
-| 1 | Palette couleurs complète | 🔴 Haute | Basée sur Trakt.tv, primary rouge `#e50914` |
-| 2 | Typographie | 🔴 Haute | Inter, échelle Tailwind |
-| 3 | Spacing system | 🟡 Moyenne | Base 4px, échelle 4-64 |
-| 4 | Border radius & shadows | 🟡 Moyenne | Coins arrondis (6-8px), pas de shadow sur dark |
-| 5 | Ratings 0-10 | 🔴 Haute | 5 étoiles pleines = 10, demi-étoiles SVG |
-| 6 | Watch button & états | 🔴 Haute | Bouton filled vert + check overlay |
-| 7 | Cards & layout | 🔴 Haute | Poster 2:3, grid 5-6 colonnes desktop |
-| 8 | Animations | 🟡 Moyenne | Framer Motion, durées 200-300ms |
-| 9 | Empty states | 🟢 Basse | Illustrations SVG + CTA |
-| 10 | Responsive breakpoints | 🟡 Moyenne | Standard Tailwind (sm/md/lg/xl) |
-| 11 | Dark mode | 🔴 Haute | Dark par défaut, toggle dans header |
-| 12 | Wording & ton | 🟡 Moyenne | Tutoiement, neutre, concis |
-| 13 | Accessibilité | 🔴 Haute | WCAG 2.1 AA minimum |
+| #   | Point de design           | Priorité   | Décision recommandée                           |
+| --- | ------------------------- | ---------- | ---------------------------------------------- |
+| 1   | Palette couleurs complète | 🔴 Haute   | Basée sur Trakt.tv, primary rouge `#e50914`    |
+| 2   | Typographie               | 🔴 Haute   | Inter, échelle Tailwind                        |
+| 3   | Spacing system            | 🟡 Moyenne | Base 4px, échelle 4-64                         |
+| 4   | Border radius & shadows   | 🟡 Moyenne | Coins arrondis (6-8px), pas de shadow sur dark |
+| 5   | Ratings 0-10              | 🔴 Haute   | 5 étoiles pleines = 10, demi-étoiles SVG       |
+| 6   | Watch button & états      | 🔴 Haute   | Bouton filled vert + check overlay             |
+| 7   | Cards & layout            | 🔴 Haute   | Poster 2:3, grid 5-6 colonnes desktop          |
+| 8   | Animations                | 🟡 Moyenne | Framer Motion, durées 200-300ms                |
+| 9   | Empty states              | 🟢 Basse   | Illustrations SVG + CTA                        |
+| 10  | Responsive breakpoints    | 🟡 Moyenne | Standard Tailwind (sm/md/lg/xl)                |
+| 11  | Dark mode                 | 🔴 Haute   | Dark par défaut, toggle dans header            |
+| 12  | Wording & ton             | 🟡 Moyenne | Tutoiement, neutre, concis                     |
+| 13  | Accessibilité             | 🔴 Haute   | WCAG 2.1 AA minimum                            |
 
 ---
 
@@ -340,4 +379,4 @@ La roadmap mentionne "Contrast ratio ≥ 4.5:1" mais pas les autres détails.
 
 ---
 
-*Dernière mise à jour : 24 juillet 2026*
+_Dernière mise à jour : 24 juillet 2026_

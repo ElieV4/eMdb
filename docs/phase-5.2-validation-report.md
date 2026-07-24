@@ -9,6 +9,7 @@ La Phase 5.2 a été validée avec succès. Le projet compile, tous les tests pa
 ## Fichiers créés
 
 ### API (`apps/api/src/recommender/`)
+
 - `recommender.module.ts` — Module NestJS (importe AdminModule, PrismaModule)
 - `recommender.controller.ts` — 3 endpoints admin
 - `recommender.service.ts` — Logique métier BullMQ + stats Prisma
@@ -18,6 +19,7 @@ La Phase 5.2 a été validée avec succès. Le projet compile, tous les tests pa
 - `recommender.service.spec.ts` — Tests unitaires (4 tests)
 
 ### Worker (`apps/worker/src/`)
+
 - `recommendations.worker.ts` — Worker BullMQ pour calcul recommandations
 - `cron.ts` — Planification mensuelle via QueueScheduler
 
@@ -44,10 +46,12 @@ La Phase 5.2 a été validée avec succès. Le projet compile, tous les tests pa
 ## Dépendances ajoutées
 
 ### apps/api
+
 - `@nestjs/bullmq` ^10.x
 - `bullmq` ^5.x
 
 ### apps/worker
+
 - `@nestjs/bullmq` ^10.x
 - `bullmq` ^5.x
 - `ioredis` ^5.x
@@ -58,9 +62,11 @@ La Phase 5.2 a été validée avec succès. Le projet compile, tous les tests pa
 ## Tests exécutés et résultats
 
 ### Build
+
 - `npm run build` — ✅ Succès (tous les workspaces)
 
 ### Tests unitaires
+
 - `@emdb/api` — 16 suites, 167 tests passés ✅
 - `@emdb/worker` — 2 suites, 3 tests passés ✅
 - `@emdb/recommender` — 1 suite, 12 tests passés ✅
@@ -70,6 +76,7 @@ La Phase 5.2 a été validée avec succès. Le projet compile, tous les tests pa
 - `@emdb/wikidata-client` — 1 suite, 1 test passé ✅
 
 ### Lint
+
 - ESLint — 0 erreur sur les fichiers Phase 5.2 (warnings pré-existants CRLF sur autres packages)
 - Prettier — Formaté automatiquement
 
@@ -96,4 +103,4 @@ La Phase 5.2 a été validée avec succès. Le projet compile, tous les tests pa
 
 ---
 
-*Généré le 24 juillet 2026*
+_Généré le 24 juillet 2026_

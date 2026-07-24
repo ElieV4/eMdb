@@ -2,23 +2,25 @@
 
 ## Décisions stratégiques
 
-| Question | Décision |
-|----------|----------|
-| 8. Permissions de partage | **Lecture + édition** — permission='lecture' ou 'edition', vérification applicative dans chaque endpoint |
-| 9. Type de liste | **Énuméré** — `@IsEnum(['watchlist', 'favoris', 'custom'])` côté API ; le type `custom` permet un nom libre |
-| 10. Doublons dans une liste | **Impossible** — contrainte `@@id([list_id, title_id])` dans le schéma |
-| 11. GET /shared-lists | **Dans le module lists** — pas de module séparé |
-| 12. Réordonnancement | **PATCH** — `/lists/:listId/items/reorder` |
+| Question                    | Décision                                                                                                    |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 8. Permissions de partage   | **Lecture + édition** — permission='lecture' ou 'edition', vérification applicative dans chaque endpoint    |
+| 9. Type de liste            | **Énuméré** — `@IsEnum(['watchlist', 'favoris', 'custom'])` côté API ; le type `custom` permet un nom libre |
+| 10. Doublons dans une liste | **Impossible** — contrainte `@@id([list_id, title_id])` dans le schéma                                      |
+| 11. GET /shared-lists       | **Dans le module lists** — pas de module séparé                                                             |
+| 12. Réordonnancement        | **PATCH** — `/lists/:listId/items/reorder`                                                                  |
 
 ## Dépendances
 
 ### Externes
+
 - `auth` → `JwtAuthGuard`, `@CurrentUser()` pour tous les endpoints
 - `users` → validation que `shared_with_user_id` existe
 - `titles` → validation que `title_id` existe (pour addItem)
 - `Prisma` → `user_lists`, `list_items`, `list_shares` (déjà dans PrismaService)
 
 ### Schéma Prisma concerné
+
 ```prisma
 model user_lists {
   id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -59,30 +61,30 @@ model list_shares {
 
 ### user_lists (5 endpoints)
 
-| Method | Path | Auth | DTO | Description |
-|--------|------|------|-----|-------------|
-| `POST` | `/lists` | ✅ | `CreateListDto` | Créer une liste |
-| `GET` | `/lists` | ✅ | — | Liste des listes de l'utilisateur |
-| `GET` | `/lists/:id` | ✅ | — | Détail d'une liste avec ses items (titles) |
-| `PATCH` | `/lists/:id` | ✅ | `UpdateListDto` | Modifier nom/description |
-| `DELETE` | `/lists/:id` | ✅ | — | Supprimer une liste (cascade items + shares) |
+| Method   | Path         | Auth | DTO             | Description                                  |
+| -------- | ------------ | ---- | --------------- | -------------------------------------------- |
+| `POST`   | `/lists`     | ✅   | `CreateListDto` | Créer une liste                              |
+| `GET`    | `/lists`     | ✅   | —               | Liste des listes de l'utilisateur            |
+| `GET`    | `/lists/:id` | ✅   | —               | Détail d'une liste avec ses items (titles)   |
+| `PATCH`  | `/lists/:id` | ✅   | `UpdateListDto` | Modifier nom/description                     |
+| `DELETE` | `/lists/:id` | ✅   | —               | Supprimer une liste (cascade items + shares) |
 
 ### list_items (3 endpoints)
 
-| Method | Path | Auth | DTO | Description |
-|--------|------|------|-----|-------------|
-| `POST` | `/lists/:listId/items` | ✅ | `AddItemDto` | Ajouter un titre (position = max+1) |
-| `DELETE` | `/lists/:listId/items/:titleId` | ✅ | — | Retirer un titre de la liste |
-| `PATCH` | `/lists/:listId/items/reorder` | ✅ | `ReorderDto` | Réordonnancement batch |
+| Method   | Path                            | Auth | DTO          | Description                         |
+| -------- | ------------------------------- | ---- | ------------ | ----------------------------------- |
+| `POST`   | `/lists/:listId/items`          | ✅   | `AddItemDto` | Ajouter un titre (position = max+1) |
+| `DELETE` | `/lists/:listId/items/:titleId` | ✅   | —            | Retirer un titre de la liste        |
+| `PATCH`  | `/lists/:listId/items/reorder`  | ✅   | `ReorderDto` | Réordonnancement batch              |
 
 ### list_shares (4 endpoints)
 
-| Method | Path | Auth | DTO | Description |
-|--------|------|------|-----|-------------|
-| `POST` | `/lists/:listId/shares` | ✅ | `ShareListDto` | Partager une liste |
-| `GET` | `/lists/:listId/shares` | ✅ | — | Liste des partages d'une liste |
-| `DELETE` | `/lists/:listId/shares/:sharedWithUserId` | ✅ | — | Retirer un partage |
-| `GET` | `/shared-lists` | ✅ | — | Listes partagées avec l'utilisateur |
+| Method   | Path                                      | Auth | DTO            | Description                         |
+| -------- | ----------------------------------------- | ---- | -------------- | ----------------------------------- |
+| `POST`   | `/lists/:listId/shares`                   | ✅   | `ShareListDto` | Partager une liste                  |
+| `GET`    | `/lists/:listId/shares`                   | ✅   | —              | Liste des partages d'une liste      |
+| `DELETE` | `/lists/:listId/shares/:sharedWithUserId` | ✅   | —              | Retirer un partage                  |
+| `GET`    | `/shared-lists`                           | ✅   | —              | Listes partagées avec l'utilisateur |
 
 ## DTOs
 
@@ -157,45 +159,50 @@ class ShareListDto {
 ```typescript
 class ListsService {
   // user_lists
-  createList(userId: string, dto: CreateListDto): Promise<any>
-  getUserLists(userId: string): Promise<any[]>
-  getListDetail(listId: string, userId: string): Promise<any>  // vérifie accès (owner ou shared)
-  updateList(listId: string, userId: string, dto: UpdateListDto): Promise<any>
-  deleteList(listId: string, userId: string): Promise<void>
+  createList(userId: string, dto: CreateListDto): Promise<any>;
+  getUserLists(userId: string): Promise<any[]>;
+  getListDetail(listId: string, userId: string): Promise<any>; // vérifie accès (owner ou shared)
+  updateList(listId: string, userId: string, dto: UpdateListDto): Promise<any>;
+  deleteList(listId: string, userId: string): Promise<void>;
 
   // list_items
-  addItem(listId: string, userId: string, titleId: string): Promise<any>
-  removeItem(listId: string, userId: string, titleId: string): Promise<void>
-  reorderItems(listId: string, userId: string, dto: ReorderDto): Promise<void>
+  addItem(listId: string, userId: string, titleId: string): Promise<any>;
+  removeItem(listId: string, userId: string, titleId: string): Promise<void>;
+  reorderItems(listId: string, userId: string, dto: ReorderDto): Promise<void>;
 
   // list_shares
-  shareList(listId: string, userId: string, dto: ShareListDto): Promise<any>
-  getShares(listId: string, userId: string): Promise<any[]>
-  removeShare(listId: string, userId: string, sharedWithUserId: string): Promise<void>
-  getSharedLists(userId: string): Promise<any[]>
+  shareList(listId: string, userId: string, dto: ShareListDto): Promise<any>;
+  getShares(listId: string, userId: string): Promise<any[]>;
+  removeShare(listId: string, userId: string, sharedWithUserId: string): Promise<void>;
+  getSharedLists(userId: string): Promise<any[]>;
 
   // Vérification d'accès (utilitaire partagé)
-  private async findListOrThrow(listId: string, userId: string): Promise<any>
+  private async findListOrThrow(listId: string, userId: string): Promise<any>;
   // Vérifie que l'utilisateur est propriétaire de la liste (ou a permission 'edition')
-  private async checkListAccess(listId: string, userId: string, requireEdit?: boolean): Promise<any>
+  private async checkListAccess(
+    listId: string,
+    userId: string,
+    requireEdit?: boolean,
+  ): Promise<any>;
 }
 ```
 
 ### Logique d'accès
 
-| Endpoint | Propriétaire | Partagé (lecture) | Partagé (édition) |
-|----------|:-----------:|:-----------------:|:-----------------:|
-| GET /lists/:id | ✅ | ✅ | ✅ |
-| PATCH /lists/:id | ✅ | ❌ | ❌ (seul le owner modifie les métadonnées) |
-| DELETE /lists/:id | ✅ | ❌ | ❌ |
-| POST /lists/:listId/items | ✅ | ❌ | ✅ |
-| DELETE /lists/:listId/items/:titleId | ✅ | ❌ | ✅ |
-| PATCH /lists/:listId/items/reorder | ✅ | ❌ | ✅ |
-| POST /lists/:listId/shares | ✅ | ❌ | ❌ |
-| GET /lists/:listId/shares | ✅ | ❌ | ❌ |
-| DELETE /lists/:listId/shares/:userId | ✅ | ❌ | ❌ |
+| Endpoint                             | Propriétaire | Partagé (lecture) |             Partagé (édition)              |
+| ------------------------------------ | :----------: | :---------------: | :----------------------------------------: |
+| GET /lists/:id                       |      ✅      |        ✅         |                     ✅                     |
+| PATCH /lists/:id                     |      ✅      |        ❌         | ❌ (seul le owner modifie les métadonnées) |
+| DELETE /lists/:id                    |      ✅      |        ❌         |                     ❌                     |
+| POST /lists/:listId/items            |      ✅      |        ❌         |                     ✅                     |
+| DELETE /lists/:listId/items/:titleId |      ✅      |        ❌         |                     ✅                     |
+| PATCH /lists/:listId/items/reorder   |      ✅      |        ❌         |                     ✅                     |
+| POST /lists/:listId/shares           |      ✅      |        ❌         |                     ❌                     |
+| GET /lists/:listId/shares            |      ✅      |        ❌         |                     ❌                     |
+| DELETE /lists/:listId/shares/:userId |      ✅      |        ❌         |                     ❌                     |
 
 ### Auto-incrément position pour addItem
+
 ```typescript
 async addItem(listId: string, userId: string, titleId: string) {
   const list = await this.checkListAccess(listId, userId, true);
@@ -242,15 +249,18 @@ apps/api/src/lists/
 ## Plan de tests
 
 ### createList
+
 - Crée une liste de type 'watchlist'
 - Crée une liste de type 'custom'
 - Lève BadRequest si type invalide (validation DTO)
 
 ### getUserLists
+
 - Retourne les listes de l'utilisateur
 - Retourne un tableau vide si aucune liste
 
 ### getListDetail
+
 - Retourne la liste avec ses items si propriétaire
 - Retourne la liste si partagée en lecture
 - Retourne la liste si partagée en édition
@@ -258,25 +268,30 @@ apps/api/src/lists/
 - Lève Forbidden si non propriétaire et non partagée
 
 ### updateList / deleteList
+
 - Met à jour/supprime si propriétaire
 - Lève Forbidden si non propriétaire
 
 ### addItem
+
 - Ajoute un item avec la bonne position (max+1)
 - Ajoute le premier item (position=0)
 - Lève Forbidden si pas le droit d'édition
 - Lève NotFound si le titre n'existe pas
 
 ### removeItem
+
 - Retire un item existant
 - Lève NotFound si l'item n'existe pas dans la liste
 
 ### reorderItems
+
 - Met à jour les positions dans une transaction
 - Lève Forbidden si pas le droit d'édition
 - Lève NotFound si un title_id n'appartient pas à la liste
 
 ### shareList / getShares / removeShare
+
 - Ajoute un partage
 - Lève NotFound si shared_with_user_id n'existe pas
 - Liste les partages (propriétaire uniquement)
@@ -284,6 +299,6 @@ apps/api/src/lists/
 - Lève Forbidden si non propriétaire
 
 ### getSharedLists
+
 - Retourne les listes partagées avec l'utilisateur
 - Retourne tableau vide si aucun partage
-

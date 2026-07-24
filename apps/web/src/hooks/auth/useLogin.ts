@@ -1,6 +1,7 @@
 /**
  * Mutation React Query pour /auth/login.
- * Stocke le token + user dans le store Zustand.
+ * Stocke le token + user + refreshToken dans le store Zustand.
+ * Set le cookie `emdb_access_token` pour le middleware.
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +15,7 @@ export type LoginInput = {
 
 export type LoginResult = {
   accessToken: string;
+  refreshToken: string;
   user: {
     id: string;
     email: string;
@@ -22,10 +24,18 @@ export type LoginResult = {
   };
 };
 
+/** Set a non-httpOnly cookie for middleware route protection. */
+function setAuthCookie(token: string) {
+  if (typeof document !== "undefined") {
+    document.cookie = `emdb_access_token=${token}; path=/; max-age=900`; // 15 min
+  }
+}
+
 export function useLogin() {
   const queryClient = useQueryClient();
   const setUser = useAuthStore((s) => s.setUser);
   const setAccessToken = useAuthStore((s) => s.setAccessToken);
+  const setRefreshToken = useAuthStore((s) => s.setRefreshToken);
 
   return useMutation({
     mutationFn: async (input: LoginInput) => {
@@ -37,7 +47,9 @@ export function useLogin() {
     },
     onSuccess: (data) => {
       setAccessToken(data.accessToken);
+      setRefreshToken(data.refreshToken);
       setUser(data.user);
+      setAuthCookie(data.accessToken);
       queryClient.invalidateQueries();
     },
   });

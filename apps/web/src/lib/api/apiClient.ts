@@ -2,10 +2,13 @@
  * Client API fetch wrapper pour Next.js.
  *
  * Règles :
- - Base URL via `NEXT_PUBLIC_API_URL`.
- - Erreurs 401/403/404 gérées centralement.
- - Pas de throw sur 4xx inattendus sans message.
+ * - Base URL via `NEXT_PUBLIC_API_URL`.
+ * - Header `Authorization: Bearer <token>` depuis le store Zustand.
+ * - Erreurs 401/403/404 gérées centralement.
+ * - Timeout configurable (10s).
  */
+
+import { useAuthStore } from "@/store/authStore";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -15,12 +18,18 @@ export type RequestOptions = {
   headers?: Record<string, string>;
 };
 
-async function buildHeaders(init?: RequestOptions["headers"]) {
-  const hasCustom = !!init && Object.keys(init).length > 0;
+async function buildHeaders(
+  init?: RequestOptions["headers"],
+): Promise<Record<string, string>> {
+  const accessToken = useAuthStore.getState().accessToken;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(hasCustom ? init : {}),
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
   };
+
+  if (init && Object.keys(init).length > 0) {
+    Object.assign(headers, init);
+  }
 
   return headers;
 }
@@ -58,7 +67,6 @@ export async function apiFetch<T = unknown>(
       }
 
       if (res.status === 401) {
-        // L’intercepteur peut rediriger vers login ou tenter un refresh token.
         throw new Error("Non autorisé");
       }
 

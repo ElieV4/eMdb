@@ -1,5 +1,6 @@
 /**
  * Store Zustand pour l'authentification.
+ * Stocke l'utilisateur, le token d'accès et le token de rafraîchissement.
  */
 
 import { create } from "zustand";
@@ -12,6 +13,7 @@ export type UserState = {
     avatarUrl?: string;
   } | null;
   accessToken: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 };
@@ -19,6 +21,7 @@ export type UserState = {
 export type AuthActions = {
   setUser: (user: UserState["user"]) => void;
   setAccessToken: (token: string | null) => void;
+  setRefreshToken: (token: string | null) => void;
   setLoading: (loading: boolean) => void;
   logout: () => void;
 };
@@ -28,6 +31,7 @@ export type AuthStore = UserState & AuthActions;
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   accessToken: null,
+  refreshToken: null,
   isAuthenticated: false,
   isLoading: true,
   setUser: (user) =>
@@ -39,6 +43,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
     set({
       accessToken,
     }),
+  setRefreshToken: (refreshToken) =>
+    set({
+      refreshToken,
+    }),
   setLoading: (isLoading) =>
     set({
       isLoading,
@@ -47,6 +55,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     set({
       user: null,
       accessToken: null,
+      refreshToken: null,
       isAuthenticated: false,
     }),
 }));

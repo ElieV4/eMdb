@@ -11,6 +11,7 @@
 La Phase 7.2 implémente la génération automatique de notifications lors de la détection de nouveaux épisodes pour les séries suivies. Cette fonctionnalité est entièrement intégrée dans le workflow quotidien de synchronisation TMDB.
 
 **Points clés** :
+
 - ✅ Génération automatique via `dailySyncNewEpisodes()`
 - ✅ Déduplication par `(episode_id, type)` pour éviter les doublons
 - ✅ 3 types de notifications supportés : `new_episode`, `season_premiere`, `series_return`
@@ -55,6 +56,7 @@ All matched files use Prettier code style!
 **Résultat** : ⚠️ **8 ERREURS PRÉ-EXISTANTES** (non liées à Phase 7.2)
 
 **Détail des erreurs pré-existantes** :
+
 - `packages/recommender/scripts/run-recommendations.ts` : 2x `no-fallthrough` (switch sans break)
 - `packages/tmdb-sync/src/index.spec.ts` : 4x `no-var-requires` (utilisation de `require` dans les mocks)
 - `apps/api/src/db-constraints.spec.ts` : 1x `no-var-requires`
@@ -76,6 +78,7 @@ All matched files use Prettier code style!
 **Résultat** : ✅ **17/17 TESTS PASSÉS**
 
 **Tests Phase 7.2** (7 tests) :
+
 1. ✅ `generateNewEpisodeNotifications` : crée des notifications pour les followers
 2. ✅ `generateNewEpisodeNotifications` : ne crée pas de doublon (vérification existante)
 3. ✅ `generateNewEpisodeNotifications` : ignore les séries sans followers
@@ -92,6 +95,7 @@ All matched files use Prettier code style!
 **Résultat** : ✅ **179/179 TESTS PASSÉS** (17 suites)
 
 **Dont** :
+
 - Notifications service : 17 tests ✅
 - E2E : 5 tests ✅
 - Autres modules : 157 tests ✅
@@ -111,18 +115,18 @@ All matched files use Prettier code style!
 
 ### Fichiers Core
 
-| Fichier | Action | Description |
-|---------|--------|-------------|
-| `packages/tmdb-sync/src/index.ts` | **Modifié** | Ajout de `generateNewEpisodeNotifications()` (lignes 345-411) et `generateSeasonPremiereNotification()` (lignes 413-462). Enrichissement de `dailySyncNewEpisodes()` pour appeler la génération de notifications (ligne 493-494). |
-| `packages/tmdb-sync/src/index.spec.ts` | **Modifié** | Ajout de 7 tests pour les nouvelles fonctions de génération de notifications. Correction mock `titles.update` (ligne 5). Correction assertion test `dailySyncNewEpisodes` (ligne 401). |
-| `apps/worker/src/worker.ts` | **Modifié** | Intégration de `generateNewEpisodeNotifications` dans le job `daily-sync-new-episodes` (ligne 147-151). Job `generate-notifications` déjà présent (ligne 153-157). |
+| Fichier                                | Action      | Description                                                                                                                                                                                                                       |
+| -------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/tmdb-sync/src/index.ts`      | **Modifié** | Ajout de `generateNewEpisodeNotifications()` (lignes 345-411) et `generateSeasonPremiereNotification()` (lignes 413-462). Enrichissement de `dailySyncNewEpisodes()` pour appeler la génération de notifications (ligne 493-494). |
+| `packages/tmdb-sync/src/index.spec.ts` | **Modifié** | Ajout de 7 tests pour les nouvelles fonctions de génération de notifications. Correction mock `titles.update` (ligne 5). Correction assertion test `dailySyncNewEpisodes` (ligne 401).                                            |
+| `apps/worker/src/worker.ts`            | **Modifié** | Intégration de `generateNewEpisodeNotifications` dans le job `daily-sync-new-episodes` (ligne 147-151). Job `generate-notifications` déjà présent (ligne 153-157).                                                                |
 
 ### Fichiers de Configuration (corrections techniques)
 
-| Fichier | Action | Description |
-|---------|--------|-------------|
-| `tsconfig.base.json` | **Modifié** | Ajout de `"ignoreDeprecations": "6.0"` pour résoudre les avertissements TypeScript 5.9.3. |
-| `apps/api/src/app.module.ts` | **Corrigé** | Correction corruption ligne 1 : `ctuelleimport` → `import`. |
+| Fichier                      | Action      | Description                                                                               |
+| ---------------------------- | ----------- | ----------------------------------------------------------------------------------------- |
+| `tsconfig.base.json`         | **Modifié** | Ajout de `"ignoreDeprecations": "6.0"` pour résoudre les avertissements TypeScript 5.9.3. |
+| `apps/api/src/app.module.ts` | **Corrigé** | Correction corruption ligne 1 : `ctuelleimport` → `import`.                               |
 
 ---
 
@@ -215,10 +219,10 @@ Time:        15.931 s
 
 ### Dette Technique
 
-1. **Erreurs ESLint pré-existantes** (8 erreurs)  
-   - `no-fallthrough` dans `run-recommendations.ts` (2 erreurs)  
+1. **Erreurs ESLint pré-existantes** (8 erreurs)
+   - `no-fallthrough` dans `run-recommendations.ts` (2 erreurs)
    - `no-var-requires` dans les tests (4 erreurs tmdb-sync, 2 erreurs apps/api)  
-   **Impact** : Aucun sur Phase 7.2. À corriger dans un sprint dédié.
+     **Impact** : Aucun sur Phase 7.2. À corriger dans un sprint dédié.
 
 2. **Index manquant sur `notifications`**  
    L'index sur `(user_id, lu, created_at)` mentionné dans la roadmap n'est pas encore créé.  
@@ -237,6 +241,7 @@ Time:        15.931 s
 ### Ajoutées
 
 Aucune dépendance ajoutée. Phase 7.2 utilise uniquement des dépendances existantes :
+
 - `@emdb/db` (Prisma)
 - `@emdb/tmdb-sync` (logique métier)
 
@@ -248,26 +253,26 @@ Aucune dépendance mise à jour.
 
 ## 🎯 Critères d'Acceptation
 
-| # | Critère | Résultat |
-|---|---------|----------|
-| 1 | Une notification est créée pour chaque follower d'une série quand un nouvel épisode sort | ✅ |
-| 2 | Aucune notification en double n'est créée si le job est relancé | ✅ (testé) |
-| 3 | Les séries sans followers ne génèrent pas de notifications | ✅ (testé) |
-| 4 | Les séries sans nouvel épisode ne génèrent pas de notifications | ✅ (testé) |
-| 5 | La fonction `dailySyncNewEpisodes()` continue de fonctionner comme avant (rétrocompatibilité) | ✅ (testé) |
-| 6 | Le nombre de notifications créées est retourné dans les métriques du job | ✅ |
-| 7 | Tous les tests passent | ✅ (17/17 tmdb-sync, 179/179 api) |
+| #   | Critère                                                                                       | Résultat                          |
+| --- | --------------------------------------------------------------------------------------------- | --------------------------------- |
+| 1   | Une notification est créée pour chaque follower d'une série quand un nouvel épisode sort      | ✅                                |
+| 2   | Aucune notification en double n'est créée si le job est relancé                               | ✅ (testé)                        |
+| 3   | Les séries sans followers ne génèrent pas de notifications                                    | ✅ (testé)                        |
+| 4   | Les séries sans nouvel épisode ne génèrent pas de notifications                               | ✅ (testé)                        |
+| 5   | La fonction `dailySyncNewEpisodes()` continue de fonctionner comme avant (rétrocompatibilité) | ✅ (testé)                        |
+| 6   | Le nombre de notifications créées est retourné dans les métriques du job                      | ✅                                |
+| 7   | Tous les tests passent                                                                        | ✅ (17/17 tmdb-sync, 179/179 api) |
 
 ---
 
 ## 📝 Documentation Mise à Jour
 
-| Document | Action | Section |
-|----------|--------|---------|
-| `README.md` | Mis à jour | Ajout section "notifications" dans Fonctionnalités |
-| `docs/ARCHITECTURE_OVERVIEW.md` | Mis à jour | Phase 7 → 🔄 (7.1 ✅, 7.2 ✅, 7.3 ⏳) |
-| `docs/TECHNICAL_DETAILS.md` | Mis à jour | Module Notifications : 17 tests, détails Phase 7.2 |
-| `docs/emdb_roadmap_backend.md` | Mis à jour | Phase 7.2 cochée ✅, section "Récapitulatif par phase" |
+| Document                        | Action     | Section                                                |
+| ------------------------------- | ---------- | ------------------------------------------------------ |
+| `README.md`                     | Mis à jour | Ajout section "notifications" dans Fonctionnalités     |
+| `docs/ARCHITECTURE_OVERVIEW.md` | Mis à jour | Phase 7 → 🔄 (7.1 ✅, 7.2 ✅, 7.3 ⏳)                  |
+| `docs/TECHNICAL_DETAILS.md`     | Mis à jour | Module Notifications : 17 tests, détails Phase 7.2     |
+| `docs/emdb_roadmap_backend.md`  | Mis à jour | Phase 7.2 cochée ✅, section "Récapitulatif par phase" |
 
 ---
 
@@ -299,5 +304,5 @@ Aucune dépendance mise à jour.
 
 ---
 
-*Rapport généré le 24 juillet 2026*  
-*Validé par : Cline (AI Assistant)*
+_Rapport généré le 24 juillet 2026_  
+_Validé par : Cline (AI Assistant)_

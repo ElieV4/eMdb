@@ -2,21 +2,23 @@
 
 ## Décisions stratégiques
 
-| Question | Décision | Justification |
-|----------|----------|---------------|
-| 1. Déclencheur | **(a) Dans `dailySyncNewEpisodes`** | Cette fonction existe déjà dans `packages/tmdb-sync` et parcourt les titres en cours chaque jour. C'est le point d'entrée idéal pour ajouter la génération de notifications. |
-| 2. Fréquence | **(a) Quotidienne (cron `daily-sync-new-episodes`)** | Cohérent avec le cycle de synchronisation TMDB. Un nouvel épisode sorti sera notifié dans les 24h. |
-| 3. Types de notifications | **(a) 3 types** | `new_episode` (nouvel épisode), `season_premiere` (nouvelle saison), `series_return` (retour de série). Distinction utile pour l'affichage frontend. |
-| 4. Déduplication | **(a) Vérification existante par `(episode_id, type)`** | Évite de créer des notifications en double si le job est relancé. Vérification simple avant insert. |
-| 5. Transaction | **(a) `createMany` sans transaction** | Chaque série est traitée indépendamment. Si une échoue, les autres continuent. Pas de risque de cohérence globale. |
+| Question                  | Décision                                                | Justification                                                                                                                                                                |
+| ------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Déclencheur            | **(a) Dans `dailySyncNewEpisodes`**                     | Cette fonction existe déjà dans `packages/tmdb-sync` et parcourt les titres en cours chaque jour. C'est le point d'entrée idéal pour ajouter la génération de notifications. |
+| 2. Fréquence              | **(a) Quotidienne (cron `daily-sync-new-episodes`)**    | Cohérent avec le cycle de synchronisation TMDB. Un nouvel épisode sorti sera notifié dans les 24h.                                                                           |
+| 3. Types de notifications | **(a) 3 types**                                         | `new_episode` (nouvel épisode), `season_premiere` (nouvelle saison), `series_return` (retour de série). Distinction utile pour l'affichage frontend.                         |
+| 4. Déduplication          | **(a) Vérification existante par `(episode_id, type)`** | Évite de créer des notifications en double si le job est relancé. Vérification simple avant insert.                                                                          |
+| 5. Transaction            | **(a) `createMany` sans transaction**                   | Chaque série est traitée indépendamment. Si une échoue, les autres continuent. Pas de risque de cohérence globale.                                                           |
 
 ## Dépendances
 
 ### Packages
+
 - `@emdb/db` — Prisma : notifications, user_follows_serie, titles, episodes
 - `@emdb/tmdb-sync` — La fonction `dailySyncNewEpisodes()` existe déjà, va être enrichie
 
 ### Schéma Prisma concerné
+
 ```prisma
 model notifications {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -208,7 +210,9 @@ import { dailySyncNewEpisodes } from '@emdb/tmdb-sync';
 
 // Dans le handler du job 'daily-sync-new-episodes'
 const result = await dailySyncNewEpisodes();
-logger.log(`Sync quotidien : ${result.titlesRefreshed} titres, ${result.notificationsCreated} notifications`);
+logger.log(
+  `Sync quotidien : ${result.titlesRefreshed} titres, ${result.notificationsCreated} notifications`,
+);
 ```
 
 ### Nouveau job `generate-notifications` (optionnel)
@@ -228,29 +232,32 @@ case 'generate-notifications': {
 
 ## Types de notifications
 
-| Type | Déclencheur | Contenu attendu (frontend) | Priorité |
-|------|-------------|---------------------------|----------|
-| `new_episode` | Nouvel épisode d'une série suivie | "Nouvel épisode de [Série] : S[XX]E[YY] - [Titre]" | Haute |
-| `season_premiere` | Première d'une nouvelle saison | "La saison [N] de [Série] est disponible" | Haute |
-| `series_return` | Retour d'une série en pause | "[Série] est de retour ! Nouvel épisode disponible" | Moyenne |
+| Type              | Déclencheur                       | Contenu attendu (frontend)                          | Priorité |
+| ----------------- | --------------------------------- | --------------------------------------------------- | -------- |
+| `new_episode`     | Nouvel épisode d'une série suivie | "Nouvel épisode de [Série] : S[XX]E[YY] - [Titre]"  | Haute    |
+| `season_premiere` | Première d'une nouvelle saison    | "La saison [N] de [Série] est disponible"           | Haute    |
+| `series_return`   | Retour d'une série en pause       | "[Série] est de retour ! Nouvel épisode disponible" | Moyenne  |
 
 ## Fichiers modifiés
 
 ### packages/tmdb-sync
-| Fichier | Action | Description |
-|---------|--------|-------------|
-| `src/index.ts` | **Modifier** | Ajouter `generateNewEpisodeNotifications()`, `generateSeasonPremiereNotification()`, enrichir `dailySyncNewEpisodes()` |
-| `src/index.spec.ts` | **Modifier** | Ajouter les tests pour les nouvelles fonctions |
+
+| Fichier             | Action       | Description                                                                                                            |
+| ------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`      | **Modifier** | Ajouter `generateNewEpisodeNotifications()`, `generateSeasonPremiereNotification()`, enrichir `dailySyncNewEpisodes()` |
+| `src/index.spec.ts` | **Modifier** | Ajouter les tests pour les nouvelles fonctions                                                                         |
 
 ### apps/worker
-| Fichier | Action | Description |
-|---------|--------|-------------|
-| `src/worker.ts` | **Modifier** | Enrichir le job `daily-sync-new-episodes`, ajouter optionnellement le job `generate-notifications` |
-| `src/worker.spec.ts` | **Modifier** | Ajouter les tests pour la génération de notifications dans le worker |
+
+| Fichier              | Action       | Description                                                                                        |
+| -------------------- | ------------ | -------------------------------------------------------------------------------------------------- |
+| `src/worker.ts`      | **Modifier** | Enrichir le job `daily-sync-new-episodes`, ajouter optionnellement le job `generate-notifications` |
+| `src/worker.spec.ts` | **Modifier** | Ajouter les tests pour la génération de notifications dans le worker                               |
 
 ## Plan de tests
 
 ### generateNewEpisodeNotifications
+
 - Crée des notifications pour les followers d'une série avec un nouvel épisode
 - Ne crée pas de doublon (vérification existante par episode_id + type)
 - Ignore les séries sans followers
@@ -258,15 +265,18 @@ case 'generate-notifications': {
 - Ignore les séries dont le statut n'est pas 'en_cours' ou 'retourne'
 
 ### generateSeasonPremiereNotification
+
 - Crée des notifications pour la première d'une nouvelle saison
 - Ne crée pas de doublon
 - Ignore si la saison n'a pas d'épisodes
 
 ### dailySyncNewEpisodes (enrichie)
+
 - La fonction enrichie retourne `notificationsCreated` dans le résultat
 - La génération de notifications ne bloque pas le refresh des titres
 
 ### Intégration worker
+
 - Le job `daily-sync-new-episodes` appelle `dailySyncNewEpisodes()` et logue le nombre de notifications
 - Le job `generate-notifications` (optionnel) appelle `generateNewEpisodeNotifications()` directement
 
@@ -283,10 +293,12 @@ case 'generate-notifications': {
 ## Dépendances
 
 ### Entre sous-phases
+
 - Phase 7.2 **dépend de** Phase 7.1 (le modèle `notifications` est déjà utilisé)
 - Phase 7.2 **est indépendante** de Phase 7.3 (peut être faite en parallèle)
 
 ### Entre modules
+
 - `packages/tmdb-sync` → `@emdb/db` (Prisma)
 - `apps/worker` → `@emdb/tmdb-sync`
 

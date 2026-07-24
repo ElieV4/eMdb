@@ -2,22 +2,24 @@
 
 ## Décisions stratégiques
 
-| Question | Décision | Justification |
-|----------|----------|---------------|
-| 1. Module NestJS dédié | **(a) Module `notifications` séparé** | Cohérent avec la structure existante (1 module = 1 fonctionnalité). La table `notifications` est déjà modélisée dans Prisma et exposée dans `PrismaService`. |
-| 2. Endpoints | **(a) 4 endpoints REST** | `GET /notifications` (liste), `PATCH /notifications/:id/read` (marquer lu), `PATCH /notifications/read-all` (tout marquer), `GET /notifications/unread-count` (compteur). Couvre les besoins sans sur-ingénierie. |
-| 3. Pagination | **(a) Oui, pagination standard** | Cohérent avec les autres modules (watches, ratings, lists). DTO `ListNotificationsFilterDto` avec `page` et `limit`. |
-| 4. Tri | **(a) Non lues en priorité** | Les notifications non lues sont plus importantes pour l'utilisateur. Tri : `lu ASC, created_at DESC`. |
-| 5. Marquage "read-all" | **(a) PATCH /notifications/read-all** | Un seul appel pour tout marquer, évite N appels. Retourne le nombre de notifications marquées. |
+| Question               | Décision                              | Justification                                                                                                                                                                                                     |
+| ---------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Module NestJS dédié | **(a) Module `notifications` séparé** | Cohérent avec la structure existante (1 module = 1 fonctionnalité). La table `notifications` est déjà modélisée dans Prisma et exposée dans `PrismaService`.                                                      |
+| 2. Endpoints           | **(a) 4 endpoints REST**              | `GET /notifications` (liste), `PATCH /notifications/:id/read` (marquer lu), `PATCH /notifications/read-all` (tout marquer), `GET /notifications/unread-count` (compteur). Couvre les besoins sans sur-ingénierie. |
+| 3. Pagination          | **(a) Oui, pagination standard**      | Cohérent avec les autres modules (watches, ratings, lists). DTO `ListNotificationsFilterDto` avec `page` et `limit`.                                                                                              |
+| 4. Tri                 | **(a) Non lues en priorité**          | Les notifications non lues sont plus importantes pour l'utilisateur. Tri : `lu ASC, created_at DESC`.                                                                                                             |
+| 5. Marquage "read-all" | **(a) PATCH /notifications/read-all** | Un seul appel pour tout marquer, évite N appels. Retourne le nombre de notifications marquées.                                                                                                                    |
 
 ## Dépendances
 
 ### Externes
+
 - `@emdb/db` → Prisma : table `notifications` (déjà dans PrismaService)
 - `auth` → `JwtAuthGuard`, `@CurrentUser()` pour tous les endpoints
 - `episodes` → jointure optionnelle pour les infos d'épisode
 
 ### Schéma Prisma concerné
+
 ```prisma
 model notifications {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -34,29 +36,31 @@ model notifications {
 Le delegate `prisma.notifications` est déjà exposé dans `PrismaService`.
 
 ### Table des index existants
+
 - `notifications_pkey` — PRIMARY KEY (id)
 - Pas d'index explicite sur `(user_id, lu, created_at)` dans Prisma
 - À ajouter si la table devient volumineuse (recommandé : index composite)
 
 ## Endpoints
 
-| Method | Path | Auth | DTO | Description |
-|--------|------|------|-----|-------------|
-| `GET` | `/notifications` | ✅ JWT | `ListNotificationsFilterDto` | Liste paginée des notifications (non lues en priorité) |
-| `PATCH` | `/notifications/:id/read` | ✅ JWT | — | Marquer une notification comme lue |
-| `PATCH` | `/notifications/read-all` | ✅ JWT | — | Marquer toutes les notifications comme lues |
-| `GET` | `/notifications/unread-count` | ✅ JWT | — | Compteur de notifications non lues |
+| Method  | Path                          | Auth   | DTO                          | Description                                            |
+| ------- | ----------------------------- | ------ | ---------------------------- | ------------------------------------------------------ |
+| `GET`   | `/notifications`              | ✅ JWT | `ListNotificationsFilterDto` | Liste paginée des notifications (non lues en priorité) |
+| `PATCH` | `/notifications/:id/read`     | ✅ JWT | —                            | Marquer une notification comme lue                     |
+| `PATCH` | `/notifications/read-all`     | ✅ JWT | —                            | Marquer toutes les notifications comme lues            |
+| `GET`   | `/notifications/unread-count` | ✅ JWT | —                            | Compteur de notifications non lues                     |
 
 ### Détail des endpoints
 
 #### 1. `GET /notifications`
+
 - Paramètres : `page`, `limit` (optionnels, défauts : page=1, limit=20)
 - Retourne :
   ```typescript
   {
     data: Array<{
       id: string;
-      type: string;         // 'new_episode' | 'season_premiere' | 'series_return'
+      type: string; // 'new_episode' | 'season_premiere' | 'series_return'
       lu: boolean;
       created_at: Date;
       episode?: {
@@ -75,16 +79,19 @@ Le delegate `prisma.notifications` est déjà exposé dans `PrismaService`.
 - Tri : `lu ASC, created_at DESC` (non lues d'abord, puis plus récentes en premier)
 
 #### 2. `PATCH /notifications/:id/read`
+
 - Paramètre : `id` (UUID de la notification)
 - Comportement : SET `lu = true`
 - Contrôle : NotFoundException si la notification n'existe pas ou n'appartient pas à l'utilisateur
 - Retour : `{ success: true }`
 
 #### 3. `PATCH /notifications/read-all`
+
 - Comportement : UPDATE notifications SET `lu = true` WHERE `user_id = userId` AND `lu = false`
 - Retour : `{ success: true, marked_count: number }`
 
 #### 4. `GET /notifications/unread-count`
+
 - Retourne : `{ count: number }`
 
 ## DTOs
@@ -114,16 +121,19 @@ class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   // Liste paginée, triée par non lues en priorité + date décroissante
-  listNotifications(userId: string, filters: ListNotificationsFilterDto): Promise<PaginatedNotifications>
+  listNotifications(
+    userId: string,
+    filters: ListNotificationsFilterDto,
+  ): Promise<PaginatedNotifications>;
 
   // Marque une notification spécifique comme lue
-  markAsRead(notificationId: string, userId: string): Promise<void>
+  markAsRead(notificationId: string, userId: string): Promise<void>;
 
   // Marque toutes les notifications de l'utilisateur comme lues
-  markAllAsRead(userId: string): Promise<{ marked_count: number }>
+  markAllAsRead(userId: string): Promise<{ marked_count: number }>;
 
   // Compteur de notifications non lues
-  getUnreadCount(userId: string): Promise<{ count: number }>
+  getUnreadCount(userId: string): Promise<{ count: number }>;
 }
 ```
 
@@ -223,21 +233,25 @@ apps/api/src/notifications/
 ## Plan de tests
 
 ### listNotifications
+
 - Retourne la liste paginée, triée par non lues en priorité + created_at DESC
 - Retourne un tableau vide si aucune notification
 - Applique correctement la pagination (skip/take)
 
 ### markAsRead
+
 - Marque une notification comme lue
 - Lève NotFoundException si la notification n'existe pas
 - Lève ForbiddenException si la notification appartient à un autre user
 
 ### markAllAsRead
+
 - Marque toutes les notifications de l'utilisateur comme lues
 - Retourne le nombre de notifications marquées
 - Ne marque pas les notifications déjà lues
 
 ### getUnreadCount
+
 - Retourne le nombre de notifications non lues
 - Retourne 0 si toutes les notifications sont lues
 

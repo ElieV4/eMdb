@@ -2,21 +2,23 @@
 
 ## Décisions stratégiques
 
-| Question | Décision | Justification |
-|----------|----------|---------------|
-| 1. Politique de rétention | **(a) 30 jours pour les lues, 90 jours pour les non lues** | Les notifications lues peuvent être supprimées rapidement (l'utilisateur les a déjà vues). Les non lues sont conservées plus longtemps au cas où l'utilisateur ne s'est pas connecté. |
-| 2. Type de suppression | **(a) Hard delete** | Les notifications sont éphémères, pas besoin de soft delete. Un hard delete libère de l'espace en base. |
-| 3. Fréquence du nettoyage | **(a) Hebdomadaire pour les lues, mensuelle pour les non lues** | Cohérent avec la politique de rétention. Un job hebdo pour les lues, un job mensuel pour les obsolètes. |
-| 4. Queue BullMQ | **(a) Queue `tmdb-cron` existante** | Réutilisation de la queue existante, pas besoin d'une queue dédiée pour un job simple. |
-| 5. Reporting | **(a) Log simple** | Le worker logue le nombre de notifications supprimées. Pas besoin de métriques complexes pour un job de maintenance. |
+| Question                  | Décision                                                        | Justification                                                                                                                                                                         |
+| ------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Politique de rétention | **(a) 30 jours pour les lues, 90 jours pour les non lues**      | Les notifications lues peuvent être supprimées rapidement (l'utilisateur les a déjà vues). Les non lues sont conservées plus longtemps au cas où l'utilisateur ne s'est pas connecté. |
+| 2. Type de suppression    | **(a) Hard delete**                                             | Les notifications sont éphémères, pas besoin de soft delete. Un hard delete libère de l'espace en base.                                                                               |
+| 3. Fréquence du nettoyage | **(a) Hebdomadaire pour les lues, mensuelle pour les non lues** | Cohérent avec la politique de rétention. Un job hebdo pour les lues, un job mensuel pour les obsolètes.                                                                               |
+| 4. Queue BullMQ           | **(a) Queue `tmdb-cron` existante**                             | Réutilisation de la queue existante, pas besoin d'une queue dédiée pour un job simple.                                                                                                |
+| 5. Reporting              | **(a) Log simple**                                              | Le worker logue le nombre de notifications supprimées. Pas besoin de métriques complexes pour un job de maintenance.                                                                  |
 
 ## Dépendances
 
 ### Externes
+
 - `@emdb/db` — Prisma : table `notifications`
 - `bullmq` — Queue `tmdb-cron` (déjà existante dans le worker)
 
 ### Schéma Prisma concerné
+
 ```prisma
 model notifications {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -155,7 +157,7 @@ export async function ensureRepeatableCronJobs(cronQueue: Queue) {
   // NOUVEAU : nettoyage hebdomadaire des notifications (tous les dimanches à 4h)
   await cronQueue.upsertJobScheduler(
     'clean-notifications-cron-weekly',
-    { pattern: '0 4 * * 0' },  // cron: dimanche à 4h du matin
+    { pattern: '0 4 * * 0' }, // cron: dimanche à 4h du matin
     {
       name: 'clean-notifications',
       data: {},
@@ -180,26 +182,30 @@ En cas d'absence de suppression (0 notifications), un simple log INFO. Pas d'ale
 ## Fichiers modifiés
 
 ### apps/worker
-| Fichier | Action | Description |
-|---------|--------|-------------|
-| `src/worker.ts` | **Modifier** | Ajouter le job `clean-notifications`, les fonctions `cleanOldNotifications` et `cleanStaleNotifications`, et la planification cron |
-| `src/worker.spec.ts` | **Modifier** | Ajouter les tests pour les fonctions de nettoyage |
+
+| Fichier              | Action       | Description                                                                                                                        |
+| -------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `src/worker.ts`      | **Modifier** | Ajouter le job `clean-notifications`, les fonctions `cleanOldNotifications` et `cleanStaleNotifications`, et la planification cron |
+| `src/worker.spec.ts` | **Modifier** | Ajouter les tests pour les fonctions de nettoyage                                                                                  |
 
 ## Plan de tests
 
 ### cleanOldNotifications
+
 - Supprime les notifications lues de plus de 30 jours
 - Ne supprime pas les notifications lues de moins de 30 jours
 - Ne supprime pas les notifications non lues (quel que soit leur âge)
 - Retourne 0 si aucune notification à supprimer
 
 ### cleanStaleNotifications
+
 - Supprime les notifications non lues de plus de 90 jours
 - Ne supprime pas les notifications non lues de moins de 90 jours
 - Ne supprime pas les notifications lues (quel que soit leur âge)
 - Retourne 0 si aucune notification à supprimer
 
 ### Intégration worker
+
 - Le job `clean-notifications` appelle les deux fonctions de nettoyage
 - Le job logue correctement le nombre de notifications supprimées
 - La planification cron `clean-notifications-cron-weekly` est correctement configurée (dimanche à 4h)
@@ -216,18 +222,20 @@ En cas d'absence de suppression (0 notifications), un simple log INFO. Pas d'ale
 
 ## Métriques de monitoring
 
-| Métrique | Valeur normale | Alerte |
-|----------|---------------|--------|
-| `cleanOldNotifications.count` | 0-1000/semaine | >10 000 (table anormalement volumineuse) |
-| `cleanStaleNotifications.count` | 0-100/mois | >1000 (beaucoup d'utilisateurs inactifs) |
+| Métrique                        | Valeur normale | Alerte                                   |
+| ------------------------------- | -------------- | ---------------------------------------- |
+| `cleanOldNotifications.count`   | 0-1000/semaine | >10 000 (table anormalement volumineuse) |
+| `cleanStaleNotifications.count` | 0-100/mois     | >1000 (beaucoup d'utilisateurs inactifs) |
 
 ## Dépendances
 
 ### Entre sous-phases
+
 - Phase 7.3 **dépend de** Phase 7.1 (le modèle `notifications` doit exister)
 - Phase 7.3 **dépend de** Phase 7.2 (les notifications doivent être générées avant d'être nettoyées)
 
 ### Ordre d'exécution recommandé
+
 1. Phase 7.1 (module API)
 2. Phase 7.2 (génération)
 3. **Phase 7.3 (nettoyage)** — en dernier

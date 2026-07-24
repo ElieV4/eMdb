@@ -5,9 +5,11 @@
 ### Déjà implémenté
 
 **Dans Phase 3.4 (PeopleService)**
+
 - `GET /people/:id/filmography` — jointure credits → titles, groupée par rôle, triée par date_sortie ✅
 
 **Dans Phase 3.5 (SeasonsEpisodesService)**
+
 - `GET /episodes/:id/credits` — credits spécifiques épisode (guest stars + crew), groupés par rôle ✅
 
 ### Ce qu'il reste de la Phase 3.6
@@ -25,11 +27,11 @@
 
 La roadmap liste 3 endpoints mais **2 sont déjà couverts** :
 
-| Method | Path | Statut | Notes |
-|--------|------|--------|-------|
-| `GET` | `/titles/:titleId/credits` | **À faire** | Cast/crew groupés par rôle (Nouveau) |
-| `GET` | `/episodes/:episodeId/credits` | ✅ Fait (Phase 3.5) | Route `GET /episodes/:id/credits` |
-| `GET` | `/people/:personId/credits` | ✅ Fait (Phase 3.4) | Route `GET /people/:id/filmography` |
+| Method | Path                           | Statut              | Notes                                |
+| ------ | ------------------------------ | ------------------- | ------------------------------------ |
+| `GET`  | `/titles/:titleId/credits`     | **À faire**         | Cast/crew groupés par rôle (Nouveau) |
+| `GET`  | `/episodes/:episodeId/credits` | ✅ Fait (Phase 3.5) | Route `GET /episodes/:id/credits`    |
+| `GET`  | `/people/:personId/credits`    | ✅ Fait (Phase 3.4) | Route `GET /people/:id/filmography`  |
 
 ### Endpoint à implémenter : `GET /titles/:titleId/credits`
 
@@ -55,19 +57,22 @@ La roadmap liste 3 endpoints mais **2 sont déjà couverts** :
 ### 2. Duplication : `GET /people/:personId/credits` vs `GET /people/:id/filmography`
 
 La roadmap liste `/people/:personId/credits` comme endpoint de CreditsService, mais `GET /people/:id/filmography` existe déjà et retourne la même chose. Faut-il :
+
 - **(a)** Créer une route d'alias `/people/:id/credits` dans le controller people qui appelle `getFilmography` ? (le plus simple)
 - **(b)** Ignorer ce point (le frontend utilise `/people/:id/filmography`)
 - **(c)** Déplacer `getFilmography` de PeopleService vers CreditsService
 
 ### 3. Episode credits : dédoublonnage avec Phase 3.5
 
-`GET /episodes/:episodeId/credits` est déjà implémenté dans SeasonsEpisodesService (route `/episodes/:id/credits`). 
+`GET /episodes/:episodeId/credits` est déjà implémenté dans SeasonsEpisodesService (route `/episodes/:id/credits`).
+
 - **(a)** Créer une route `/credits/episodes/:episodeId` qui redirige vers SeasonsEpisodesService
 - **(b)** Ne rien faire, le frontend utilise `/episodes/:id/credits`
 
 ### Recommandation
 
 Je recommande **1b + 2a + 3b** :
+
 - Un vrai module NestJS `credits` pour suivre la convention
 - Un `CreditsController` avec `GET /titles/:titleId/credits` uniquement (les deux autres sont déjà disponibles)
 - `CreditsService.getTitleCredits()` dans le nouveau service
@@ -86,4 +91,3 @@ apps/api/src/credits/
 ```
 
 Pas de DTO nécessaire (param UUID simple).
-

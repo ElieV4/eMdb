@@ -8,31 +8,31 @@ Basé sur `README.md`, `emdb_roadmap_backend.md`, `packages/db/sql/db_init.sql` 
 
 ## Stack retenue
 
-| Couche | Techno | Justification |
-|---|---|---|
-| **Framework** | Next.js 14+ (App Router) | SSR/SSG natif, routing déclaratif, API routes pour le proxy |
-| **Langage** | TypeScript | Typage end-to-end avec le backend |
-| **UI/Styling** | Tailwind CSS + shadcn/ui + Radix UI | Composants accessibles, thème sombre/light, productivité |
-| **Dataviz** | Recharts | Intégration React simple, supporte tous les types de graphiques nécessaires |
-| **State management** | Zustand (global) + React Context (auth) | Léger, pas de boilerplate, idéal pour un projet de cette taille |
-| **API client** | React Query (TanStack Query) | Cache, mutations, refetch automatique, gestion d'état serveur |
-| **Auth** | JWT via httpOnly cookie + NestJS `/auth/*` endpoints | Sécurité (pas de token dans le localStorage), cohérence avec le backend |
-| **Tests** | Jest + React Testing Library (unit) + Cypress (e2e) | Couverture complète |
-| **CI/CD** | GitHub Actions + Vercel | Déploiement automatique depuis GitHub, gratuit pour usage perso |
-| **Hébergement** | Vercel | Hébergeur officiel de Next.js, déploiement instantané |
+| Couche               | Techno                                               | Justification                                                               |
+| -------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
+| **Framework**        | Next.js 14+ (App Router)                             | SSR/SSG natif, routing déclaratif, API routes pour le proxy                 |
+| **Langage**          | TypeScript                                           | Typage end-to-end avec le backend                                           |
+| **UI/Styling**       | Tailwind CSS + shadcn/ui + Radix UI                  | Composants accessibles, thème sombre/light, productivité                    |
+| **Dataviz**          | Recharts                                             | Intégration React simple, supporte tous les types de graphiques nécessaires |
+| **State management** | Zustand (global) + React Context (auth)              | Léger, pas de boilerplate, idéal pour un projet de cette taille             |
+| **API client**       | React Query (TanStack Query)                         | Cache, mutations, refetch automatique, gestion d'état serveur               |
+| **Auth**             | JWT via httpOnly cookie + NestJS `/auth/*` endpoints | Sécurité (pas de token dans le localStorage), cohérence avec le backend     |
+| **Tests**            | Jest + React Testing Library (unit) + Cypress (e2e)  | Couverture complète                                                         |
+| **CI/CD**            | GitHub Actions + Vercel                              | Déploiement automatique depuis GitHub, gratuit pour usage perso             |
+| **Hébergement**      | Vercel                                               | Hébergeur officiel de Next.js, déploiement instantané                       |
 
 ### Décisions d'architecture validées
 
-| Question | Décision | Justification |
-|---|---|---|
-| Next.js Router | App Router (Next.js 14+) | SSR/SSG natif, layout système, loading.tsx |
-| Component library | shadcn/ui + Radix UI | Composants accessibles, thème sombre/light, productivité |
-| Charting | Recharts | Intégration React simple, supporte tous les types de graphiques |
-| State management | Zustand + React Context (auth) | Léger, pas de boilerplate |
-| API client | React Query | Cache, mutations, refetch automatique |
-| Auth | httpOnly cookie + NestJS endpoints | Sécurité (pas de token dans localStorage) |
-| Tests | Jest + RTL (unit) + Cypress (e2e) | Couverture complète |
-| Structure | `apps/web/` dans le monorepo | Cohérent avec `apps/api` et `apps/worker` |
+| Question          | Décision                           | Justification                                                   |
+| ----------------- | ---------------------------------- | --------------------------------------------------------------- |
+| Next.js Router    | App Router (Next.js 14+)           | SSR/SSG natif, layout système, loading.tsx                      |
+| Component library | shadcn/ui + Radix UI               | Composants accessibles, thème sombre/light, productivité        |
+| Charting          | Recharts                           | Intégration React simple, supporte tous les types de graphiques |
+| State management  | Zustand + React Context (auth)     | Léger, pas de boilerplate                                       |
+| API client        | React Query                        | Cache, mutations, refetch automatique                           |
+| Auth              | httpOnly cookie + NestJS endpoints | Sécurité (pas de token dans localStorage)                       |
+| Tests             | Jest + RTL (unit) + Cypress (e2e)  | Couverture complète                                             |
+| Structure         | `apps/web/` dans le monorepo       | Cohérent avec `apps/api` et `apps/worker`                       |
 
 ---
 
@@ -197,7 +197,7 @@ emdb/
 
 - [x] Config Jest + React Testing Library (`jest.config.js`, `jest.setup.ts`)
 - [x] Config Cypress (`cypress.config.ts`, `cypress/e2e/`, `cypress/fixtures/`)
-- [ ] CI GitHub Actions : lint → format:check → test → build
+- [x] CI GitHub Actions : lint → format:check → test → build
 
 ---
 
@@ -207,47 +207,49 @@ emdb/
 
 ### 1.1 Pages
 
-- [ ] `app/(auth)/login/page.tsx` — formulaire login :
+- [x] `app/(auth)/login/page.tsx` — formulaire login :
   - Champs : email, password
-  - Validation : email requis, password requis (min 6)
+  - Validation : email requis, password requis (min 8)
   - Bouton "Se connecter"
   - Lien "Créer un compte"
   - Affichage des erreurs (email/password invalide → 401)
   - Redirection vers `/` ou `?redirect=` après login
-- [ ] `app/(auth)/register/page.tsx` — formulaire register :
+- [x] `app/(auth)/register/page.tsx` — formulaire register :
   - Champs : email, pseudo, password, confirm password
-  - Validation : email valide, pseudo (3-30 chars), password (min 6), confirmation
+  - Validation : email valide, pseudo (3-30 chars), password (min 8), confirmation
   - Bouton "Créer le compte"
   - Lien "Déjà un compte ? Connectez-vous"
   - Affichage des erreurs (email/pseudo déjà utilisé → 409)
-- [ ] `app/(auth)/layout.tsx` — layout sans header/sidebar (page blanche centrée)
+- [x] `app/(auth)/layout.tsx` — layout sans header/sidebar (page blanche centrée)
 
 ### 1.2 Hooks & store
 
-- [ ] `hooks/auth/useLogin()` — React Query mutation :
+- [x] `hooks/auth/useLogin()` — React Query mutation :
   - POST `/auth/login`
-  - Stock le token + user dans Zustand
+  - Stock le token + user + refreshToken dans Zustand
+  - Set cookie `emdb_access_token` pour middleware
   - Redirect vers la page précédente ou `/`
-- [ ] `hooks/auth/useRegister()` — React Query mutation :
+- [x] `hooks/auth/useRegister()` — React Query mutation :
   - POST `/auth/register`
-  - Stock le token + user dans Zustand
+  - Stock le token + user + refreshToken dans Zustand
+  - Set cookie `emdb_access_token` pour middleware
   - Redirect vers `/`
-- [ ] `hooks/auth/useLogout()` — mutation :
+- [x] `hooks/auth/useLogout()` — mutation :
   - POST `/auth/logout`
-  - Clear le store Zustand
+  - Clear le store Zustand + cookie
   - Redirect vers `/login`
 
 ### 1.3 Composants
 
-- [ ] `components/auth/LoginForm.tsx`
-- [ ] `components/auth/RegisterForm.tsx`
-- [ ] `components/auth/AuthInput.tsx` — input avec label, validation, error message
+- [x] `components/auth/LoginForm.tsx` — validation, appel useLogin, états loading/error/success, redirect
+- [x] `components/auth/RegisterForm.tsx` — validation (pseudo 3-30, password min 8, confirmation), appel useRegister, états loading/error/success, redirect
+- [x] `components/auth/AuthInput.tsx` — input avec label, error message, types text/email/password, accessibilité ARIA
 
 ### 1.4 Tests
 
-- [ ] Login form : validation des champs, affichage erreur, redirect après login
-- [ ] Register form : validation, confirmation password, affichage erreur 409
-- [ ] Auth store : login/logout/refresh
+- [x] Login form : validation des champs, affichage erreur, redirect après login
+- [x] Register form : validation, confirmation password, affichage erreur 409
+- [x] Auth store : login/logout/refresh + cookie management
 
 ---
 
@@ -868,55 +870,55 @@ emdb/
 
 ## Mapping frontend ↔ backend API
 
-| Frontend (page/hook) | Backend endpoint | Phase backend | Auth |
-|---|---|---|---|
-| `useLogin()` | `POST /auth/login` | 3.1 | ❌ |
-| `useRegister()` | `POST /auth/register` | 3.1 | ❌ |
-| `useLogout()` | `POST /auth/logout` | 3.1 | ✅ |
-| `useCurrentUser()` | `GET /users/me` | 3.2 | ✅ |
-| `useUpdateProfile()` | `PATCH /users/me` | 3.2 | ✅ |
-| `useUploadAvatar()` | `POST /users/me/avatar` | 3.2 | ✅ |
-| `useSearch()` | `GET /titles/search` | 3.3 | ❌ |
-| `useTitle(id)` | `GET /titles/:id` | 3.3 | ❌ |
-| `useTitleRecommendations(id)` | `GET /titles/:id/recommendations` | 3.3 | ❌ |
-| `usePerson(id)` | `GET /people/:id` | 3.4 | ❌ |
-| `usePersonFilmography(id)` | `GET /people/:id/filmography` | 3.4 | ❌ |
-| `usePersonRecommendations(id)` | `GET /people/:id/recommendations` | 3.4 | ❌ |
-| `useSeasons(titleId)` | `GET /titles/:titleId/seasons` | 3.5 | ❌ |
-| `useSeason(titleId, numero)` | `GET /titles/:titleId/seasons/:numero` | 3.5 | ❌ |
-| `useEpisode(id)` | `GET /episodes/:id` | 3.5 | ❌ |
-| `useEpisodeCredits(id)` | `GET /episodes/:id/credits` | 3.5 | ❌ |
-| `useTitleCredits(titleId)` | `GET /titles/:titleId/credits` | 3.6 | ❌ |
-| `useCreateWatch()` | `POST /watches` | 4.1 | ✅ |
-| `useDeleteWatch()` | `DELETE /watches/:id` | 4.1 | ✅ |
-| `useWatches()` | `GET /watches` | 4.1 | ✅ |
-| `useSerieProgress()` | `GET /titles/:titleId/progress` | 4.1 | ✅ |
-| `useCalendar()` | `GET /calendar` | 4.1 | ✅ |
-| `useFollows()` | `GET /follows` | 4.1/4.4 | ✅ |
-| `useFollow()` | `POST /follows` | 4.1/4.4 | ✅ |
-| `useUnfollow()` | `DELETE /follows/:titleId` | 4.1/4.4 | ✅ |
-| `useUpsertRating()` | `PUT /ratings` | 4.2 | ✅ |
-| `useDeleteRating()` | `DELETE /ratings/:id` | 4.2 | ✅ |
-| `useUserRatings()` | `GET /ratings` | 4.2 | ✅ |
-| `useTitleRatingsSummary()` | `GET /titles/:id/ratings` | 4.2 | ❌ |
-| `useLists()` | `GET /lists` | 4.3 | ✅ |
-| `useList(id)` | `GET /lists/:id` | 4.3 | ✅ |
-| `useCreateList()` | `POST /lists` | 4.3 | ✅ |
-| `useUpdateList()` | `PATCH /lists/:id` | 4.3 | ✅ |
-| `useDeleteList()` | `DELETE /lists/:id` | 4.3 | ✅ |
-| `useAddItem()` | `POST /lists/:listId/items` | 4.3 | ✅ |
-| `useRemoveItem()` | `DELETE /lists/:listId/items/:titleId` | 4.3 | ✅ |
-| `useReorderItems()` | `PATCH /lists/:listId/items/reorder` | 4.3 | ✅ |
-| `useShares()` | `GET /lists/:listId/shares` | 4.3 | ✅ |
-| `useShareList()` | `POST /lists/:listId/shares` | 4.3 | ✅ |
-| `useRemoveShare()` | `DELETE /lists/:listId/shares/:userId` | 4.3 | ✅ |
-| `useSharedLists()` | `GET /shared-lists` | 4.3 | ✅ |
-| `useWatchTime()` | `GET /dataviz/watch-time` | 6.1 | ✅ |
-| `useWatchCount()` | `GET /dataviz/watch-count` | 6.1 | ✅ |
-| `useRefreshMaterializedViews()` | `POST /admin/refresh-materialized-views` | 6.2 | ✅ admin |
-| `useComputeRecommendations()` | `POST /admin/compute-recommendations` | 5.2 | ✅ admin |
-| `useJobStatus()` | `GET /admin/compute-recommendations/:jobId/status` | 5.2 | ✅ admin |
-| `useRecommendationStats()` | `GET /admin/recommendations/stats` | 5.2 | ✅ admin |
+| Frontend (page/hook)            | Backend endpoint                                   | Phase backend | Auth     |
+| ------------------------------- | -------------------------------------------------- | ------------- | -------- |
+| `useLogin()`                    | `POST /auth/login`                                 | 3.1           | ❌       |
+| `useRegister()`                 | `POST /auth/register`                              | 3.1           | ❌       |
+| `useLogout()`                   | `POST /auth/logout`                                | 3.1           | ✅       |
+| `useCurrentUser()`              | `GET /users/me`                                    | 3.2           | ✅       |
+| `useUpdateProfile()`            | `PATCH /users/me`                                  | 3.2           | ✅       |
+| `useUploadAvatar()`             | `POST /users/me/avatar`                            | 3.2           | ✅       |
+| `useSearch()`                   | `GET /titles/search`                               | 3.3           | ❌       |
+| `useTitle(id)`                  | `GET /titles/:id`                                  | 3.3           | ❌       |
+| `useTitleRecommendations(id)`   | `GET /titles/:id/recommendations`                  | 3.3           | ❌       |
+| `usePerson(id)`                 | `GET /people/:id`                                  | 3.4           | ❌       |
+| `usePersonFilmography(id)`      | `GET /people/:id/filmography`                      | 3.4           | ❌       |
+| `usePersonRecommendations(id)`  | `GET /people/:id/recommendations`                  | 3.4           | ❌       |
+| `useSeasons(titleId)`           | `GET /titles/:titleId/seasons`                     | 3.5           | ❌       |
+| `useSeason(titleId, numero)`    | `GET /titles/:titleId/seasons/:numero`             | 3.5           | ❌       |
+| `useEpisode(id)`                | `GET /episodes/:id`                                | 3.5           | ❌       |
+| `useEpisodeCredits(id)`         | `GET /episodes/:id/credits`                        | 3.5           | ❌       |
+| `useTitleCredits(titleId)`      | `GET /titles/:titleId/credits`                     | 3.6           | ❌       |
+| `useCreateWatch()`              | `POST /watches`                                    | 4.1           | ✅       |
+| `useDeleteWatch()`              | `DELETE /watches/:id`                              | 4.1           | ✅       |
+| `useWatches()`                  | `GET /watches`                                     | 4.1           | ✅       |
+| `useSerieProgress()`            | `GET /titles/:titleId/progress`                    | 4.1           | ✅       |
+| `useCalendar()`                 | `GET /calendar`                                    | 4.1           | ✅       |
+| `useFollows()`                  | `GET /follows`                                     | 4.1/4.4       | ✅       |
+| `useFollow()`                   | `POST /follows`                                    | 4.1/4.4       | ✅       |
+| `useUnfollow()`                 | `DELETE /follows/:titleId`                         | 4.1/4.4       | ✅       |
+| `useUpsertRating()`             | `PUT /ratings`                                     | 4.2           | ✅       |
+| `useDeleteRating()`             | `DELETE /ratings/:id`                              | 4.2           | ✅       |
+| `useUserRatings()`              | `GET /ratings`                                     | 4.2           | ✅       |
+| `useTitleRatingsSummary()`      | `GET /titles/:id/ratings`                          | 4.2           | ❌       |
+| `useLists()`                    | `GET /lists`                                       | 4.3           | ✅       |
+| `useList(id)`                   | `GET /lists/:id`                                   | 4.3           | ✅       |
+| `useCreateList()`               | `POST /lists`                                      | 4.3           | ✅       |
+| `useUpdateList()`               | `PATCH /lists/:id`                                 | 4.3           | ✅       |
+| `useDeleteList()`               | `DELETE /lists/:id`                                | 4.3           | ✅       |
+| `useAddItem()`                  | `POST /lists/:listId/items`                        | 4.3           | ✅       |
+| `useRemoveItem()`               | `DELETE /lists/:listId/items/:titleId`             | 4.3           | ✅       |
+| `useReorderItems()`             | `PATCH /lists/:listId/items/reorder`               | 4.3           | ✅       |
+| `useShares()`                   | `GET /lists/:listId/shares`                        | 4.3           | ✅       |
+| `useShareList()`                | `POST /lists/:listId/shares`                       | 4.3           | ✅       |
+| `useRemoveShare()`              | `DELETE /lists/:listId/shares/:userId`             | 4.3           | ✅       |
+| `useSharedLists()`              | `GET /shared-lists`                                | 4.3           | ✅       |
+| `useWatchTime()`                | `GET /dataviz/watch-time`                          | 6.1           | ✅       |
+| `useWatchCount()`               | `GET /dataviz/watch-count`                         | 6.1           | ✅       |
+| `useRefreshMaterializedViews()` | `POST /admin/refresh-materialized-views`           | 6.2           | ✅ admin |
+| `useComputeRecommendations()`   | `POST /admin/compute-recommendations`              | 5.2           | ✅ admin |
+| `useJobStatus()`                | `GET /admin/compute-recommendations/:jobId/status` | 5.2           | ✅ admin |
+| `useRecommendationStats()`      | `GET /admin/recommendations/stats`                 | 5.2           | ✅ admin |
 
 ---
 
@@ -928,6 +930,7 @@ emdb/
 ### Intégration dans le projet
 
 Le fichier `design-tokens.ts` sera :
+
 1. **Consommé par `tailwind.config.js`** pour générer les classes utilitaires Tailwind avec les bonnes valeurs
 2. **Importé par les composants** pour accéder aux valeurs de design de manière typée
 3. **Utilisé par les composants shadcn/ui** via le theme CSS custom properties
@@ -935,6 +938,7 @@ Le fichier `design-tokens.ts` sera :
 ### Structure des tokens
 
 Les tokens sont organisés en catégories sémantiques :
+
 - **Colors** : Primary (rouge eMDB), secondary, accent, semantic (success/warning/danger), text, background, surface, border
 - **Typography** : Font families (Inter + JetBrains Mono), font sizes, weights, line heights, letter spacing
 - **Spacing** : Base 4px, échelle 4-80
@@ -974,7 +978,7 @@ export default {
       spacing: designTokens.spacing,
     },
   },
-}
+};
 ```
 
 ### Points de design à valider
@@ -985,21 +989,21 @@ Les 13 points identifiés dans [`docs/frontend-design-choices.md`](./frontend-de
 
 ## Décisions à trancher (questions ouvertes)
 
-| # | Question | Options | Recommandation |
-|---|---|---|---|
-| 1 | App Router vs Pages Router | App Router (Next 14+) / Pages Router | App Router |
-| 2 | Component library | shadcn/ui / Radix pur / Tailwind pur | shadcn/ui + Radix |
-| 3 | Charting | Recharts / Chart.js / ApexCharts | Recharts |
-| 4 | State management | Zustand / Jotai / Redux Toolkit / React Context | Zustand + Context (auth) |
-| 5 | API client | React Query / SWR / Axios + custom | React Query |
-| 6 | Auth storage | httpOnly cookie / localStorage / memory | httpOnly cookie |
-| 7 | Drag & drop | @dnd-kit/core / react-beautiful-dnd | @dnd-kit/core |
-| 8 | Animations | Framer Motion / CSS transitions / AOS | Framer Motion |
-| 9 | Tests e2e | Cypress / Playwright / TestCafe | Cypress |
-| 10 | Image optimization | next/image / vanilla img | next/image |
-| 11 | Refresh token | Cookie httpOnly / localStorage / memory | httpOnly cookie |
-| 12 | Admin guard | ADMIN_EMAILS env / champ is_admin / rôle Supabase | ADMIN_EMAILS env |
-| 13 | Refresh queue | Queue `dataviz` dédiée / réutiliser `tmdb-cron` | Réutiliser `tmdb-cron` (job déjà défini) |
+| #   | Question                   | Options                                           | Recommandation                           |
+| --- | -------------------------- | ------------------------------------------------- | ---------------------------------------- |
+| 1   | App Router vs Pages Router | App Router (Next 14+) / Pages Router              | App Router                               |
+| 2   | Component library          | shadcn/ui / Radix pur / Tailwind pur              | shadcn/ui + Radix                        |
+| 3   | Charting                   | Recharts / Chart.js / ApexCharts                  | Recharts                                 |
+| 4   | State management           | Zustand / Jotai / Redux Toolkit / React Context   | Zustand + Context (auth)                 |
+| 5   | API client                 | React Query / SWR / Axios + custom                | React Query                              |
+| 6   | Auth storage               | httpOnly cookie / localStorage / memory           | httpOnly cookie                          |
+| 7   | Drag & drop                | @dnd-kit/core / react-beautiful-dnd               | @dnd-kit/core                            |
+| 8   | Animations                 | Framer Motion / CSS transitions / AOS             | Framer Motion                            |
+| 9   | Tests e2e                  | Cypress / Playwright / TestCafe                   | Cypress                                  |
+| 10  | Image optimization         | next/image / vanilla img                          | next/image                               |
+| 11  | Refresh token              | Cookie httpOnly / localStorage / memory           | httpOnly cookie                          |
+| 12  | Admin guard                | ADMIN_EMAILS env / champ is_admin / rôle Supabase | ADMIN_EMAILS env                         |
+| 13  | Refresh queue              | Queue `dataviz` dédiée / réutiliser `tmdb-cron`   | Réutiliser `tmdb-cron` (job déjà défini) |
 
 ---
 
@@ -1036,43 +1040,43 @@ Les 13 points identifiés dans [`docs/frontend-design-choices.md`](./frontend-de
 
 ## Fichiers de référence
 
-| Fichier | Rôle |
-|---|---|
-| `README.md` | Stack, fonctionnalités, hébergement |
-| `emdb_roadmap_backend.md` | Phases, endpoints, décisions backend |
-| `packages/db/sql/db_init.sql` | Schéma DB (tables, types, contraintes) |
-| `packages/db/src/functions.ts` | Fonctions PL/pgSQL (fn_episodes_non_vus, fn_progress_serie) |
-| `packages/db/prisma/schema.prisma` | Schéma Prisma (introspecté) |
-| `packages/db/prisma/README.md` | Gestion Prisma / SQL brut |
-| `packages/db/README.md` | Package db partagé |
-| `docs/phase-*.md` | Contextes détaillés par phase |
-| `docker-compose.yml` | Infra locale (postgres, redis, api, worker) |
-| `.env.example` | Variables d'environnement |
-| `apps/api/src/**` | Code API existant (patterns à suivre) |
-| `docs/frontend-design-choices.md` | Points de design à trancher et recommandations |
-| `apps/web/design-tokens.ts` | Charte graphique complète (couleurs, typographie, spacing, etc.) |
+| Fichier                            | Rôle                                                             |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| `README.md`                        | Stack, fonctionnalités, hébergement                              |
+| `emdb_roadmap_backend.md`          | Phases, endpoints, décisions backend                             |
+| `packages/db/sql/db_init.sql`      | Schéma DB (tables, types, contraintes)                           |
+| `packages/db/src/functions.ts`     | Fonctions PL/pgSQL (fn_episodes_non_vus, fn_progress_serie)      |
+| `packages/db/prisma/schema.prisma` | Schéma Prisma (introspecté)                                      |
+| `packages/db/prisma/README.md`     | Gestion Prisma / SQL brut                                        |
+| `packages/db/README.md`            | Package db partagé                                               |
+| `docs/phase-*.md`                  | Contextes détaillés par phase                                    |
+| `docker-compose.yml`               | Infra locale (postgres, redis, api, worker)                      |
+| `.env.example`                     | Variables d'environnement                                        |
+| `apps/api/src/**`                  | Code API existant (patterns à suivre)                            |
+| `docs/frontend-design-choices.md`  | Points de design à trancher et recommandations                   |
+| `apps/web/design-tokens.ts`        | Charte graphique complète (couleurs, typographie, spacing, etc.) |
 
 ---
 
 ## Résumé des phases frontend
 
-| Phase | Nom | Correspondance backend | Endpoints clés | Statut |
-|---|---|---|---|---|
-| 0 | Socle technique | Phase 0 | — | À faire |
-| 1 | Auth pages | Phase 3.1 | `/auth/*` | À faire |
-| 2 | Recherche & navigation | Phase 3.3, 3.4 | `/titles/search`, `/people/search` | À faire |
-| 3 | Pages de détail | Phase 3.3-3.6 | `/titles/:id`, `/people/:id`, `/episodes/:id` | À faire |
-| 4.1 | Watches + calendrier | Phase 4.1 | `/watches`, `/calendar`, `/follows` | À faire |
-| 4.2 | Ratings | Phase 4.2 | `/ratings`, `/titles/:id/ratings` | À faire |
-| 4.3 | Lists | Phase 4.3 | `/lists`, `/shared-lists` | À faire |
-| 4.4 | Follows | Phase 4.4 | `/follows` | À faire |
-| 5 | Recommandations | Phase 5 | `/admin/compute-recommendations` | À faire |
-| 6 | Dataviz + admin refresh | Phase 6.1, 6.2 | `/dataviz/watch-time`, `/dataviz/watch-count`, `/admin/refresh-materialized-views` | À faire |
-| 7 | Notifications | Phase 7 | `/notifications` | À faire |
-| 8 | Profil | Phase 3.2 | `/users/me` | À faire |
-| 9 | Optimisations | — | — | À faire |
+| Phase | Nom                     | Correspondance backend | Endpoints clés                                                                     | Statut  |
+| ----- | ----------------------- | ---------------------- | ---------------------------------------------------------------------------------- | ------- |
+| 0     | Socle technique         | Phase 0                | —                                                                                  | Terminé |
+| 1     | Auth pages              | Phase 3.1              | `/auth/*`                                                                          | Terminé |
+| 2     | Recherche & navigation  | Phase 3.3, 3.4         | `/titles/search`, `/people/search`                                                 | À faire |
+| 3     | Pages de détail         | Phase 3.3-3.6          | `/titles/:id`, `/people/:id`, `/episodes/:id`                                      | À faire |
+| 4.1   | Watches + calendrier    | Phase 4.1              | `/watches`, `/calendar`, `/follows`                                                | À faire |
+| 4.2   | Ratings                 | Phase 4.2              | `/ratings`, `/titles/:id/ratings`                                                  | À faire |
+| 4.3   | Lists                   | Phase 4.3              | `/lists`, `/shared-lists`                                                          | À faire |
+| 4.4   | Follows                 | Phase 4.4              | `/follows`                                                                         | À faire |
+| 5     | Recommandations         | Phase 5                | `/admin/compute-recommendations`                                                   | À faire |
+| 6     | Dataviz + admin refresh | Phase 6.1, 6.2         | `/dataviz/watch-time`, `/dataviz/watch-count`, `/admin/refresh-materialized-views` | À faire |
+| 7     | Notifications           | Phase 7                | `/notifications`                                                                   | À faire |
+| 8     | Profil                  | Phase 3.2              | `/users/me`                                                                        | À faire |
+| 9     | Optimisations           | —                      | —                                                                                  | À faire |
 
 ---
 
-*Dernière mise à jour : 23 juillet 2026*
-*Basé sur : `emdb_roadmap_backend.md` (v2), `packages/db/sql/db_init.sql` (v2), `README.md`, `docs/phase-*.md`*
+_Dernière mise à jour : 24 juillet 2026_
+_Basé sur : `emdb_roadmap_backend.md` (v2), `packages/db/sql/db_init.sql` (v2), `README.md`, `docs/phase-*.md`_

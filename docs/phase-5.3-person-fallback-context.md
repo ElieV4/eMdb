@@ -2,21 +2,23 @@
 
 ## Décisions stratégiques (tranchées)
 
-| Question | Décision | Justification |
-|----------|----------|---------------|
-| 1. Algorithme TMDB | **(a) Jaccard sur credits partagés** | TMDB n'a pas d'endpoint `/person/{id}/recommendations`. Seule option pour calculer un score : fetch `getPersonCombinedCredits` pour chaque personne, Jaccard sur les titres communs. Cohérent avec Phase 5.1. |
-| 2. Où placer la fonction | **(a) `packages/tmdb-sync/src/index.ts`** | Symétrique de `bootstrapRecommendationsFromTmdb` pour les titres, déjà présent dans tmdb-sync. |
-| 3. Fallback API | **(a) Oui, fallback TMDB** | Même logique que les titres (Phase 3.3) : si `person_recommendations` est vide, appeler TMDB. Cohérence UX. |
-| 4. Max recommandations | **(a) 10** | Cohérent avec le reste (title_recommendations aussi limité à 10). |
+| Question                 | Décision                                  | Justification                                                                                                                                                                                                 |
+| ------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Algorithme TMDB       | **(a) Jaccard sur credits partagés**      | TMDB n'a pas d'endpoint `/person/{id}/recommendations`. Seule option pour calculer un score : fetch `getPersonCombinedCredits` pour chaque personne, Jaccard sur les titres communs. Cohérent avec Phase 5.1. |
+| 2. Où placer la fonction | **(a) `packages/tmdb-sync/src/index.ts`** | Symétrique de `bootstrapRecommendationsFromTmdb` pour les titres, déjà présent dans tmdb-sync.                                                                                                                |
+| 3. Fallback API          | **(a) Oui, fallback TMDB**                | Même logique que les titres (Phase 3.3) : si `person_recommendations` est vide, appeler TMDB. Cohérence UX.                                                                                                   |
+| 4. Max recommandations   | **(a) 10**                                | Cohérent avec le reste (title_recommendations aussi limité à 10).                                                                                                                                             |
 
 ## Dépendances
 
 ### Externes
+
 - `@emdb/tmdb-client` → `getPersonCombinedCredits(personTmdbId)`
 - `@emdb/db` → Prisma : lecture `people` (tmdb_id), écriture `person_recommendations`
 - `@emdb/tmdb-sync` → déjà existant, on ajoute une fonction exportée
 
 ### Personnes concernées
+
 Seules les personnes qui ont un `tmdb_id` peuvent bénéficier du fallback TMDB (celles importées via Phase 2.3). Les personnes créées manuellement (sans tmdb_id) ne peuvent pas être bootstrapées.
 
 ## Algorithme : bootstrapPersonRecommendationsFromTmdb
@@ -53,7 +55,7 @@ export async function bootstrapPersonRecommendationsFromTmdb(personId: string): 
   }
 
   if (!person.tmdb_id) {
-    throw new Error('La personne n\'a pas de tmdb_id, impossible de bootstrap depuis TMDB.');
+    throw new Error("La personne n'a pas de tmdb_id, impossible de bootstrap depuis TMDB.");
   }
 
   // 1. Fetch TMDB combined credits
@@ -228,16 +230,17 @@ async getRecommendations(id: string) {
 
 ## Fichiers modifiés
 
-| Fichier | Action | Description |
-|---------|--------|-------------|
-| `packages/tmdb-sync/src/index.ts` | **Modifier** | Ajouter `bootstrapPersonRecommendationsFromTmdb(personId)` |
-| `packages/tmdb-sync/src/index.spec.ts` | **Modifier** | Tester la nouvelle fonction |
-| `apps/api/src/people/people.service.ts` | **Modifier** | Ajouter fallback TMDB dans `getRecommendations()` |
-| `apps/api/src/people/people.service.spec.ts` | **Modifier** | Tester le fallback TMDB |
+| Fichier                                      | Action       | Description                                                |
+| -------------------------------------------- | ------------ | ---------------------------------------------------------- |
+| `packages/tmdb-sync/src/index.ts`            | **Modifier** | Ajouter `bootstrapPersonRecommendationsFromTmdb(personId)` |
+| `packages/tmdb-sync/src/index.spec.ts`       | **Modifier** | Tester la nouvelle fonction                                |
+| `apps/api/src/people/people.service.ts`      | **Modifier** | Ajouter fallback TMDB dans `getRecommendations()`          |
+| `apps/api/src/people/people.service.spec.ts` | **Modifier** | Tester le fallback TMDB                                    |
 
 ## Plan de tests
 
 ### bootstrapPersonRecommendationsFromTmdb (tmdb-sync)
+
 - Appelle `getPersonCombinedCredits` et insère des recommandations
 - Retourne 0 si la personne n'a pas de tmdb_id
 - Retourne 0 si aucun titre local trouvé (tmdbTitleIds vides → 0 titres locaux)
@@ -246,9 +249,9 @@ async getRecommendations(id: string) {
 - Lève Error si personne introuvable
 
 ### Fallback PeopleService.getRecommendations()
+
 - Si recommandations locales existantes → les retourne (inchangé)
 - Si pas de recommandations locales et pas de tmdb_id → tableau vide
 - Si pas de recommandations locales et tmdb_id présent → appelle bootstrapPersonRecommendationsFromTmdb
 - Si TMDB échoue → ne crashe pas, retourne tableau vide (catch silencieux)
 - Après bootstrap réussi → retourne les nouvelles recommandations
-

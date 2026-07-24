@@ -6,8 +6,8 @@
 
 ---
 
-
 ## Objectifs
+
 - Initialiser le workspace Next.js 14+ (App Router, TypeScript, Tailwind).
 - Ajouter shadcn/ui + thème sombre/light par défaut dark.
 - Mettre en place React Query, un client API typé, et les types/base url.
@@ -19,13 +19,14 @@
 
 ---
 
-
 ## Pages à créer
+
 - Aucune page métier spécifique en phase 0.
 - Pages structurelles uniquement : layout global `(frontend)` avec haut/bas de page.
 - Pages d’auth vides prêtes pour Phase 1 : `(auth)/login`, `(auth)/register`.
 
 ## Décisions prises (points à trancher résolus)
+
 - Authentification : `(auth)/` séparé du layout app + middleware sur routes protégées.
 - Rafraîchissement token : cookie httpOnly + endpoint `/auth/refresh` explicite (standard, sécurisé).
 - Pagination : composant générique `components/common/Pagination` (réutilisable).
@@ -33,8 +34,8 @@
 
 ---
 
-
 ## Composants à créer
+
 - `components/layout/Header.tsx` — navigation responsive
 - `components/layout/Footer.tsx`
 - `components/common/LoadingSpinner.tsx`
@@ -43,8 +44,8 @@
 
 ---
 
-
 ## Hooks à créer
+
 - `hooks/auth/useAuth.ts`
 - `hooks/auth/useLogin.ts`
 - `hooks/auth/useRegister.ts`
@@ -52,8 +53,8 @@
 
 ---
 
-
 ## Endpoints API consommés (backend existants)
+
 - `POST /auth/register`
 - `POST /auth/login`
 - `POST /auth/logout`
@@ -64,8 +65,8 @@
 
 ---
 
-
 ## Gestion des états (loading/error/empty)
+
 - React Query fournit loading/error par hook.
 - `LoadingSpinner` utilisé pour les états pending.
 - `ErrorBoundary` pour erreurs render.
@@ -73,8 +74,8 @@
 
 ---
 
-
 ## Tests
+
 - Jest config + setup, RTL installé.
 - Tests unitaires pour :
   - hooks auth
@@ -83,8 +84,8 @@
 
 ---
 
-
 ## Critères d’acceptation
+
 - `npm run build` passe.
 - `npm run lint` et `npm run format` passent.
 - Tests unitaires passent.
@@ -94,13 +95,14 @@
 - shadcn/ui initialisé + thème dark par défaut.
 
 ## Erreurs connues à résorber avant build
+
 - ~~`apps/web/tailwind.config.ts` : TS errors type declarations manquants~~ ✅ Résolu par l'import direct de `design-tokens.ts`.
 - ~~`asChild` sur composants base-ui~~ ✅ Résolu : `@base-ui/react` ne supporte pas `asChild` ; les composants enfants sont rendus directement.
 
 ---
 
-
 ## Plan d’implémentation
+
 1. Création du projet Next.js dans `apps/web`.
 2. Tailwind + shadcn/ui + thème dark par défaut.
 3. Configuration alias `@/`, eslint/prettier.
@@ -110,6 +112,7 @@
 7. Tests + Cypress config.
 
 ## Arborescence cible Phase 0
+
 - `apps/web/src/app/(frontend)/layout.tsx`
 - `apps/web/src/app/(auth)/login/page.tsx`
 - `apps/web/src/app/(auth)/register/page.tsx`
@@ -138,14 +141,14 @@
 
 ## Décisions finales Phase 0
 
-| Décision | Choix retenu | Justification |
-|----------|-------------|---------------|
-| UI primitives | `@base-ui/react` (via shadcn/ui) | Remplace Radix UI ; pas de support `asChild` |
-| Theme | Dark par défaut (`className="dark"` sur `<html>`) | Cohérent avec design tokens |
-| Alias | `@/*` → `./src/*` | Standard Next.js monorepo |
-| Auth store | Zustand (global) + React Context non utilisé pour l'instant | Léger, pas de boilerplate |
-| API client | Fetch wrapper + React Query | Pas d'Axios ; intercepteur 401/403/404 centralisé |
-| Tests | Jest + RTL (unit) ; Cypress configuré mais non exécuté en CI | Couverture unitaire suffisante pour Phase 0 |
+| Décision      | Choix retenu                                                 | Justification                                     |
+| ------------- | ------------------------------------------------------------ | ------------------------------------------------- |
+| UI primitives | `@base-ui/react` (via shadcn/ui)                             | Remplace Radix UI ; pas de support `asChild`      |
+| Theme         | Dark par défaut (`className="dark"` sur `<html>`)            | Cohérent avec design tokens                       |
+| Alias         | `@/*` → `./src/*`                                            | Standard Next.js monorepo                         |
+| Auth store    | Zustand (global) + React Context non utilisé pour l'instant  | Léger, pas de boilerplate                         |
+| API client    | Fetch wrapper + React Query                                  | Pas d'Axios ; intercepteur 401/403/404 centralisé |
+| Tests         | Jest + RTL (unit) ; Cypress configuré mais non exécuté en CI | Couverture unitaire suffisante pour Phase 0       |
 
 ## Validation Phase 0
 
@@ -157,12 +160,12 @@
 
 ## Endpoints API consommés (vérifiés côté backend)
 
-| Endpoint | Méthode | Auth | Status backend |
-|----------|---------|------|----------------|
-| `/auth/register` | POST | ❌ | ✅ Existe |
-| `/auth/login` | POST | ❌ | ✅ Existe |
-| `/auth/logout` | POST | ✅ | ✅ Existe |
-| `/auth/me` | GET | ✅ | ✅ Existe |
-| `/auth/refresh` | POST | ❌ | ✅ Existe |
-| `/users/me` | GET | ✅ | ✅ Existe |
-| `/users/search` | GET | ✅ | ✅ Existe |
+| Endpoint         | Méthode | Auth | Status backend |
+| ---------------- | ------- | ---- | -------------- |
+| `/auth/register` | POST    | ❌   | ✅ Existe      |
+| `/auth/login`    | POST    | ❌   | ✅ Existe      |
+| `/auth/logout`   | POST    | ✅   | ✅ Existe      |
+| `/auth/me`       | GET     | ✅   | ✅ Existe      |
+| `/auth/refresh`  | POST    | ❌   | ✅ Existe      |
+| `/users/me`      | GET     | ✅   | ✅ Existe      |
+| `/users/search`  | GET     | ✅   | ✅ Existe      |

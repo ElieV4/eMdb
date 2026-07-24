@@ -1,14 +1,30 @@
 /**
- * Page d’inscription.
+ * Page d'inscription.
+ * Affiche le formulaire RegisterForm avec lien vers la connexion.
  */
 
-export default function RegisterPage() {
+import Link from "next/link";
+import { RegisterForm } from "@/components/auth/RegisterForm";
+
+export default function RegisterPage({
+  searchParams,
+}: {
+  searchParams?: { redirect?: string };
+}) {
+  const redirectTo = searchParams?.redirect || "/";
+
   return (
-    <div className="mx-auto max-w-sm px-4 py-12">
-      <h1 className="text-2xl font-bold">Inscription</h1>
-      <p className="mt-2 text-muted-foreground">
-        Formulaire d’inscription (implémenté en phase 1).
-      </p>
-    </div>
+    <>
+      <div className="text-center">
+        <h1 className="text-2xl font-bold">Inscription</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Déjà un compte ?{" "}
+          <Link href="/login" className="text-primary hover:underline">
+            Connectez-vous
+          </Link>
+        </p>
+      </div>
+      <RegisterForm redirectTo={redirectTo} />
+    </>
   );
 }
