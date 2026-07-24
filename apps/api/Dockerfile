@@ -2,6 +2,9 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 
+# Installer les dépendances système pour Prisma
+RUN apk add --no-cache openssl libstdc++
+
 # Copie des manifests pour profiter du cache Docker sur l'install
 COPY package.json package-lock.json* ./
 COPY apps/api/package.json apps/api/package.json
@@ -11,6 +14,27 @@ RUN npm install --workspaces --if-present
 
 # Copie du reste du monorepo (utile en build ; en dev, volumes montés par compose)
 COPY . .
+
+# Générer le client Prisma
+RUN cd /app/packages/db && npx prisma generate --schema=./prisma/schema.prisma
+
+# Compiler packages/db
+RUN cd /app/packages/db && npx tsc --skipLibCheck
+
+# Compiler packages/tmdb-client, tmdb-mapper, wikidata-client
+RUN cd /app/packages/tmdb-client && npx tsc --skipLibCheck
+RUN cd /app/packages/tmdb-mapper && npx tsc --skipLibCheck
+RUN cd /app/packages/wikidata-client && npx tsc --skipLibCheck
+RUN cd /app/packages/tmdb-sync && npx tsc --skipLibCheck
+
+# Créer des symlinks pour les packages dans node_modules
+RUN mkdir -p /app/node_modules/@emdb && \
+    ln -s /app/packages/db /app/node_modules/@emdb/db && \
+    ln -s /app/packages/tmdb-client /app/node_modules/@emdb/tmdb-client && \
+    ln -s /app/packages/tmdb-mapper /app/node_modules/@emdb/tmdb-mapper && \
+    ln -s /app/packages/wikidata-client /app/node_modules/@emdb/wikidata-client && \
+    ln -s /app/packages/tmdb-sync /app/node_modules/@emdb/tmdb-sync && \
+    ln -s /app/packages/recommender /app/node_modules/@emdb/recommender
 
 WORKDIR /app/apps/api
 EXPOSE 3001

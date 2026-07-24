@@ -54,7 +54,7 @@ services:
         condition: service_healthy
     volumes:
       - ./apps/api:/app/apps/api
-      - ./packages:/app/packages
+      # - ./packages:/app/packages
       - /app/node_modules
 
   worker:

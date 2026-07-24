@@ -24,5 +24,4 @@ exports.prisma = new client_1.PrismaClient();
 __exportStar(require("@prisma/client"), exports);
 // Fonctions PL/pgSQL (Phase 1.3) — à exposer côté API
 // Ces fonctions appellent les fonctions PostgreSQL définies dans packages/db/sql/db_init.sql
-__exportStar(require("./src/functions"), exports);
-//# sourceMappingURL=index.js.map
+__exportStar(require("./dist/src/functions.js"), exports);

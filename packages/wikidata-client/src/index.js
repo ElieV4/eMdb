@@ -19,4 +19,3 @@ async function getWikipediaUrlFromWikidataId(wikidataId, lang = 'fr') {
     const siteKey = `${lang}wiki`;
     return siteLinks[siteKey]?.url ?? null;
 }
-//# sourceMappingURL=index.js.map

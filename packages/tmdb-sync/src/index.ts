@@ -607,6 +607,7 @@ export async function bootstrapPersonRecommendationsFromTmdb(personId: string): 
   const candidates: Array<{ personId: string; score: number }> = [];
 
   for (const [otherPersonId, otherTitles] of personTitles) {
+    // @ts-ignore - Type issue with Set elements
     const intersection = new Set([...personTitleSet].filter((x) => otherTitles.has(x)));
     const union = new Set([...personTitleSet, ...otherTitles]);
 

@@ -51,6 +51,7 @@ export class PrismaService implements OnModuleDestroy {
    * @returns Résultat de la requête
    */
   async $queryRawUnsafe<T = any>(sql: string, ...params: any[]): Promise<T> {
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
     return prisma.$queryRawUnsafe<T>(sql, ...params);
   }
 

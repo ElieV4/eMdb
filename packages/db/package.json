@@ -2,7 +2,8 @@
   "name": "@emdb/db",
   "version": "0.0.0",
   "private": true,
-  "main": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "generate": "dotenv -e ../../.env -- prisma generate",
     "db:pull": "dotenv -o -e ../../.env -- prisma db pull",

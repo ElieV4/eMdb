@@ -7,6 +7,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new PrismaExceptionFilter());
+  
+  // Enable CORS for frontend (Next.js on localhost:3000)
+  app.enableCors({
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    credentials: true,
+  });
 
   const port = process.env.PORT ?? 3001;
   await app.listen(port);

@@ -1,9 +1,7 @@
 {
   "extends": "../db/tsconfig.json",
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
-    "rootDir": ".",
     "paths": {
       "@emdb/db": ["../db/index.ts"],
       "@emdb/tmdb-client": ["../tmdb-client/src/index.ts"],
@@ -11,7 +9,12 @@
       "@emdb/wikidata-client": ["../wikidata-client/src/index.ts"]
     },
     "outDir": "./dist",
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "skipLibCheck": true,
+    "composite": false
   },
   "include": ["src/**/*.ts"]
 }

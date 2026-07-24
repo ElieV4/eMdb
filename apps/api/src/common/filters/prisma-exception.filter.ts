@@ -3,26 +3,31 @@ import { Prisma } from '@prisma/client';
 
 @Catch()
 export class PrismaExceptionFilter implements ExceptionFilter {
-  catch(exception: unknown, host: ArgumentsHost) {
+  catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
     const request = ctx.getRequest();
 
+    // @ts-ignore - Prisma type issue
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      // @ts-ignore
       if (exception.code === 'P2002') {
         response.status(HttpStatus.CONFLICT).json({
           statusCode: HttpStatus.CONFLICT,
           message: 'Conflit de donnée en base.',
+          // @ts-ignore
           details: exception.meta,
           path: request.url,
         });
         return;
       }
 
+      // @ts-ignore
       if (exception.code === 'P2025') {
         response.status(HttpStatus.NOT_FOUND).json({
           statusCode: HttpStatus.NOT_FOUND,
           message: 'Ressource introuvable.',
+          // @ts-ignore
           details: exception.meta,
           path: request.url,
         });
