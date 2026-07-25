@@ -6,13 +6,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Search, Film, Tv, Users, SlidersHorizontal } from "lucide-react";
-import { cn, slugify } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { PersonCard } from "@/components/people/PersonCard";
-import { Pagination } from "@/components/common/Pagination";
-import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { SimplePagination } from "@/components/common/SimplePagination";
 import { useTitles } from "@/hooks/api/useTitles";
 import { usePeople } from "@/hooks/api/usePeople";
 import {
@@ -95,14 +94,21 @@ const TITLE_FILTERS: TitleFilter[] = [
 // Nombre d'éléments par page
 const ITEMS_PER_PAGE = 20;
 
-export default function SearchPage() {
+interface SearchPageProps {
+  searchParams: {
+    query?: string;
+    type?: string;
+    page?: string;
+  };
+}
+
+export default function SearchPage({ searchParams }: SearchPageProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // Paramètres de recherche depuis l'URL
-  const urlQuery = searchParams.get("query") || "";
-  const urlTab = searchParams.get("type") as SearchType | "tout" | null;
-  const urlPage = searchParams.get("page") || "1";
+  const urlQuery = searchParams.query || "";
+  const urlTab = searchParams.type as SearchType | "tout" | null;
+  const urlPage = searchParams.page || "1";
 
   // État local
   const [query, setQuery] = useState(urlQuery);
@@ -193,16 +199,13 @@ export default function SearchPage() {
   const isLoading = isTitlesLoading || isPeopleLoading;
 
   // Données à afficher selon le tab
-  let displayData;
   let totalItems = 0;
   let totalPages = 1;
 
   if (activeTab === "personne") {
-    displayData = peopleData;
     totalItems = peopleData?.total || 0;
     totalPages = peopleData?.totalPages || 1;
   } else {
-    displayData = titlesData;
     totalItems = titlesData?.total || 0;
     totalPages = titlesData?.totalPages || 1;
   }
@@ -351,14 +354,12 @@ export default function SearchPage() {
               </div>
 
               {/* Pagination */}
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={page}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                  className="justify-center"
-                />
-              )}
+              <SimplePagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                className="justify-center"
+              />
             </>
           )}
 

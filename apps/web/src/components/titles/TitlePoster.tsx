@@ -35,9 +35,6 @@ export function TitlePoster({
     ? `${TMDB_POSTER_BASE_URL}/w500${src}`
     : PLACEHOLDER_POSTER;
 
-  // Ratio d'aspect : 2:3 pour les affiches de films
-  const aspectRatio = width / height;
-
   return (
     <div
       className={cn(

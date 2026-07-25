@@ -18,13 +18,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, LogOut } from "lucide-react";
+import { Menu, X, User, LogOut, Search } from "lucide-react";
+import { TitleSearchBar } from "@/components/titles/TitleSearchBar";
 
 export function Header() {
   const { isAuthenticated, user } = useAuth();
   const logout = useLogout();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Redirect to login after successful logout
   useEffect(() => {
@@ -49,7 +51,26 @@ export function Header() {
           <Link href="/" className="text-xl font-bold tracking-tight">
             eMDB
           </Link>
-          <nav className="hidden md:flex gap-4">
+          <div className="hidden lg:flex flex-1 max-w-md">
+            <TitleSearchBar
+              placeholder="Rechercher un film, une série ou une personne..."
+              showSuggestions={true}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="lg:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSearchOpen(!searchOpen)}
+              aria-label="Rechercher"
+            >
+              <Search className="h-5 w-5" />
+            </Button>
+          </div>
+          <nav className="hidden lg:flex gap-4">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -60,9 +81,6 @@ export function Header() {
               </Link>
             ))}
           </nav>
-        </div>
-
-        <div className="flex items-center gap-2">
           {isAuthenticated ? (
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger>
@@ -79,7 +97,7 @@ export function Header() {
                   {user?.pseudo}
                 </div>
                 <DropdownMenuItem>
-                  <Link href="/profile">Profil</Link>
+                  <Link href="/profile" className="w-full">Profil</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => logout.mutate()}>
                   <LogOut className="mr-2 h-4 w-4" />
@@ -88,7 +106,7 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <div className="flex gap-2">
+            <div className="hidden lg:flex gap-2">
               <Link href="/login" className="underline">
                 Connexion
               </Link>
@@ -100,7 +118,7 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="lg:hidden"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Menu"
           >
@@ -113,8 +131,20 @@ export function Header() {
         </div>
       </div>
 
+      {/* Barre de recherche mobile */}
+      {searchOpen && (
+        <div className="border-t px-4 py-2 lg:hidden">
+          <TitleSearchBar
+            placeholder="Rechercher un film, une série ou une personne..."
+            showSuggestions={true}
+            onSearch={() => setSearchOpen(false)}
+          />
+        </div>
+      )}
+
+      {/* Menu navigation mobile */}
       {menuOpen && (
-        <nav className="border-t px-4 py-2 md:hidden">
+        <nav className="border-t px-4 py-2 lg:hidden">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -125,6 +155,24 @@ export function Header() {
               {link.label}
             </Link>
           ))}
+          {!isAuthenticated && (
+            <>
+              <Link
+                href="/login"
+                className="block py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                Connexion
+              </Link>
+              <Link
+                href="/register"
+                className="block py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                Inscription
+              </Link>
+            </>
+          )}
         </nav>
       )}
     </header>

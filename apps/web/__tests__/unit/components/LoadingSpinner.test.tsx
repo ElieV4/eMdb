@@ -2,7 +2,7 @@
  * Tests unitaires pour LoadingSpinner.
  */
 
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 
 describe("LoadingSpinner", () => {

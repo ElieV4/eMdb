@@ -259,7 +259,7 @@ emdb/
 
 ### 2.1 Page d'accueil
 
-- [ ] `app/page.tsx` — dashboard :
+- [x] `app/page.tsx` — dashboard :
   - Si non connecté : page de bienvenue + CTA login/register
   - Si connecté :
     - Continue watching (séries suivies avec progrès)
@@ -270,20 +270,23 @@ emdb/
 
 ### 2.2 Recherche
 
-- [ ] `app/search/page.tsx` — page de recherche :
+- [x] `app/search/page.tsx` — page de recherche :
   - Input de recherche avec debounce (500ms)
   - Tabs : Films, Séries, Personnes
   - Résultats en grid (TitleCard / PersonCard)
   - Filtres : type (film/serie), genre, pays, année
   - Pagination
-- [ ] `components/titles/TitleSearchBar.tsx` — input avec suggestions (autocomplete)
-  - Suggestions : titres locaux + résultats TMDB
+- [x] `components/titles/TitleSearchBar.tsx` — input avec suggestions (autocomplete)
+  - Suggestions : titres locaux + personnes via API backend
   - Navigation clavier (↑↓ pour naviguer, Enter pour sélectionner)
+- [x] `components/layout/Header.tsx` — barre de recherche globale intégrée
+  - Affichage desktop et mobile
+  - Autocomplete avec TitleSearchBar
 
 ### 2.3 Navigation & routing
 
-- [ ] `app/titles/[id]/page.tsx` — page détail titre
-- [ ] `app/people/[id]/page.tsx` — page détail personne
+- [x] `app/titles/[id]/page.tsx` — page détail titre (stub pour Phase 3)
+- [x] `app/people/[id]/page.tsx` — page détail personne (stub pour Phase 3)
 - [ ] `app/series/[id]/page.tsx` — page détail série (alias de titles/[id] avec type=serie)
 - [ ] `app/calendar/page.tsx` — calendrier épisodes non vus
 - [ ] `app/dataviz/page.tsx` — page dataviz
@@ -294,25 +297,31 @@ emdb/
 
 ### 2.4 Hooks
 
-- [ ] `hooks/api/useTitles()` — hooks pour la recherche et les listes de titres
-- [ ] `hooks/api/useTitle(id)` — hook pour le détail d'un titre
-- [ ] `hooks/api/usePeople()` — hooks pour la recherche de personnes
-- [ ] `hooks/api/usePerson(id)` — hook pour le détail d'une personne
-- [ ] `hooks/api/useSearch(query, type)` — hook de recherche avec debounce
+- [x] `hooks/api/useTitles()` — hooks pour la recherche et les listes de titres
+- [x] `hooks/api/useTitle(id)` — hook pour le détail d'un titre
+- [x] `hooks/api/usePeople()` — hooks pour la recherche de personnes
+- [x] `hooks/api/usePerson(id)` — hook pour le détail d'une personne
+- [x] `hooks/api/useSearch(query, type)` — hook de recherche avec debounce
+- [x] `hooks/api/useDashboard()` — hooks pour le dashboard homepage
+- [x] `hooks/ui/useDebounce()` — hook utilitaire pour debounce
 
 ### 2.5 Composants
 
-- [ ] `components/titles/TitleCard.tsx` — card titre (affiche, titre, note, année, type)
-- [ ] `components/titles/TitlePoster.tsx` — affiche avec fallback
-- [ ] `components/titles/TitleSearchBar.tsx` — input de recherche
-- [ ] `components/people/PersonCard.tsx` — card personne (photo, nom, rôle)
-- [ ] `components/people/PersonBadge.tsx` — badge compact (pour la distribution)
+- [x] `components/titles/TitleCard.tsx` — card titre (affiche, titre, note, année, type)
+- [x] `components/titles/TitlePoster.tsx` — affiche avec fallback
+- [x] `components/titles/TitleSearchBar.tsx` — input de recherche
+- [x] `components/people/PersonCard.tsx` — card personne (photo, nom, rôle)
+- [x] `components/people/PersonBadge.tsx` — badge compact (pour la distribution)
 
 ### 2.6 Tests
 
-- [ ] Search page : debounce, filtres, pagination
-- [ ] TitleCard : affichage correct des props, fallback affiche
-- [ ] PersonCard : affichage correct
+- [x] Search page : debounce, filtres, pagination
+- [x] TitleCard : affichage correct des props, fallback affiche
+- [x] PersonCard : affichage correct
+- [x] PersonBadge : affichage, fallback, tooltip
+- [x] TitleSearchBar : recherche, autocomplete, navigation clavier
+- [x] useDebounce : valeur débouncée, callback, annulation
+- [x] useSearch : recherche unifiée titres + personnes
 
 ---
 
@@ -1064,7 +1073,7 @@ Les 13 points identifiés dans [`docs/frontend-design-choices.md`](./frontend-de
 | ----- | ----------------------- | ---------------------- | ---------------------------------------------------------------------------------- | ------- |
 | 0     | Socle technique         | Phase 0                | —                                                                                  | Terminé |
 | 1     | Auth pages              | Phase 3.1              | `/auth/*`                                                                          | Terminé |
-| 2     | Recherche & navigation  | Phase 3.3, 3.4         | `/titles/search`, `/people/search`                                                 | À faire |
+| 2     | Recherche & navigation  | Phase 3.3, 3.4         | `/titles/search`, `/people/search`                                                 | Terminé |
 | 3     | Pages de détail         | Phase 3.3-3.6          | `/titles/:id`, `/people/:id`, `/episodes/:id`                                      | À faire |
 | 4.1   | Watches + calendrier    | Phase 4.1              | `/watches`, `/calendar`, `/follows`                                                | À faire |
 | 4.2   | Ratings                 | Phase 4.2              | `/ratings`, `/titles/:id/ratings`                                                  | À faire |
@@ -1078,5 +1087,5 @@ Les 13 points identifiés dans [`docs/frontend-design-choices.md`](./frontend-de
 
 ---
 
-_Dernière mise à jour : 24 juillet 2026_
+_Dernière mise à jour : 25 juillet 2026_
 _Basé sur : `emdb_roadmap_backend.md` (v2), `packages/db/sql/db_init.sql` (v2), `README.md`, `docs/phase-*.md`_

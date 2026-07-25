@@ -186,20 +186,15 @@ export default function HomePage() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
 
   // Hooks pour les données du dashboard
-  const { data: recentWatches, isLoading: isLoadingWatches } =
-    useRecentWatches(4);
+  const { data: recentWatches } = useRecentWatches(4);
 
-  const { data: followedSeries, isLoading: isLoadingFollowed } =
-    useFollowedSeries(4);
+  const { data: followedSeries } = useFollowedSeries(4);
 
   const { data: trendingTitles, isLoading: isLoadingTrending } =
     useTrendingTitles(undefined, 6);
 
   const { data: popularTitles, isLoading: isLoadingPopular } =
     usePopularTitles(8);
-
-  // État de chargement global
-  const isLoading = isAuthLoading || isLoadingWatches || isLoadingFollowed;
 
   // Si l'authentification est encore en cours de vérification
   if (isAuthLoading) {

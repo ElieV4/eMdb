@@ -3,13 +3,12 @@
  * Correspondance backend : Phase 3.3 (Titles)
  */
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/apiClient";
 import {
   Title,
   PaginationResult,
   TitleSearchResult,
-  SearchParams,
 } from "@/lib/types/api";
 
 // ============================================
