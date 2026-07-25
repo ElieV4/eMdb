@@ -1,28 +1,421 @@
 /**
- * Page d’accueil.
- * Suppose l’utilisateur connecté ; les pages d’auth existent déjà.
- * Les données métier seront ajoutées dans les phases suivantes.
+ * Page d'accueil avec dashboard personnalisé.
+ * Affiche du contenu différent selon si l'utilisateur est connecté ou non.
+ * Correspondance backend : Phase 2 - Recherche & navigation
  */
 
 "use client";
 
 import Link from "next/link";
+import {
+  PlayCircle,
+  Star,
+  List,
+  Calendar,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { TitleCard } from "@/components/titles/TitleCard";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { useAuthStore } from "@/store/authStore";
+import { useTrendingTitles } from "@/hooks/api/useTitles";
+import {
+  useRecentWatches,
+  useFollowedSeries,
+  usePopularTitles,
+} from "@/hooks/api/useDashboard";
+import { Title, TitleSearchResult } from "@/lib/types/api";
 
-export default function Page() {
+// Convertir Title en TitleSearchResult pour compatibilité avec TitleCard
+function titleToSearchResult(title: Title): TitleSearchResult {
+  return {
+    id: title.id,
+    tmdbId: title.tmdbId,
+    titre: title.titre,
+    titreOriginal: title.titreOriginal,
+    type: title.type,
+    dateSortie: title.dateSortie,
+    duree: title.duree,
+    note: title.note,
+    afficheUrl: title.afficheUrl,
+    genres: title.genres,
+    pays: title.pays,
+  };
+}
+
+// Composant de section pour le dashboard
+interface DashboardSectionProps {
+  title: string;
+  subtitle?: string;
+  actionLabel?: string;
+  actionHref?: string;
+  children: React.ReactNode;
+  className?: string;
+}
+
+function DashboardSection({
+  title,
+  subtitle,
+  actionLabel,
+  actionHref,
+  children,
+  className,
+}: DashboardSectionProps) {
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12">
-      <h1 className="text-3xl font-bold tracking-tight">Bienvenue sur eMDB</h1>
-      <p className="mt-2 text-muted-foreground">
-        Suivi de films et séries, recommandations, dataviz et plus encore.
-      </p>
-      <div className="mt-6 flex gap-4">
-        <Link href="/search" className="underline">
-          Rechercher un titre
-        </Link>
-        <Link href="/calendar" className="underline">
-          Mon calendrier
-        </Link>
+    <section className={className}>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-xl font-semibold">{title}</h2>
+          {subtitle && (
+            <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+          )}
+        </div>
+        {actionLabel && actionHref && (
+          <Link
+            href={actionHref}
+            className="text-sm text-primary hover:underline"
+          >
+            {actionLabel}
+          </Link>
+        )}
       </div>
+      {children}
+    </section>
+  );
+}
+
+// Composant de card pour "Continue Watching"
+function ContinueWatchingCard({ watch }: { watch: any }) {
+  const title = watch.title?.titre || watch.episode?.titre || "Inconnu";
+  const progress = watch.progress || 0;
+  const imageUrl = watch.title?.afficheUrl || watch.episode?.stillUrl;
+
+  return (
+    <Link
+      href={
+        watch.episode
+          ? `/episodes/${watch.episode.id}`
+          : `/titles/${watch.titleId}`
+      }
+      className="group relative block overflow-hidden rounded-lg"
+    >
+      <div className="aspect-video relative bg-muted/20">
+        {imageUrl ? (
+          <img
+            src={`https://image.tmdb.org/t/p/w500${imageUrl}`}
+            alt={title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-muted flex items-center justify-center">
+            <span className="text-muted-foreground">Pas image</span>
+          </div>
+        )}
+
+        {/* Overlay avec progress */}
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+          <div className="text-center text-white">
+            <div className="flex items-center gap-2">
+              <PlayCircle className="h-10 w-10 fill-white/80" />
+              <span className="text-sm font-medium">Continuer</span>
+            </div>
+            {progress > 0 && (
+              <div className="mt-2 text-xs">
+                {Math.round(progress)}% termine
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Barre de progression */}
+        {progress > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+            <div
+              className="h-full bg-primary"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="p-3 bg-background">
+        <h3 className="font-medium line-clamp-1 group-hover:text-primary">
+          {title}
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          {watch.episode
+            ? `Episode ${watch.episode.numero}`
+            : watch.title?.type === "serie"
+              ? "Serie"
+              : "Film"}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+// Composant de stat card pour le dashboard
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  href,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center gap-4 p-4 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+    >
+      <div className="rounded-full p-3 bg-primary/10 group-hover:bg-primary/20 transition-colors">
+        <Icon className="h-6 w-6 text-primary" />
+      </div>
+      <div>
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-sm text-muted-foreground">{label}</p>
+      </div>
+    </Link>
+  );
+}
+
+export default function HomePage() {
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
+
+  // Hooks pour les données du dashboard
+  const { data: recentWatches, isLoading: isLoadingWatches } =
+    useRecentWatches(4);
+
+  const { data: followedSeries, isLoading: isLoadingFollowed } =
+    useFollowedSeries(4);
+
+  const { data: trendingTitles, isLoading: isLoadingTrending } =
+    useTrendingTitles(undefined, 6);
+
+  const { data: popularTitles, isLoading: isLoadingPopular } =
+    usePopularTitles(8);
+
+  // État de chargement global
+  const isLoading = isAuthLoading || isLoadingWatches || isLoadingFollowed;
+
+  // Si l'authentification est encore en cours de vérification
+  if (isAuthLoading) {
+    return (
+      <div className="container mx-auto max-w-7xl px-4 py-12">
+        <LoadingSpinner className="mx-auto" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto max-w-7xl px-4 py-8">
+      {/* En-tête */}
+      <div className="mb-12">
+        <h1 className="text-3xl font-bold tracking-tight">
+          Bienvenue {isAuthenticated ? `, ${user?.pseudo}` : "sur eMDB"}
+        </h1>
+        <p className="mt-2 text-lg text-muted-foreground">
+          {isAuthenticated
+            ? "Suivez vos films et séries préférés, découvrez des recommandations et explorez."
+            : "Découvrez, suivez et partagez vos films et séries préférés."}
+        </p>
+
+        {/* CTA pour les invités */}
+        {!isAuthenticated && (
+          <div className="mt-6 flex gap-4">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+            >
+              Créer un compte
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-input bg-background font-medium hover:bg-muted/50 transition-colors"
+            >
+              Se connecter
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Dashboard pour utilisateurs connectés */}
+      {isAuthenticated ? (
+        <div className="space-y-10">
+          {/* Statistiques rapides */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              icon={PlayCircle}
+              label="Visionnages"
+              value={recentWatches?.length || 0}
+              href="/watches"
+            />
+            <StatCard icon={Star} label="Notes" value={0} href="/ratings" />
+            <StatCard icon={List} label="Listes" value={0} href="/lists" />
+            <StatCard
+              icon={Calendar}
+              label="Séries suivies"
+              value={followedSeries?.length || 0}
+              href="/follows"
+            />
+          </div>
+
+          {/* Continue Watching */}
+          {recentWatches && recentWatches.length > 0 && (
+            <DashboardSection
+              title="Continuer à regarder"
+              actionLabel="Voir tout l'historique"
+              actionHref="/watches"
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {recentWatches.slice(0, 4).map((watch) => (
+                  <ContinueWatchingCard key={watch.id} watch={watch} />
+                ))}
+              </div>
+            </DashboardSection>
+          )}
+
+          {/* Séries suivies */}
+          {followedSeries && followedSeries.length > 0 && (
+            <DashboardSection
+              title="Séries en cours"
+              actionLabel="Voir toutes les séries"
+              actionHref="/follows"
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {followedSeries.slice(0, 4).map((follow) => (
+                  <TitleCard
+                    key={follow.id}
+                    title={titleToSearchResult(follow.title)}
+                    compact
+                  />
+                ))}
+              </div>
+            </DashboardSection>
+          )}
+
+          {/* Tendances */}
+          <DashboardSection
+            title="Tendances"
+            actionLabel="Explorer les titres"
+            actionHref="/search"
+          >
+            {isLoadingTrending ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <div
+                    key={i}
+                    className="aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : trendingTitles && trendingTitles.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {trendingTitles.slice(0, 6).map((title) => (
+                  <TitleCard
+                    key={title.id}
+                    title={titleToSearchResult(title)}
+                    compact
+                  />
+                ))}
+              </div>
+            ) : null}
+          </DashboardSection>
+        </div>
+      ) : (
+        /* Dashboard pour invités */
+        <div className="space-y-10">
+          {/* Titres populaires */}
+          <DashboardSection
+            title="Titres populaires"
+            subtitle="Découvrez les films et séries les plus appréciés"
+            actionLabel="Voir plus"
+            actionHref="/search"
+          >
+            {isLoadingPopular ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {Array.from({ length: 8 }, (_, i) => (
+                  <div
+                    key={i}
+                    className="aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : popularTitles && popularTitles.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {popularTitles.slice(0, 8).map((title) => (
+                  <TitleCard
+                    key={title.id}
+                    title={titleToSearchResult(title)}
+                    compact
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">
+                Aucun titre populaire trouvé.
+              </p>
+            )}
+          </DashboardSection>
+
+          {/* Fonctionnalités */}
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-lg border bg-muted/30">
+              <div className="rounded-full p-3 bg-primary/10 w-fit mb-4">
+                <TrendingUp className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Découvrir</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Explorez une base de données complète de films et séries avec
+                des informations détaillées.
+              </p>
+              <Link
+                href="/search"
+                className="text-sm text-primary hover:underline"
+              >
+                Commencer la recherche
+              </Link>
+            </div>
+
+            <div className="p-6 rounded-lg border bg-muted/30">
+              <div className="rounded-full p-3 bg-secondary/10 w-fit mb-4">
+                <Calendar className="h-6 w-6 text-secondary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Suivre</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Créez un compte pour suivre vos séries préférées et être notifié
+                des nouveaux épisodes.
+              </p>
+              <Link
+                href="/register"
+                className="text-sm text-primary hover:underline"
+              >
+                Créer un compte
+              </Link>
+            </div>
+
+            <div className="p-6 rounded-lg border bg-muted/30">
+              <div className="rounded-full p-3 bg-accent/10 w-fit mb-4">
+                <Users className="h-6 w-6 text-accent" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Partager</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Partagez vos listes de films et séries avec vos amis et
+                découvrez leurs recommandations.
+              </p>
+              <Link
+                href="/register"
+                className="text-sm text-primary hover:underline"
+              >
+                Rejoindre la communauté
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

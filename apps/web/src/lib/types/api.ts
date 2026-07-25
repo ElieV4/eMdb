@@ -131,3 +131,46 @@ export type Notification = {
   episodeId?: string;
   titleId?: string;
 };
+
+// ============================================
+// Phase 2 - Recherche & Navigation
+// ============================================
+
+export type SearchType = "film" | "serie" | "personne";
+
+export type SearchParams = {
+  query?: string;
+  type?: SearchType;
+  genre?: string;
+  country?: string;
+  year?: number;
+  page?: number;
+  limit?: number;
+};
+
+export type SearchResult<T> = PaginationResult<T> & {
+  query: string;
+  type: SearchType;
+};
+
+export type TitleSearchResult = {
+  id: string;
+  tmdbId?: number;
+  titre: string;
+  titreOriginal?: string;
+  type: "film" | "serie";
+  dateSortie?: string;
+  duree?: number;
+  note?: number;
+  afficheUrl?: string;
+  genres?: Genre[];
+  pays?: Country[];
+};
+
+export type PersonSearchResult = {
+  id: string;
+  tmdbId?: number;
+  nom: string;
+  photoUrl?: string;
+  rolePrincipal?: string;
+};
