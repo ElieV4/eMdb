@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Calendar, Clock, ArrowLeft, ArrowRight } from "lucide-react";
+import { Calendar, Clock, ArrowLeft } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { TitleCredits } from "@/components/titles/TitleCredits";
 import { useEpisode } from "@/hooks/api/useEpisode";

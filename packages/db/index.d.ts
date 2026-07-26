@@ -1,4 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-export declare const prisma: PrismaClient<import(".prisma/client").Prisma.PrismaClientOptions, never, import("@prisma/client/runtime/library.js").DefaultArgs>;
+export declare const prisma: PrismaClient<import(".prisma/client").Prisma.PrismaClientOptions, never, import("@prisma/client/runtime/library").DefaultArgs>;
 export * from '@prisma/client';
-export * from './dist/src/functions.js';
+export * from './src/functions';

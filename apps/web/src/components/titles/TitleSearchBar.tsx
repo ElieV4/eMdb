@@ -97,9 +97,15 @@ export function TitleSearchBar({
         if (activeSuggestionIndex >= 0 && suggestions[activeSuggestionIndex]) {
           const suggestion = suggestions[activeSuggestionIndex];
           if ("type" in suggestion) {
-            router.push(`/titles/${suggestion.id}`);
+            const href = suggestion.local
+              ? `/titles/${suggestion.id}`
+              : `/titles/tmdb/${suggestion.tmdbId}?type=${suggestion.type}`;
+            router.push(href);
           } else {
-            router.push(`/people/${suggestion.id}`);
+            const href = suggestion.local
+              ? `/people/${suggestion.id}`
+              : `/people/tmdb/${suggestion.tmdbId}`;
+            router.push(href);
           }
           setIsFocused(false);
           setActiveSuggestionIndex(-1);
@@ -134,9 +140,15 @@ export function TitleSearchBar({
     suggestion: TitleSearchResult | PersonSearchResult,
   ) => {
     if ("type" in suggestion) {
-      router.push(`/titles/${suggestion.id}`);
+      const href = suggestion.local
+        ? `/titles/${suggestion.id}`
+        : `/titles/tmdb/${suggestion.tmdbId}?type=${suggestion.type}`;
+      router.push(href);
     } else {
-      router.push(`/people/${suggestion.id}`);
+      const href = suggestion.local
+        ? `/people/${suggestion.id}`
+        : `/people/tmdb/${suggestion.tmdbId}`;
+      router.push(href);
     }
     setIsFocused(false);
     setQuery("");

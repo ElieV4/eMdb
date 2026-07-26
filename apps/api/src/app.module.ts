@@ -15,11 +15,13 @@ import { RatingsModule } from './ratings/ratings.module';
 import { ListsModule } from './lists/lists.module';
 import { RecommenderModule } from './recommender/recommender.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import * as path from 'node:path';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: [path.resolve(__dirname, '..', '..', '..', '.env')],
     }),
     PrismaModule,
     AdminModule,

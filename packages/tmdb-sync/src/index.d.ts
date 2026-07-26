@@ -1,74 +1,66 @@
 export declare function importPersonByTmdbId(tmdbId: number): Promise<{
-  id: string;
-  tmdb_id: number | null;
-  source: string;
-  created_at: Date;
-  genre: string | null;
-  nom: string;
-  date_naissance: Date | null;
-  pays_id: string | null;
-  photo_url: string | null;
-  bio: string | null;
-  wiki_url: string | null;
+    id: string;
+    tmdb_id: number | null;
+    nom: string;
+    genre: string | null;
+    date_naissance: Date | null;
+    pays_id: string | null;
+    photo_url: string | null;
+    bio: string | null;
+    wiki_url: string | null;
+    source: string;
+    created_at: Date;
 }>;
-export declare function importEpisodeGuestCredits(
-  episodeId: string,
-  tmdbId: number,
-  seasonNumber: number,
-  episodeNumber: number,
-): Promise<void>;
-export declare function importTitleByTmdbId(
-  tmdbId: number,
-  type: 'film' | 'serie',
-): Promise<{
-  id: string;
-  tmdb_id: number | null;
-  type: string;
-  titre_vo: string;
-  titre_vf: string | null;
-  synopsis: string | null;
-  affiche_url: string | null;
-  date_sortie: Date | null;
-  duree_minutes: number | null;
-  statut_serie: string | null;
-  statut_production: string | null;
-  note_imdb: import('@prisma/client/runtime/library').Decimal | null;
-  is_animation: boolean;
-  next_episode_air_date: Date | null;
-  source: string;
-  created_at: Date;
+export declare function importEpisodeGuestCredits(episodeId: string, tmdbId: number, seasonNumber: number, episodeNumber: number): Promise<void>;
+export declare function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie'): Promise<{
+    id: string;
+    tmdb_id: number | null;
+    source: string;
+    created_at: Date;
+    type: string;
+    titre_vo: string;
+    titre_vf: string | null;
+    synopsis: string | null;
+    affiche_url: string | null;
+    date_sortie: Date | null;
+    duree_minutes: number | null;
+    statut_serie: string | null;
+    statut_production: string | null;
+    note_imdb: import("@prisma/client/runtime/library").Decimal | null;
+    is_animation: boolean;
+    next_episode_air_date: Date | null;
 }>;
 export declare function importSeasonsForSerie(titleId: string): Promise<void>;
 export declare function refreshPersonData(personId: string): Promise<{
-  id: string;
-  tmdb_id: number | null;
-  source: string;
-  created_at: Date;
-  genre: string | null;
-  nom: string;
-  date_naissance: Date | null;
-  pays_id: string | null;
-  photo_url: string | null;
-  bio: string | null;
-  wiki_url: string | null;
+    id: string;
+    tmdb_id: number | null;
+    nom: string;
+    genre: string | null;
+    date_naissance: Date | null;
+    pays_id: string | null;
+    photo_url: string | null;
+    bio: string | null;
+    wiki_url: string | null;
+    source: string;
+    created_at: Date;
 }>;
 export declare function refreshTitleData(titleId: string): Promise<{
-  id: string;
-  tmdb_id: number | null;
-  type: string;
-  titre_vo: string;
-  titre_vf: string | null;
-  synopsis: string | null;
-  affiche_url: string | null;
-  date_sortie: Date | null;
-  duree_minutes: number | null;
-  statut_serie: string | null;
-  statut_production: string | null;
-  note_imdb: import('@prisma/client/runtime/library').Decimal | null;
-  is_animation: boolean;
-  next_episode_air_date: Date | null;
-  source: string;
-  created_at: Date;
+    id: string;
+    tmdb_id: number | null;
+    source: string;
+    created_at: Date;
+    type: string;
+    titre_vo: string;
+    titre_vf: string | null;
+    synopsis: string | null;
+    affiche_url: string | null;
+    date_sortie: Date | null;
+    duree_minutes: number | null;
+    statut_serie: string | null;
+    statut_production: string | null;
+    note_imdb: import("@prisma/client/runtime/library").Decimal | null;
+    is_animation: boolean;
+    next_episode_air_date: Date | null;
 }>;
 /**
  * Génère des notifications pour les nouveaux épisodes des séries suivies.
@@ -93,23 +85,15 @@ export declare function generateNewEpisodeNotifications(): Promise<number>;
  * @returns Nombre de notifications créées
  * @phase 7.2
  */
-export declare function generateSeasonPremiereNotification(
-  titleId: string,
-  seasonNumber: number,
-): Promise<number>;
+export declare function generateSeasonPremiereNotification(titleId: string, seasonNumber: number): Promise<number>;
 export declare function dailySyncNewEpisodes(): Promise<{
-  titlesRefreshed: number;
-  notificationsCreated: number;
+    titlesRefreshed: number;
+    notificationsCreated: number;
 }>;
-export declare function weeklyResyncChanges(
-  startDate: string,
-  endDate: string,
-): Promise<
-  {
+export declare function weeklyResyncChanges(startDate: string, endDate: string): Promise<{
     tmdbId: number;
-    type: 'film' | 'serie';
-  }[]
->;
+    type: "film" | "serie";
+}[]>;
 /**
  * Bootstrap les recommandations TMDB pour une personne.
  *
@@ -125,10 +109,8 @@ export declare function weeklyResyncChanges(
  * @throws Error si la personne n'existe pas ou n'a pas de tmdb_id
  */
 export declare function bootstrapPersonRecommendationsFromTmdb(personId: string): Promise<number>;
-export declare function bootstrapRecommendationsFromTmdb(titleId: string): Promise<
-  {
+export declare function bootstrapRecommendationsFromTmdb(titleId: string): Promise<{
     title_id: string;
     recommended_id: string;
     score: number;
-  }[]
->;
+}[]>;

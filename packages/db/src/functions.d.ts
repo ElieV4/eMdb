@@ -15,9 +15,9 @@ export type EpisodesNonVusResult = number;
  * Résultat de fn_progress_serie : progrès par saison
  */
 export interface ProgressSerieResult {
-  saison: number;
-  vus: number;
-  total: number;
+    saison: number;
+    vus: number;
+    total: number;
 }
 /**
  * Compte le nombre d'épisodes **sortis et non vus** par un utilisateur pour une série.
@@ -38,10 +38,7 @@ export interface ProgressSerieResult {
  * // => 3 (l'utilisateur a 3 épisodes non vus)
  * ```
  */
-export declare function countEpisodesNonVus(
-  userId: string,
-  titleId: string,
-): Promise<EpisodesNonVusResult>;
+export declare function countEpisodesNonVus(userId: string, titleId: string): Promise<EpisodesNonVusResult>;
 /**
  * Récupère le progrès de visionnage par saison pour une série.
  *
@@ -62,68 +59,59 @@ export declare function countEpisodesNonVus(
  * // => [{ saison: 1, vus: 10, total: 12 }, { saison: 2, vus: 5, total: 12 }]
  * ```
  */
-export declare function getSerieProgress(
-  userId: string,
-  titleId: string,
-): Promise<ProgressSerieResult[]>;
+export declare function getSerieProgress(userId: string, titleId: string): Promise<ProgressSerieResult[]>;
 export interface WatchTimeByPeriodResult {
-  user_id: string;
-  periode_semaine: Date;
-  periode_mois: Date;
-  periode_annee: Date;
-  minutes: number;
+    user_id: string;
+    periode_semaine: Date;
+    periode_mois: Date;
+    periode_annee: Date;
+    minutes: number;
 }
 export interface WatchTimeByGenreResult {
-  user_id: string;
-  genre_id: string;
-  minutes: number;
+    user_id: string;
+    genre_id: string;
+    minutes: number;
 }
 export interface WatchTimeByCountryResult {
-  user_id: string;
-  country_id: string;
-  minutes: number;
+    user_id: string;
+    country_id: string;
+    minutes: number;
 }
 export interface WatchTimeByAnimationResult {
-  user_id: string;
-  is_animation: boolean;
-  minutes: number;
+    user_id: string;
+    is_animation: boolean;
+    minutes: number;
 }
 export interface WatchCountByGenreResult {
-  user_id: string;
-  genre_id: string;
-  nb_items: number;
+    user_id: string;
+    genre_id: string;
+    nb_items: number;
 }
 export interface WatchCountByPeriodResult {
-  user_id: string;
-  periode_semaine: Date;
-  periode_mois: Date;
-  periode_annee: Date;
-  nb_items: number;
+    user_id: string;
+    periode_semaine: Date;
+    periode_mois: Date;
+    periode_annee: Date;
+    nb_items: number;
 }
 export interface WatchCountByCountryResult {
-  user_id: string;
-  country_id: string;
-  nb_items: number;
+    user_id: string;
+    country_id: string;
+    nb_items: number;
 }
 export interface WatchCountByAnimationResult {
-  user_id: string;
-  is_animation: boolean;
-  nb_items: number;
+    user_id: string;
+    is_animation: boolean;
+    nb_items: number;
 }
 export declare function getWatchTimeByPeriod(userId: string): Promise<WatchTimeByPeriodResult[]>;
 export declare function getWatchTimeByGenre(userId: string): Promise<WatchTimeByGenreResult[]>;
 export declare function getWatchTimeByCountry(userId: string): Promise<WatchTimeByCountryResult[]>;
-export declare function getWatchTimeByAnimation(
-  userId: string,
-): Promise<WatchTimeByAnimationResult[]>;
+export declare function getWatchTimeByAnimation(userId: string): Promise<WatchTimeByAnimationResult[]>;
 export declare function getWatchCountByGenre(userId: string): Promise<WatchCountByGenreResult[]>;
 export declare function getWatchCountByPeriod(userId: string): Promise<WatchCountByPeriodResult[]>;
-export declare function getWatchCountByCountry(
-  userId: string,
-): Promise<WatchCountByCountryResult[]>;
-export declare function getWatchCountByAnimation(
-  userId: string,
-): Promise<WatchCountByAnimationResult[]>;
+export declare function getWatchCountByCountry(userId: string): Promise<WatchCountByCountryResult[]>;
+export declare function getWatchCountByAnimation(userId: string): Promise<WatchCountByAnimationResult[]>;
 /**
  * Calcule le pourcentage de visionnage global pour une série.
  *
@@ -147,9 +135,9 @@ export declare function calculateSerieCompletion(progress: ProgressSerieResult[]
  */
 export declare function calculateTotalNonVus(progress: ProgressSerieResult[]): number;
 declare const _default: {
-  countEpisodesNonVus: typeof countEpisodesNonVus;
-  getSerieProgress: typeof getSerieProgress;
-  calculateSerieCompletion: typeof calculateSerieCompletion;
-  calculateTotalNonVus: typeof calculateTotalNonVus;
+    countEpisodesNonVus: typeof countEpisodesNonVus;
+    getSerieProgress: typeof getSerieProgress;
+    calculateSerieCompletion: typeof calculateSerieCompletion;
+    calculateTotalNonVus: typeof calculateTotalNonVus;
 };
 export default _default;

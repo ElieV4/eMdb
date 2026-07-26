@@ -23,13 +23,15 @@ export function PersonCard({
   compact = false,
   showRole = true,
 }: PersonCardProps) {
-  const { id, nom, photoUrl, rolePrincipal } = person;
+  const { id, nom, photoUrl, rolePrincipal, local } = person;
 
   const imageSrc = photoUrl || PLACEHOLDER_PERSON;
 
+  const href = local ? `/people/${id}` : `/people/tmdb/${person.tmdbId}`;
+
   return (
     <Link
-      href={`/people/${id}`}
+      href={href}
       className={cn(
         "group block overflow-hidden rounded-lg transition-all duration-200",
         "hover:shadow-md hover:-translate-y-0.5",
@@ -82,11 +84,13 @@ export function PersonCardHorizontal({
   person,
   className,
 }: Omit<PersonCardProps, "compact" | "showRole">) {
-  const { id, nom, photoUrl, rolePrincipal } = person;
+  const { id, nom, photoUrl, rolePrincipal, local } = person;
+
+  const href = local ? `/people/${id}` : `/people/tmdb/${person.tmdbId}`;
 
   return (
     <Link
-      href={`/people/${id}`}
+      href={href}
       className={cn(
         "group flex items-center gap-4 p-3 rounded-lg transition-all duration-200",
         "hover:bg-muted/50",

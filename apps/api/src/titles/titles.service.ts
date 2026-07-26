@@ -140,16 +140,30 @@ export class TitlesService {
    * @returns Le titre importé ou existant
    */
   async getOrImportByTmdbId(tmdbId: number, type: 'film' | 'serie') {
+    console.log('[getOrImportByTmdbId] start', tmdbId, type);
     const existing = await this.prisma.titles.findUnique({
       where: { tmdb_id: tmdbId },
+    }).catch((error) => {
+      console.error('[getOrImportByTmdbId] findUnique failed', tmdbId, type, error);
+      throw error;
     });
 
     if (existing) {
+      console.log('[getOrImportByTmdbId] existing', tmdbId, existing.id);
       return existing;
     }
 
-    // Déclenche l'import via tmdb-sync
-    return importTitleByTmdbId(tmdbId, type);
+    try {
+      console.log('[getOrImportByTmdbId] importing', tmdbId, type);
+      const result = await importTitleByTmdbId(tmdbId, type);
+      console.log('[getOrImportByTmdbId] success', tmdbId, type, (result as any)?.id);
+      return result;
+    } catch (error: any) {
+      const message =
+        error?.stack || error?.message || `Impossible d'importer le titre TMDB ${tmdbId} (${type}).`;
+      console.error('[getOrImportByTmdbId] failed', tmdbId, type, message);
+      throw new BadRequestException(message);
+    }
   }
 
   /**

@@ -2,6 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import dotenv from 'dotenv';
+import path from 'node:path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '..', '..', '.env') });
+console.log('[main] DATABASE_URL =', process.env.DATABASE_URL ? '[set]' : '[MISSING]');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

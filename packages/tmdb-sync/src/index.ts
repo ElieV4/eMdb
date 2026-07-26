@@ -167,6 +167,7 @@ async function ensureCountryIds(countries: { iso_3166_1: string; name: string }[
 }
 
 export async function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie') {
+  console.log('[importTitleByTmdbId] start', tmdbId, type);
   await createSyncLog({
     tmdb_id: tmdbId,
     type,
@@ -175,17 +176,22 @@ export async function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie'
   });
 
   try {
+    console.log('[importTitleByTmdbId] fetch tmdb', tmdbId, type);
     const tmdbData = type === 'film' ? await getMovieDetails(tmdbId) : await getTvDetails(tmdbId);
+    console.log('[importTitleByTmdbId] tmdb fetched', tmdbId, type, !!tmdbData);
     const titlePayload =
       type === 'film' ? mapTmdbMovieToTitle(tmdbData) : mapTmdbTvToTitle(tmdbData);
 
+    console.log('[importTitleByTmdbId] upsert', tmdbId, type);
     const title = await prisma.titles.upsert({
       where: { tmdb_id: tmdbId },
       create: titlePayload,
       update: titlePayload,
     });
+    console.log('[importTitleByTmdbId] upsert done', tmdbId, type, title.id);
 
     if (tmdbData.genres?.length) {
+      console.log('[importTitleByTmdbId] genres', tmdbId, tmdbData.genres.length);
       const genreIds = await ensureGenreIds(tmdbData.genres);
       await prisma.title_genres.createMany({
         data: genreIds.map((genreId) => ({ title_id: title.id, genre_id: genreId })),
@@ -194,6 +200,7 @@ export async function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie'
     }
 
     if (tmdbData.production_countries?.length) {
+      console.log('[importTitleByTmdbId] countries', tmdbId, tmdbData.production_countries.length);
       const countryIds = await ensureCountryIds(tmdbData.production_countries);
       await prisma.title_countries.createMany({
         data: countryIds.map((countryId) => ({ title_id: title.id, country_id: countryId })),
@@ -202,6 +209,7 @@ export async function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie'
     }
 
     if (tmdbData.credits) {
+      console.log('[importTitleByTmdbId] credits', tmdbId, tmdbData.credits?.cast?.length, tmdbData.credits?.crew?.length);
       const creditInserts = mapTmdbCredits(tmdbData.credits, title.id, null);
       for (const credit of creditInserts) {
         const person = await importPersonByTmdbId(credit.tmdb_person_id);
@@ -228,7 +236,9 @@ export async function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie'
     }
 
     if (type === 'serie') {
+      console.log('[importTitleByTmdbId] seasons start', title.id);
       await importSeasonsForSerie(title.id);
+      console.log('[importTitleByTmdbId] seasons done', title.id);
     }
 
     await createSyncLog({
@@ -238,14 +248,17 @@ export async function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie'
       status: 'success',
     });
 
+    console.log('[importTitleByTmdbId] success', tmdbId, type, title.id);
     return title;
   } catch (error: any) {
+    const message = error?.message ?? 'unknown error';
+    console.error('[importTitleByTmdbId] failed', tmdbId, type, message, error?.stack);
     await createSyncLog({
       tmdb_id: tmdbId,
       type,
       action: 'importTitle',
       status: 'failed',
-      error: error?.message ?? 'unknown error',
+      error: message,
     });
     throw error;
   }

@@ -124,6 +124,7 @@ async function ensureCountryIds(countries) {
     return ids;
 }
 async function importTitleByTmdbId(tmdbId, type) {
+    console.log('[importTitleByTmdbId] start', tmdbId, type);
     await createSyncLog({
         tmdb_id: tmdbId,
         type,
@@ -131,14 +132,19 @@ async function importTitleByTmdbId(tmdbId, type) {
         status: 'started',
     });
     try {
+        console.log('[importTitleByTmdbId] fetch tmdb', tmdbId, type);
         const tmdbData = type === 'film' ? await (0, tmdb_client_1.getMovieDetails)(tmdbId) : await (0, tmdb_client_1.getTvDetails)(tmdbId);
+        console.log('[importTitleByTmdbId] tmdb fetched', tmdbId, type, !!tmdbData);
         const titlePayload = type === 'film' ? (0, tmdb_mapper_1.mapTmdbMovieToTitle)(tmdbData) : (0, tmdb_mapper_1.mapTmdbTvToTitle)(tmdbData);
+        console.log('[importTitleByTmdbId] upsert', tmdbId, type);
         const title = await db_1.prisma.titles.upsert({
             where: { tmdb_id: tmdbId },
             create: titlePayload,
             update: titlePayload,
         });
+        console.log('[importTitleByTmdbId] upsert done', tmdbId, type, title.id);
         if (tmdbData.genres?.length) {
+            console.log('[importTitleByTmdbId] genres', tmdbId, tmdbData.genres.length);
             const genreIds = await ensureGenreIds(tmdbData.genres);
             await db_1.prisma.title_genres.createMany({
                 data: genreIds.map((genreId) => ({ title_id: title.id, genre_id: genreId })),
@@ -146,6 +152,7 @@ async function importTitleByTmdbId(tmdbId, type) {
             });
         }
         if (tmdbData.production_countries?.length) {
+            console.log('[importTitleByTmdbId] countries', tmdbId, tmdbData.production_countries.length);
             const countryIds = await ensureCountryIds(tmdbData.production_countries);
             await db_1.prisma.title_countries.createMany({
                 data: countryIds.map((countryId) => ({ title_id: title.id, country_id: countryId })),
@@ -153,6 +160,7 @@ async function importTitleByTmdbId(tmdbId, type) {
             });
         }
         if (tmdbData.credits) {
+            console.log('[importTitleByTmdbId] credits', tmdbId, tmdbData.credits?.cast?.length, tmdbData.credits?.crew?.length);
             const creditInserts = (0, tmdb_mapper_1.mapTmdbCredits)(tmdbData.credits, title.id, null);
             for (const credit of creditInserts) {
                 const person = await importPersonByTmdbId(credit.tmdb_person_id);
@@ -179,7 +187,9 @@ async function importTitleByTmdbId(tmdbId, type) {
             }
         }
         if (type === 'serie') {
+            console.log('[importTitleByTmdbId] seasons start', title.id);
             await importSeasonsForSerie(title.id);
+            console.log('[importTitleByTmdbId] seasons done', title.id);
         }
         await createSyncLog({
             tmdb_id: tmdbId,
@@ -187,15 +197,18 @@ async function importTitleByTmdbId(tmdbId, type) {
             action: 'importTitle',
             status: 'success',
         });
+        console.log('[importTitleByTmdbId] success', tmdbId, type, title.id);
         return title;
     }
     catch (error) {
+        const message = error?.message ?? 'unknown error';
+        console.error('[importTitleByTmdbId] failed', tmdbId, type, message, error?.stack);
         await createSyncLog({
             tmdb_id: tmdbId,
             type,
             action: 'importTitle',
             status: 'failed',
-            error: error?.message ?? 'unknown error',
+            error: message,
         });
         throw error;
     }
@@ -500,6 +513,7 @@ async function bootstrapPersonRecommendationsFromTmdb(personId) {
     const personTitleSet = new Set(localTitleIds);
     const candidates = [];
     for (const [otherPersonId, otherTitles] of personTitles) {
+        // @ts-ignore - Type issue with Set elements
         const intersection = new Set([...personTitleSet].filter((x) => otherTitles.has(x)));
         const union = new Set([...personTitleSet, ...otherTitles]);
         const jaccard = intersection.size / union.size;

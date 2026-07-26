@@ -46,6 +46,7 @@ const __1 = require("../");
  */
 async function countEpisodesNonVus(userId, titleId) {
     // PostgreSQL retourne les scalaires sous forme { fn_name: value }
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
     const result = await __1.prisma.$queryRawUnsafe(`SELECT fn_episodes_non_vus('${userId}'::UUID, '${titleId}'::UUID) AS fn_episodes_non_vus`);
     if (!result || result.length === 0 || result[0]?.fn_episodes_non_vus === undefined) {
         return 0;
@@ -73,38 +74,47 @@ async function countEpisodesNonVus(userId, titleId) {
  * ```
  */
 async function getSerieProgress(userId, titleId) {
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
     const results = await __1.prisma.$queryRawUnsafe(`SELECT * FROM fn_progress_serie('${userId}'::UUID, '${titleId}'::UUID)`);
     return results || [];
 }
 async function getWatchTimeByPeriod(userId) {
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
     const results = await __1.prisma.$queryRawUnsafe(`SELECT * FROM mv_watch_time_by_period WHERE user_id='${userId}'::UUID ORDER BY periode_semaine`);
     return results || [];
 }
 async function getWatchTimeByGenre(userId) {
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
     const results = await __1.prisma.$queryRawUnsafe(`SELECT * FROM mv_watch_time_by_genre WHERE user_id='${userId}'::UUID ORDER BY genre_id`);
     return results || [];
 }
 async function getWatchTimeByCountry(userId) {
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
     const results = await __1.prisma.$queryRawUnsafe(`SELECT * FROM mv_watch_time_by_country WHERE user_id='${userId}'::UUID ORDER BY country_id`);
     return results || [];
 }
 async function getWatchTimeByAnimation(userId) {
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
     const results = await __1.prisma.$queryRawUnsafe(`SELECT * FROM mv_watch_time_by_animation WHERE user_id='${userId}'::UUID ORDER BY is_animation`);
     return results || [];
 }
 async function getWatchCountByGenre(userId) {
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
     const results = await __1.prisma.$queryRawUnsafe(`SELECT * FROM mv_watch_count_by_genre WHERE user_id='${userId}'::UUID ORDER BY genre_id`);
     return results || [];
 }
 async function getWatchCountByPeriod(userId) {
-    const results = await __1.prisma.$queryRawUnsafe(`SELECT * FROM mv_watch_count_by_period WHERE user_id='${userId}'::UUID ORDER BY periode_semaine`);
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
+    const results = await __1.prisma.$queryRawUnsafe(`SELECT * FROM mv_watch_count_by_period WHERE user_id='${userId}'::UUID ORDER BY période_semaine`);
     return results || [];
 }
 async function getWatchCountByCountry(userId) {
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
     const results = await __1.prisma.$queryRawUnsafe(`SELECT * FROM mv_watch_count_by_country WHERE user_id='${userId}'::UUID ORDER BY country_id`);
     return results || [];
 }
 async function getWatchCountByAnimation(userId) {
+    // @ts-ignore - Prisma $queryRawUnsafe type issue
     const results = await __1.prisma.$queryRawUnsafe(`SELECT * FROM mv_watch_count_by_animation WHERE user_id='${userId}'::UUID ORDER BY is_animation`);
     return results || [];
 }
