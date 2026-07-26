@@ -133,6 +133,120 @@ export type Notification = {
 };
 
 // ============================================
+// Phase 4 — Fonctionnalités utilisateur
+// Types alignés sur les réponses NestJS (endpoints Phase 4 backend)
+// ============================================
+
+// --- Watches (4.1) ---
+
+export type WatchCreateInput = {
+  title_id?: string;
+  episode_id?: string;
+  date_vue?: string;
+};
+
+export type WatchFilters = {
+  type?: "film" | "serie";
+  date_from?: string;
+  date_to?: string;
+  title_id?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type CalendarEntry = {
+  title_id: string;
+  titre_vo: string;
+  titre_vf: string | null;
+  affiche_url: string | null;
+  saison: number;
+  episode_numero: number;
+  episode_titre: string | null;
+  date_diffusion: Date | null;
+  nb_non_vus: number;
+};
+
+export type ProgressSerieResult = {
+  saison: number;
+  vus: number;
+  total: number;
+};
+
+export type WatchAction = "now" | "release" | "custom" | "unknown";
+
+// --- Follows (4.4, intégré dans watches) ---
+
+export type FollowDetail = {
+  id: string;
+  tmdb_id: number | null;
+  titre_vo: string;
+  titre_vf: string | null;
+  affiche_url: string | null;
+  type: string;
+  next_episode_air_date: string | null;
+  followed_at: string;
+};
+
+// --- Ratings (4.2) ---
+
+export type RatingUpsertInput = {
+  title_id?: string;
+  episode_id?: string;
+  note_perso?: number;
+  commentaire?: string;
+};
+
+export type TitleRatingsSummary = {
+  title_id: string;
+  moyenne: number | null;
+  count: number;
+  repartition: Record<number, number>;
+};
+
+// --- Lists (4.3) ---
+
+export type ListCreateInput = {
+  nom: string;
+  type: "watchlist" | "favoris" | "custom";
+  description?: string;
+};
+
+export type ListUpdateInput = {
+  nom?: string;
+  description?: string;
+};
+
+export type ListItemAddInput = {
+  title_id: string;
+};
+
+export type ShareListInput = {
+  shared_with_user_id: string;
+  permission: "lecture" | "edition";
+};
+
+export type ListDetail = {
+  id: string;
+  nom: string;
+  type: "watchlist" | "favoris" | "custom";
+  description: string | null;
+  user_id: string;
+  created_at: string;
+  items: Array<{
+    title_id: string;
+    position: number | null;
+    added_at: string;
+    titles: TitleSearchResult;
+  }>;
+  shares: Array<{
+    shared_with_user_id: string;
+    permission: "lecture" | "edition";
+    shared_at: string;
+    users: { id: string; pseudo: string };
+  }>;
+};
+
+// ============================================
 // Phase 2 - Recherche & Navigation
 // ============================================
 

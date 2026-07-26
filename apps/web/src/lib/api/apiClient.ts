@@ -13,7 +13,7 @@ import { useAuthStore } from "@/store/authStore";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export type RequestOptions = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   headers?: Record<string, string>;
 };
@@ -45,7 +45,7 @@ export async function apiFetch<T = unknown>(
 
   try {
     const res = await fetch(url, {
-      method: options.method ?? "GET",
+      method: options.method ?? ("GET" as const),
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
       credentials: "include",

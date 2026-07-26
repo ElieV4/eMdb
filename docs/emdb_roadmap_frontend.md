@@ -1075,10 +1075,10 @@ Les 13 points identifiés dans [`docs/frontend-design-choices.md`](./frontend-de
 | 1     | Auth pages              | Phase 3.1              | `/auth/*`                                                                          | Terminé |
 | 2     | Recherche & navigation  | Phase 3.3, 3.4         | `/titles/search`, `/people/search`                                                 | Terminé |
 | 3     | Pages de détail         | Phase 3.3-3.6          | `/titles/:id`, `/people/:id`, `/episodes/:id`                                      | Terminé |
-| 4.1   | Watches + calendrier    | Phase 4.1              | `/watches`, `/calendar`, `/follows`                                                | À faire |
-| 4.2   | Ratings                 | Phase 4.2              | `/ratings`, `/titles/:id/ratings`                                                  | À faire |
-| 4.3   | Lists                   | Phase 4.3              | `/lists`, `/shared-lists`                                                          | À faire |
-| 4.4   | Follows                 | Phase 4.4              | `/follows`                                                                         | À faire |
+| 4.1   | Watches + calendrier    | Phase 4.1              | `/watches`, `/calendar`, `/follows`                                                | Validé |
+| 4.2   | Ratings                 | Phase 4.2              | `/ratings`, `/titles/:id/ratings`                                                  | Validé |
+| 4.3   | Lists                   | Phase 4.3              | `/lists`, `/shared-lists`                                                          | Validé |
+| 4.4   | Follows                 | Phase 4.4              | `/follows`                                                                         | Validé |
 | 5     | Recommandations         | Phase 5                | `/admin/compute-recommendations`                                                   | À faire |
 | 6     | Dataviz + admin refresh | Phase 6.1, 6.2         | `/dataviz/watch-time`, `/dataviz/watch-count`, `/admin/refresh-materialized-views` | À faire |
 | 7     | Notifications           | Phase 7                | `/notifications`                                                                   | À faire |
