@@ -1167,6 +1167,119 @@ apps/web/
             └── auth/                   # Tests hooks auth
 ```
 
+### Fichiers Source Phase 3 — Pages de détail (titres, personnes, saisons, épisodes)
+
+```
+apps/web/
+├── src/
+│   ├── app/
+│   │   ├── titles/
+│   │   │   └── [id]/
+│   │   │       └── page.tsx                # Page détail titre (film/serie)
+│   │   ├── people/
+│   │   │   └── [id]/
+│   │   │       └── page.tsx                # Page détail personne
+│   │   ├── episodes/
+│   │   │   └── [id]/
+│   │   │       └── page.tsx                # Page détail épisode
+│   │   └── series/
+│   │       └── [id]/
+│   │           └── seasons/
+│   │               └── [numero]/
+│   │                   └── page.tsx        # Page détail saison
+│   ├── components/
+│   │   ├── titles/
+│   │   │   ├── TitleHero.tsx              # Hero banner (backdrop, poster, titre, note)
+│   │   │   ├── TitleInfo.tsx              # Métadonnées (genres, pays, studios, durée)
+│   │   │   ├── TitleCredits.tsx          # Distribution groupée par rôle
+│   │   │   └── TitleRecommendations.tsx  # Carrousel de titres recommandés
+│   │   ├── seasons/
+│   │   │   ├── SeasonCard.tsx            # Card saison dans la grille
+│   │   │   ├── EpisodeRow.tsx            # Ligne d'épisode (desktop)
+│   │   │   └── EpisodeCard.tsx           # Card épisode (mobile)
+│   │   └── people/
+│   │       ├── PersonHero.tsx            # Hero personne (photo, nom, bio, pays)
+│   │       └── Filmography.tsx           # Filmographie groupée par rôle
+│   ├── hooks/
+│   │   └── api/
+│   │       ├── useTitleCredits.ts         # GET /titles/:titleId/credits
+│   │       ├── useTitleRecommendations.ts # GET /titles/:id/recommendations
+│   │       ├── useSeasons.ts              # GET /titles/:titleId/seasons
+│   │       ├── useSeason.ts               # GET /titles/:titleId/seasons/:numero
+│   │       ├── useEpisode.ts              # GET /episodes/:id
+│   │       ├── useEpisodeCredits.ts       # GET /episodes/:id/credits
+│   │       └── usePersonRecommendations.ts # GET /people/:id/recommendations
+│   ├── lib/
+│   │   └── types/
+│   │       └── api.ts                    # Types Phase 3 (TitleDetail, EpisodeDetail, etc.)
+│   └── __tests__/
+│       └── unit/
+│           ├── components/
+│           │   ├── titles/
+│           │   │   ├── TitleHero.test.tsx
+│           │   │   ├── TitleInfo.test.tsx
+│           │   │   ├── TitleCredits.test.tsx
+│           │   │   └── TitleRecommendations.test.tsx
+│           │   ├── seasons/
+│           │   │   ├── SeasonCard.test.tsx
+│           │   │   ├── EpisodeRow.test.tsx
+│           │   │   └── EpisodeCard.test.tsx
+│           │   └── people/
+│           │       ├── PersonHero.test.tsx
+│           │       └── Filmography.test.tsx
+│           └── hooks/
+│               └── api/
+│                   ├── useTitleCredits.test.tsx
+│                   ├── useTitleRecommendations.test.tsx
+│                   ├── useSeasons.test.tsx
+│                   ├── useSeason.test.tsx
+│                   ├── useEpisode.test.tsx
+│                   ├── useEpisodeCredits.test.tsx
+│                   └── usePersonRecommendations.test.tsx
+└── cypress/
+    └── e2e/
+        └── phase3-detail-pages.cy.ts     # Scénarios e2e (à tester manuellement)
+```
+
+### Tests Unitaires Phase 3 — Couverture
+
+| Module         | Fichier de Test                                          | Couverture                                                                 |
+| -------------- | -------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Composants** | `__tests__/unit/components/titles/TitleHero.test.tsx`    | Affichage titre VO/VF, année, note, type (Film/Série), statut, synopsis   |
+| **Composants** | `__tests__/unit/components/titles/TitleInfo.test.tsx`    | Genres, pays, studios, durée, statut, animation, date de sortie         |
+| **Composants** | `__tests__/unit/components/titles/TitleCredits.test.tsx` | Rôles groupés, noms de personnes, message vide, gestion tableaux vides    |
+| **Composants** | `__tests__/unit/components/titles/TitleRecommendations.test.tsx` | Titre de section, message vide, gestion undefined                      |
+| **Composants** | `__tests__/unit/components/seasons/SeasonCard.test.tsx`  | Titre, numéro, nb épisodes, année, lien correct                          |
+| **Composants** | `__tests__/unit/components/seasons/EpisodeRow.test.tsx`  | Titre, S/E, date, durée, placeholder image, lien, icône check            |
+| **Composants** | `__tests__/unit/components/seasons/EpisodeCard.test.tsx` | Titre, badge E#, année, durée, lien, style watched                       |
+| **Composants** | `__tests__/unit/components/people/PersonHero.test.tsx`   | Nom, genre, date de naissance, âge, pays, bio, lien Wikipedia            |
+| **Composants** | `__tests__/unit/components/people/Filmography.test.tsx`  | Rôles groupés, message vide, gestion tableaux vides                      |
+| **Hooks**      | `__tests__/unit/hooks/api/useTitleCredits.test.tsx`      | Endpoint correct, données mappées, pas d'appel si titleId vide           |
+| **Hooks**      | `__tests__/unit/hooks/api/useTitleRecommendations.test.tsx` | Endpoint correct, données mappées, pas d'appel si id vide              |
+| **Hooks**      | `__tests__/unit/hooks/api/useSeasons.test.tsx`           | Endpoint correct, données mappées, pas d'appel si titleId vide           |
+| **Hooks**      | `__tests__/unit/hooks/api/useSeason.test.tsx`            | Endpoint correct, données mappées, pas d'appel si titleId vide           |
+| **Hooks**      | `__tests__/unit/hooks/api/useEpisode.test.tsx`           | Endpoint correct, données mappées, pas d'appel si id vide                  |
+| **Hooks**      | `__tests__/unit/hooks/api/useEpisodeCredits.test.tsx`    | Endpoint correct, données mappées, pas d'appel si id vide                  |
+| **Hooks**      | `__tests__/unit/hooks/api/usePersonRecommendations.test.tsx` | Endpoint correct, données mappées, pas d'appel si id vide              |
+
+### Scénarios Cypress (E2E) Phase 3 — à tester manuellement
+
+| #   | Scénario                                                                              | Priorité |
+| --- | ------------------------------------------------------------------------------------- | -------- |
+| 1   | Page titre affiche le titre, la note et le type (Film/Série)                         | Haute    |
+| 2   | Page titre affiche les métadonnées (genres, pays, studios, durée)                    | Haute    |
+| 3   | Page titre affiche la distribution (crédits groupés par rôle)                        | Haute    |
+| 4   | Page série affiche la liste des saisons                                              | Haute    |
+| 5   | Page titre affiche les recommandations                                               | Moyenne  |
+| 6   | Page titre inexistant → redirect 404                                                 | Haute    |
+| 7   | Page personne affiche le nom, la bio et le lien Wikipedia                            | Haute    |
+| 8   | Page personne affiche la filmographie groupée par rôle                               | Haute    |
+| 9   | Page personne affiche les personnes connexes                                         | Moyenne  |
+| 10  | Page saison affiche le header et la liste des épisodes                               | Haute    |
+| 11  | Page saison affiche le lien de retour vers la série                                  | Moyenne  |
+| 12  | Page épisode affiche le titre, les métadonnées et le casting                         | Haute    |
+| 13  | Navigation : page titre → saison → épisode → saison parente                          | Moyenne  |
+
 ---
 
 ## 📊 Résumé

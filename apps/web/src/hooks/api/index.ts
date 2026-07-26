@@ -1,6 +1,6 @@
 /**
  * Index des hooks API pour le frontend eMDB.
- * Exporte tous les hooks de la phase 2.
+ * Exporte tous les hooks des phases 2 et 3.
  */
 
 export {
@@ -39,3 +39,12 @@ export {
   type DashboardFollow,
   type DashboardStats,
 } from "./useDashboard";
+
+// Phase 3 — Pages de détail
+export { useTitleCredits } from "./useTitleCredits";
+export { useTitleRecommendations } from "./useTitleRecommendations";
+export { useSeasons } from "./useSeasons";
+export { useSeason } from "./useSeason";
+export { useEpisode } from "./useEpisode";
+export { useEpisodeCredits } from "./useEpisodeCredits";
+export { usePersonRecommendations } from "./usePersonRecommendations";

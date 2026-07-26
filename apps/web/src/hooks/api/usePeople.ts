@@ -5,7 +5,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/apiClient";
-import { Person, PaginationResult, PersonSearchResult } from "@/lib/types/api";
+import {
+  Person,
+  PersonDetail,
+  PaginationResult,
+  PersonSearchResult,
+} from "@/lib/types/api";
 
 // ============================================
 // Types étendus pour les réponses API
@@ -69,8 +74,8 @@ export function usePeople(params: PeopleSearchParams = {}) {
 export function usePerson(id: string) {
   return useQuery({
     queryKey: ["people", "detail", id],
-    queryFn: async (): Promise<Person> => {
-      return apiFetch<Person>(`/people/${id}`);
+    queryFn: async (): Promise<PersonDetail> => {
+      return apiFetch<PersonDetail>(`/people/${id}`);
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

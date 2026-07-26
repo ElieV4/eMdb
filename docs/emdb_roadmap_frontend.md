@@ -333,7 +333,7 @@ emdb/
 
 > **Backend** : `GET /titles/:id`
 
-- [ ] `app/titles/[id]/page.tsx` :
+- [x] `app/titles/[id]/page.tsx` :
   - Hero banner avec affiche + synopsis
   - Titre VO/VF, année, durée, note IMDB
   - Genres (badges cliquables)
@@ -351,7 +351,7 @@ emdb/
 
 > **Backend** : `GET /titles/:id`, `GET /titles/:id/seasons`, `GET /titles/:titleId/progress`
 
-- [ ] `app/series/[id]/page.tsx` (ou `app/titles/[id]/page.tsx` avec type=serie) :
+- [x] `app/series/[id]/page.tsx` (ou `app/titles/[id]/page.tsx` avec type=serie) :
   - Hero banner
   - Statut de la série (en cours, terminée, annulée)
   - Prochain épisode (next_episode_air_date)
@@ -367,7 +367,7 @@ emdb/
 
 > **Backend** : `GET /people/:id`, `GET /people/:id/filmography`
 
-- [ ] `app/people/[id]/page.tsx` :
+- [x] `app/people/[id]/page.tsx` :
   - Photo + nom
   - Genre (homme/femme/autre)
   - Âge (calculé depuis date_naissance)
@@ -385,7 +385,7 @@ emdb/
 
 > **Backend** : `GET /titles/:titleId/seasons/:numero`
 
-- [ ] `app/series/[id]/seasons/[numero]/page.tsx` :
+- [x] `app/series/[id]/seasons/[numero]/page.tsx` :
   - Header saison (numéro, titre, date de sortie, synopsis)
   - Liste des épisodes (tableau ou liste) :
     - Numéro, titre, date de sortie, durée
@@ -399,7 +399,7 @@ emdb/
 
 > **Backend** : `GET /episodes/:id`, `GET /episodes/:id/credits`
 
-- [ ] `app/episodes/[id]/page.tsx` :
+- [x] `app/episodes/[id]/page.tsx` :
   - Header épisode (saison, numéro, titre, date de sortie, durée, image)
   - Synopsis
   - Guest stars / crew spécifiques à l'épisode — `GET /episodes/:id/credits`
@@ -409,34 +409,34 @@ emdb/
 
 ### 3.6 Composants détaillés
 
-- [ ] `components/titles/TitleHero.tsx` — hero banner titre
-- [ ] `components/titles/TitleInfo.tsx` — métadonnées (genres, pays, dates)
-- [ ] `components/titles/TitleCredits.tsx` — distribution groupée par rôle
-- [ ] `components/titles/TitleRecommendations.tsx` — carrousel de titres connexes
-- [ ] `components/seasons/SeasonCard.tsx` — card saison
-- [ ] `components/seasons/EpisodeRow.tsx` — ligne d'épisode (dans un tableau)
-- [ ] `components/seasons/EpisodeCard.tsx` — card épisode (mobile)
-- [ ] `components/people/PersonHero.tsx` — hero personne
-- [ ] `components/people/Filmography.tsx` — filmographie groupée par rôle
+- [x] `components/titles/TitleHero.tsx` — hero banner titre
+- [x] `components/titles/TitleInfo.tsx` — métadonnées (genres, pays, dates)
+- [x] `components/titles/TitleCredits.tsx` — distribution groupée par rôle
+- [x] `components/titles/TitleRecommendations.tsx` — carrousel de titres connexes
+- [x] `components/seasons/SeasonCard.tsx` — card saison
+- [x] `components/seasons/EpisodeRow.tsx` — ligne d'épisode (dans un tableau)
+- [x] `components/seasons/EpisodeCard.tsx` — card épisode (mobile)
+- [x] `components/people/PersonHero.tsx` — hero personne
+- [x] `components/people/Filmography.tsx` — filmographie groupée par rôle
 
 ### 3.7 Hooks
 
-- [ ] `hooks/api/useTitleCredits(titleId)` — `GET /titles/:titleId/credits`
-- [ ] `hooks/api/useTitleRecommendations(titleId)` — `GET /titles/:titleId/recommendations`
-- [ ] `hooks/api/useSeasons(titleId)` — `GET /titles/:titleId/seasons`
-- [ ] `hooks/api/useSeason(titleId, numero)` — `GET /titles/:titleId/seasons/:numero`
-- [ ] `hooks/api/useEpisode(id)` — `GET /episodes/:id`
-- [ ] `hooks/api/useEpisodeCredits(id)` — `GET /episodes/:id/credits`
-- [ ] `hooks/api/usePersonFilmography(id)` — `GET /people/:id/filmography`
-- [ ] `hooks/api/usePersonRecommendations(id)` — `GET /people/:id/recommendations`
+- [x] `hooks/api/useTitleCredits(titleId)` — `GET /titles/:titleId/credits`
+- [x] `hooks/api/useTitleRecommendations(titleId)` — `GET /titles/:titleId/recommendations`
+- [x] `hooks/api/useSeasons(titleId)` — `GET /titles/:titleId/seasons`
+- [x] `hooks/api/useSeason(titleId, numero)` — `GET /titles/:titleId/seasons/:numero`
+- [x] `hooks/api/useEpisode(id)` — `GET /episodes/:id`
+- [x] `hooks/api/useEpisodeCredits(id)` — `GET /episodes/:id/credits`
+- [x] `hooks/api/usePersonFilmography(id)` — `GET /people/:id/filmography`
+- [x] `hooks/api/usePersonRecommendations(id)` — `GET /people/:id/recommendations`
 
 ### 3.8 Tests
 
-- [ ] Title detail page : affichage des métadonnées, distribution, recommendations
-- [ ] Series detail page : progrès, prochain épisode, saisons
-- [ ] Person detail page : filmographie groupée, liens Wikipedia
-- [ ] Episode row : statut vu/non-vu, boutons watch/rating
-- [ ] Season page : liste des épisodes, tri par numéro
+- [x] Title detail page : affichage des métadonnées, distribution, recommendations
+- [x] Series detail page : progrès, prochain épisode, saisons
+- [x] Person detail page : filmographie groupée, liens Wikipedia
+- [x] Episode row : statut vu/non-vu, boutons watch/rating
+- [x] Season page : liste des épisodes, tri par numéro
 
 ---
 
@@ -1074,7 +1074,7 @@ Les 13 points identifiés dans [`docs/frontend-design-choices.md`](./frontend-de
 | 0     | Socle technique         | Phase 0                | —                                                                                  | Terminé |
 | 1     | Auth pages              | Phase 3.1              | `/auth/*`                                                                          | Terminé |
 | 2     | Recherche & navigation  | Phase 3.3, 3.4         | `/titles/search`, `/people/search`                                                 | Terminé |
-| 3     | Pages de détail         | Phase 3.3-3.6          | `/titles/:id`, `/people/:id`, `/episodes/:id`                                      | À faire |
+| 3     | Pages de détail         | Phase 3.3-3.6          | `/titles/:id`, `/people/:id`, `/episodes/:id`                                      | Terminé |
 | 4.1   | Watches + calendrier    | Phase 4.1              | `/watches`, `/calendar`, `/follows`                                                | À faire |
 | 4.2   | Ratings                 | Phase 4.2              | `/ratings`, `/titles/:id/ratings`                                                  | À faire |
 | 4.3   | Lists                   | Phase 4.3              | `/lists`, `/shared-lists`                                                          | À faire |
@@ -1089,3 +1089,4 @@ Les 13 points identifiés dans [`docs/frontend-design-choices.md`](./frontend-de
 
 _Dernière mise à jour : 25 juillet 2026_
 _Basé sur : `emdb_roadmap_backend.md` (v2), `packages/db/sql/db_init.sql` (v2), `README.md`, `docs/phase-*.md`_
+

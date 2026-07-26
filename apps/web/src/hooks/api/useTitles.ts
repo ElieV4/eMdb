@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/apiClient";
 import {
   Title,
+  TitleDetail,
   PaginationResult,
   TitleSearchResult,
 } from "@/lib/types/api";
@@ -73,8 +74,8 @@ export function useTitles(params: TitlesSearchParams = {}) {
 export function useTitle(id: string) {
   return useQuery({
     queryKey: ["titles", "detail", id],
-    queryFn: async (): Promise<Title> => {
-      return apiFetch<Title>(`/titles/${id}`);
+    queryFn: async (): Promise<TitleDetail> => {
+      return apiFetch<TitleDetail>(`/titles/${id}`);
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
