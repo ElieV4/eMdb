@@ -97,7 +97,9 @@ export function Header() {
                   {user?.pseudo}
                 </div>
                 <DropdownMenuItem>
-                  <Link href="/profile" className="w-full">Profil</Link>
+                  <Link href="/profile" className="w-full">
+                    Profil
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => logout.mutate()}>
                   <LogOut className="mr-2 h-4 w-4" />

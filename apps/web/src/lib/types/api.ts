@@ -333,9 +333,7 @@ export function titleRecommendationToSearchResult(
     tmdbId: rec.tmdb_id ?? undefined,
     titre: rec.titre_vo,
     titreOriginal:
-      rec.titre_vf && rec.titre_vf !== rec.titre_vo
-        ? rec.titre_vf
-        : undefined,
+      rec.titre_vf && rec.titre_vf !== rec.titre_vo ? rec.titre_vf : undefined,
     type: rec.type,
     dateSortie: undefined,
     note: rec.note_imdb ?? undefined,

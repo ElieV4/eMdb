@@ -11,9 +11,7 @@ export function usePersonRecommendations(id: string) {
   return useQuery({
     queryKey: ["people", id, "recommendations"],
     queryFn: async (): Promise<PersonRecommendation[]> => {
-      return apiFetch<PersonRecommendation[]>(
-        `/people/${id}/recommendations`,
-      );
+      return apiFetch<PersonRecommendation[]>(`/people/${id}/recommendations`);
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,

@@ -49,7 +49,7 @@ export function useTitles(params: TitlesSearchParams = {}) {
     ],
     queryFn: async (): Promise<TitlesSearchResponse> => {
       const searchParams = new URLSearchParams();
-      if (query) searchParams.set("query", query);
+      if (query) searchParams.set("q", query);
       if (type) searchParams.set("type", type);
       if (genre) searchParams.set("genre", genre);
       if (country) searchParams.set("country", country);

@@ -3,10 +3,7 @@
  * Réutilise TitleCard avec le mapping filmographyToSearchResult.
  */
 
-import {
-  FilmographyGrouped,
-  filmographyToSearchResult,
-} from "@/lib/types/api";
+import { FilmographyGrouped, filmographyToSearchResult } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 import { TitleCard } from "@/components/titles/TitleCard";
 

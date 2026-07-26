@@ -102,7 +102,10 @@ export function EpisodeRow({
       {/* Statut vu */}
       <div className="flex items-center justify-center">
         {isWatched ? (
-          <CheckCircle2 className="h-5 w-5 text-primary" data-testid="check-icon" />
+          <CheckCircle2
+            className="h-5 w-5 text-primary"
+            data-testid="check-icon"
+          />
         ) : (
           <Circle className="h-5 w-5 text-muted-foreground/50" />
         )}

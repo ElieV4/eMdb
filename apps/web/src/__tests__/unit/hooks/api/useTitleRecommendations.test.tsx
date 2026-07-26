@@ -36,9 +36,7 @@ function createQueryClient() {
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
   };
 }
@@ -50,7 +48,9 @@ describe("useTitleRecommendations", () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
 
-    const { result } = renderHook(() => useTitleRecommendations("title-1"), { wrapper });
+    const { result } = renderHook(() => useTitleRecommendations("title-1"), {
+      wrapper,
+    });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -65,7 +65,9 @@ describe("useTitleRecommendations", () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
 
-    const { result } = renderHook(() => useTitleRecommendations("title-1"), { wrapper });
+    const { result } = renderHook(() => useTitleRecommendations("title-1"), {
+      wrapper,
+    });
 
     await waitFor(() => {
       expect(result.current.data).toEqual(mockRecs);
@@ -76,7 +78,9 @@ describe("useTitleRecommendations", () => {
     const queryClient = createQueryClient();
     const wrapper = createWrapper(queryClient);
 
-    const { result } = renderHook(() => useTitleRecommendations(""), { wrapper });
+    const { result } = renderHook(() => useTitleRecommendations(""), {
+      wrapper,
+    });
 
     expect(result.current.status).toBe("pending");
   });

@@ -29,48 +29,34 @@ const mockEpisodeNoImage: EpisodeRowItem = {
 
 describe("EpisodeRow", () => {
   it("affiche le titre de l'épisode", () => {
-    render(
-      <EpisodeRow episode={mockEpisode} titleId="t1" seasonNumero={1} />,
-    );
+    render(<EpisodeRow episode={mockEpisode} titleId="t1" seasonNumero={1} />);
     expect(screen.getByText("The Vanishing of Will Byers")).toBeInTheDocument();
   });
 
   it("affiche le numéro S/E", () => {
-    render(
-      <EpisodeRow episode={mockEpisode} titleId="t1" seasonNumero={1} />,
-    );
+    render(<EpisodeRow episode={mockEpisode} titleId="t1" seasonNumero={1} />);
     expect(screen.getByText("S1 E01")).toBeInTheDocument();
   });
 
   it("affiche la date de sortie", () => {
-    render(
-      <EpisodeRow episode={mockEpisode} titleId="t1" seasonNumero={1} />,
-    );
+    render(<EpisodeRow episode={mockEpisode} titleId="t1" seasonNumero={1} />);
     expect(screen.getByText("15/07/2016")).toBeInTheDocument();
   });
 
   it("affiche la durée", () => {
-    render(
-      <EpisodeRow episode={mockEpisode} titleId="t1" seasonNumero={1} />,
-    );
+    render(<EpisodeRow episode={mockEpisode} titleId="t1" seasonNumero={1} />);
     expect(screen.getByText("45 min")).toBeInTheDocument();
   });
 
   it("affiche un placeholder quand image_url est null", () => {
     render(
-      <EpisodeRow
-        episode={mockEpisodeNoImage}
-        titleId="t1"
-        seasonNumero={1}
-      />,
+      <EpisodeRow episode={mockEpisodeNoImage} titleId="t1" seasonNumero={1} />,
     );
     expect(screen.getByText("Pas image")).toBeInTheDocument();
   });
 
   it("génère le bon lien vers l'épisode", () => {
-    render(
-      <EpisodeRow episode={mockEpisode} titleId="t1" seasonNumero={1} />,
-    );
+    render(<EpisodeRow episode={mockEpisode} titleId="t1" seasonNumero={1} />);
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute("href", "/episodes/e1");
   });

@@ -57,7 +57,7 @@ export function useSearch(params: UnifiedSearchParams) {
     ],
     queryFn: async (): Promise<PaginationResult<TitleSearchResult>> => {
       const searchParams = new URLSearchParams();
-      searchParams.set("query", query);
+      searchParams.set("q", query);
       if (type && type !== "personne") searchParams.set("type", type);
       if (genre) searchParams.set("genre", genre);
       if (country) searchParams.set("country", country);
@@ -79,7 +79,7 @@ export function useSearch(params: UnifiedSearchParams) {
     queryKey: ["search", "people", query, page, limit],
     queryFn: async (): Promise<PaginationResult<PersonSearchResult>> => {
       const searchParams = new URLSearchParams();
-      searchParams.set("query", query);
+      searchParams.set("q", query);
       searchParams.set("page", page.toString());
       searchParams.set("limit", limit.toString());
 

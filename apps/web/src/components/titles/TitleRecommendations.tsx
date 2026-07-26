@@ -5,7 +5,10 @@
 
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { TitleRecommendation, titleRecommendationToSearchResult } from "@/lib/types/api";
+import {
+  TitleRecommendation,
+  titleRecommendationToSearchResult,
+} from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 import { TitleCard } from "./TitleCard";
 

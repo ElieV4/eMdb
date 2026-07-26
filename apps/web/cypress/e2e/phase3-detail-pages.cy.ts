@@ -11,16 +11,36 @@
 describe("Phase 3 — Pages de détail (titres, personnes, saisons, épisodes)", () => {
   beforeEach(() => {
     // Intercepte les appels API pour des réponses stables
-    cy.intercept("GET", "/titles/*", { fixture: "title-detail.json" }).as("titleDetail");
-    cy.intercept("GET", "/titles/*/credits", { fixture: "credits.json" }).as("titleCredits");
-    cy.intercept("GET", "/titles/*/recommendations", { fixture: "recommendations.json" }).as("titleRecs");
-    cy.intercept("GET", "/titles/*/seasons", { fixture: "seasons.json" }).as("seasons");
-    cy.intercept("GET", "/people/*", { fixture: "person-detail.json" }).as("personDetail");
-    cy.intercept("GET", "/people/*/filmography", { fixture: "filmography.json" }).as("filmography");
-    cy.intercept("GET", "/people/*/recommendations", { fixture: "person-recs.json" }).as("personRecs");
-    cy.intercept("GET", "/episodes/*", { fixture: "episode-detail.json" }).as("episodeDetail");
-    cy.intercept("GET", "/episodes/*/credits", { fixture: "episode-credits.json" }).as("episodeCredits");
-    cy.intercept("GET", "/titles/*/seasons/*", { fixture: "season-detail.json" }).as("seasonDetail");
+    cy.intercept("GET", "/titles/*", { fixture: "title-detail.json" }).as(
+      "titleDetail",
+    );
+    cy.intercept("GET", "/titles/*/credits", { fixture: "credits.json" }).as(
+      "titleCredits",
+    );
+    cy.intercept("GET", "/titles/*/recommendations", {
+      fixture: "recommendations.json",
+    }).as("titleRecs");
+    cy.intercept("GET", "/titles/*/seasons", { fixture: "seasons.json" }).as(
+      "seasons",
+    );
+    cy.intercept("GET", "/people/*", { fixture: "person-detail.json" }).as(
+      "personDetail",
+    );
+    cy.intercept("GET", "/people/*/filmography", {
+      fixture: "filmography.json",
+    }).as("filmography");
+    cy.intercept("GET", "/people/*/recommendations", {
+      fixture: "person-recs.json",
+    }).as("personRecs");
+    cy.intercept("GET", "/episodes/*", { fixture: "episode-detail.json" }).as(
+      "episodeDetail",
+    );
+    cy.intercept("GET", "/episodes/*/credits", {
+      fixture: "episode-credits.json",
+    }).as("episodeCredits");
+    cy.intercept("GET", "/titles/*/seasons/*", {
+      fixture: "season-detail.json",
+    }).as("seasonDetail");
   });
 
   describe("Page détail titre (GET /titles/:id)", () => {
@@ -63,7 +83,9 @@ describe("Phase 3 — Pages de détail (titres, personnes, saisons, épisodes)",
     });
 
     it("redirige vers 404 pour un titre inexistant", () => {
-      cy.intercept("GET", "/titles/nonexistent", { statusCode: 404 }).as("notFound");
+      cy.intercept("GET", "/titles/nonexistent", { statusCode: 404 }).as(
+        "notFound",
+      );
       cy.visit("/titles/nonexistent");
       cy.url().should("include", "/not-found");
     });
@@ -118,15 +140,18 @@ describe("Phase 3 — Pages de détail (titres, personnes, saisons, épisodes)",
       cy.visit("/series/serie-1/seasons/1");
 
       cy.contains("Épisodes").should("be.visible");
-      cy.get("[data-testid='episode-row'], [data-testid='episode-card']").should(
-        "have.length.gte",
-        1,
-      );
+      cy.get(
+        "[data-testid='episode-row'], [data-testid='episode-card']",
+      ).should("have.length.gte", 1);
     });
 
     it("affiche le lien de retour vers la série", () => {
       cy.visit("/series/serie-1/seasons/1");
-      cy.contains("Retour à la série").should("have.attr", "href", "/titles/serie-1");
+      cy.contains("Retour à la série").should(
+        "have.attr",
+        "href",
+        "/titles/serie-1",
+      );
     });
   });
 

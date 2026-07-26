@@ -92,11 +92,7 @@ export default function TitleDetailPage({
             ) : (
               <div className="space-y-3">
                 {seasons.map((season) => (
-                  <SeasonCard
-                    key={season.id}
-                    season={season}
-                    titleId={id}
-                  />
+                  <SeasonCard key={season.id} season={season} titleId={id} />
                 ))}
               </div>
             )}
@@ -108,7 +104,9 @@ export default function TitleDetailPage({
           <h2 className="text-2xl font-bold mb-4">Recommandations</h2>
           {isRecsLoading ? (
             <LoadingSpinner className="h-6 w-6" />
-          ) : isRecsError || !recommendations || recommendations.length === 0 ? (
+          ) : isRecsError ||
+            !recommendations ||
+            recommendations.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Aucune recommandation disponible pour ce titre.
             </p>

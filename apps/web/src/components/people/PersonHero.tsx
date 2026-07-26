@@ -51,7 +51,11 @@ export function PersonHero({ person, className }: PersonHeroProps) {
           <h1 className="text-3xl md:text-4xl font-bold">{nom}</h1>
           {genre && (
             <p className="text-sm text-muted-foreground mt-1">
-              {genre === "Homme" ? "Acteur" : genre === "Femme" ? "Actrice" : genre}
+              {genre === "Homme"
+                ? "Acteur"
+                : genre === "Femme"
+                  ? "Actrice"
+                  : genre}
             </p>
           )}
         </div>
@@ -61,8 +65,7 @@ export function PersonHero({ person, className }: PersonHeroProps) {
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               <span>
-                Né(e) le{" "}
-                {new Date(date_naissance).toLocaleDateString("fr-FR")}
+                Né(e) le {new Date(date_naissance).toLocaleDateString("fr-FR")}
                 {age && ` (${age} ans)`}
               </span>
             </div>
@@ -77,9 +80,7 @@ export function PersonHero({ person, className }: PersonHeroProps) {
         </div>
 
         {bio && (
-          <p className="text-sm text-muted-foreground line-clamp-4">
-            {bio}
-          </p>
+          <p className="text-sm text-muted-foreground line-clamp-4">{bio}</p>
         )}
 
         {person.wiki_url && (

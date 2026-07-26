@@ -22,9 +22,15 @@ const mockTitle: TitleDetail = {
   statut: "Released",
   is_animation: false,
   next_episode_air_date: null,
-  title_genres: [{ id: "1", genre_id: "g1", genres: { id: "g1", nom: "Sci-Fi" } }],
-  title_countries: [{ id: "1", country_id: "c1", countries: { id: "c1", nom: "USA" } }],
-  title_studios: [{ id: "1", studio_id: "s1", studios: { id: "s1", nom: "Warner Bros" } }],
+  title_genres: [
+    { id: "1", genre_id: "g1", genres: { id: "g1", nom: "Sci-Fi" } },
+  ],
+  title_countries: [
+    { id: "1", country_id: "c1", countries: { id: "c1", nom: "USA" } },
+  ],
+  title_studios: [
+    { id: "1", studio_id: "s1", studios: { id: "s1", nom: "Warner Bros" } },
+  ],
   seasons: [],
 };
 
@@ -61,12 +67,14 @@ describe("TitleHero", () => {
 
   it("affiche le type Film pour un film", () => {
     render(<TitleHero title={mockTitle} />);
-    expect(screen.getByText("Film")).toBeInTheDocument();
+    const badges = screen.getAllByText("Film");
+    expect(badges.length).toBeGreaterThan(0);
   });
 
   it("affiche le type Série pour une série", () => {
     render(<TitleHero title={mockSerie} />);
-    expect(screen.getByText("Série")).toBeInTheDocument();
+    const badges = screen.getAllByText("Série");
+    expect(badges.length).toBeGreaterThan(0);
   });
 
   it("affiche le statut quand disponible", () => {

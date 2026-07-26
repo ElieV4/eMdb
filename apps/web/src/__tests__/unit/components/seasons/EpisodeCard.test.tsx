@@ -19,37 +19,27 @@ const mockEpisode: EpisodeRowItem = {
 
 describe("EpisodeCard", () => {
   it("affiche le titre de l'épisode", () => {
-    render(
-      <EpisodeCard episode={mockEpisode} titleId="t1" seasonNumero={2} />,
-    );
+    render(<EpisodeCard episode={mockEpisode} titleId="t1" seasonNumero={2} />);
     expect(screen.getByText("The Power of Three")).toBeInTheDocument();
   });
 
   it("affiche le badge E3", () => {
-    render(
-      <EpisodeCard episode={mockEpisode} titleId="t1" seasonNumero={2} />,
-    );
+    render(<EpisodeCard episode={mockEpisode} titleId="t1" seasonNumero={2} />);
     expect(screen.getByText("E3")).toBeInTheDocument();
   });
 
   it("affiche l'année de sortie", () => {
-    render(
-      <EpisodeCard episode={mockEpisode} titleId="t1" seasonNumero={2} />,
-    );
+    render(<EpisodeCard episode={mockEpisode} titleId="t1" seasonNumero={2} />);
     expect(screen.getByText("2017")).toBeInTheDocument();
   });
 
   it("affiche la durée", () => {
-    render(
-      <EpisodeCard episode={mockEpisode} titleId="t1" seasonNumero={2} />,
-    );
+    render(<EpisodeCard episode={mockEpisode} titleId="t1" seasonNumero={2} />);
     expect(screen.getByText("50 min")).toBeInTheDocument();
   });
 
   it("génère le bon lien vers l'épisode", () => {
-    render(
-      <EpisodeCard episode={mockEpisode} titleId="t1" seasonNumero={2} />,
-    );
+    render(<EpisodeCard episode={mockEpisode} titleId="t1" seasonNumero={2} />);
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute("href", "/episodes/e1");
   });

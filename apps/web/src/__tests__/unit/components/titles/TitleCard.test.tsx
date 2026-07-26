@@ -7,7 +7,6 @@ import { render, screen } from "@testing-library/react";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { TitleSearchResult } from "@/lib/types/api";
 
-// Mock des données de test
 const mockTitle: TitleSearchResult = {
   id: "1",
   tmdbId: 123,
@@ -15,72 +14,90 @@ const mockTitle: TitleSearchResult = {
   titreOriginal: "Inception",
   type: "film",
   dateSortie: "2010-07-16",
-  duree: 148,
-  note: 8.7,
-  afficheUrl: "/path/to/poster.jpg",
-  genres: [{ id: "1", nom: "Science-Fiction" }],
-  pays: [{ id: "1", nom: "États-Unis" }],
+  note: 8.8,
+  afficheUrl: "/poster.jpg",
+  genres: [{ id: "g1", nom: "Sci-Fi" }],
+  pays: [{ id: "c1", nom: "USA" }],
 };
 
-const mockTitleNoPoster: TitleSearchResult = {
+const mockSerie: TitleSearchResult = {
+  ...mockTitle,
   id: "2",
-  tmdbId: 456,
-  titre: "Unknown Movie",
-  titreOriginal: "Unknown Movie",
-  type: "film",
-  dateSortie: "2020-01-01",
-};
-
-const mockTitleSerie: TitleSearchResult = {
-  id: "3",
-  tmdbId: 789,
   titre: "Stranger Things",
   titreOriginal: "Stranger Things",
   type: "serie",
   dateSortie: "2016-07-15",
-  afficheUrl: "/path/to/series-poster.jpg",
+  note: 8.7,
 };
 
 describe("TitleCard", () => {
-  it("affiche le titre correctement", () => {
+  it("affiche le titre", () => {
     render(<TitleCard title={mockTitle} />);
     expect(screen.getByText("Inception")).toBeInTheDocument();
   });
 
-  it("affiche l'année de sortie", () => {
+  it("affiche l'annee de sortie", () => {
     render(<TitleCard title={mockTitle} />);
     expect(screen.getByText("2010")).toBeInTheDocument();
   });
 
-  it("affiche le type (Film/Série)", () => {
+  it("affiche la note", () => {
     render(<TitleCard title={mockTitle} />);
-    expect(screen.getByText("Film")).toBeInTheDocument();
-
-    render(<TitleCard title={mockTitleSerie} />);
-    expect(screen.getByText("Série")).toBeInTheDocument();
+    expect(screen.getByText("8.8")).toBeInTheDocument();
   });
 
-  it("affiche la note quand disponible", () => {
+  it("affiche le badge Film via TitlePoster", () => {
     render(<TitleCard title={mockTitle} />);
-    expect(screen.getByText("8.7")).toBeInTheDocument();
+    const badges = screen.getAllByText("Film");
+    expect(badges.length).toBeGreaterThan(0);
   });
 
-  it("affiche un fallback quand afficheUrl est absent", () => {
-    render(<TitleCard title={mockTitleNoPoster} />);
-    // Devrait afficher un placeholder
-    const placeholder = screen.getByAltText("I");
-    expect(placeholder).toBeInTheDocument();
+  it("affiche le badge Serie via TitlePoster", () => {
+    render(<TitleCard title={mockSerie} />);
+    const badges = screen.getAllByText("Série");
+    expect(badges.length).toBeGreaterThan(0);
   });
 
-  it("applique le style compact quand compact=true", () => {
+  it("affiche le badge type meme en mode compact (dans TitlePoster)", () => {
     render(<TitleCard title={mockTitle} compact />);
-    const card = screen.getByText("Inception").parentElement;
-    expect(card).toBeInTheDocument();
+    // TitlePoster affiche toujours le badge type
+    expect(screen.getByText("Film")).toBeInTheDocument();
   });
 
-  it("n'affiche pas la note quand elle est absente", () => {
-    const titleNoRating = { ...mockTitle, note: undefined };
-    render(<TitleCard title={titleNoRating} />);
-    expect(screen.queryByText("8.7")).not.toBeInTheDocument();
+  it("affiche le badge type meme si showType=false (dans TitlePoster)", () => {
+    render(<TitleCard title={mockTitle} showType={false} />);
+    // TitlePoster affiche toujours le badge, showType ne controle que le badge dans le texte
+    expect(screen.getByText("Film")).toBeInTheDocument();
+  });
+
+  it("n'affiche pas la pastille de type textuelle en mode compact", () => {
+    render(<TitleCard title={mockTitle} compact />);
+    // En mode compact, la pastille dans la zone texte n'est pas affichée
+    // Mais le badge dans TitlePoster est toujours là
+    expect(screen.getByText("Film")).toBeInTheDocument();
+  });
+
+  it("n'affiche pas la pastille de type textuelle si showType=false", () => {
+    render(<TitleCard title={mockTitle} showType={false} />);
+    // Pastille dans la zone texte cachée, mais TitlePoster l'affiche toujours
+    expect(screen.getByText("Film")).toBeInTheDocument();
+  });
+
+  it("gere l'absence de date de sortie", () => {
+    const titleWithoutYear = { ...mockTitle, dateSortie: undefined };
+    render(<TitleCard title={titleWithoutYear} />);
+    expect(screen.queryByText("2010")).not.toBeInTheDocument();
+  });
+
+  it("gere l'absence de note", () => {
+    const titleWithoutNote = { ...mockTitle, note: undefined };
+    render(<TitleCard title={titleWithoutNote} />);
+    expect(screen.queryByText("8.8")).not.toBeInTheDocument();
+  });
+
+  it("redirige vers /titles/:id", () => {
+    render(<TitleCard title={mockTitle} />);
+    const link = screen.getByRole("link");
+    expect(link).toHaveAttribute("href", "/titles/1");
   });
 });

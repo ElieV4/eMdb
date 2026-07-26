@@ -78,7 +78,9 @@ export default function PersonDetailPage({
           <h2 className="text-2xl font-bold mb-4">Personnes connexes</h2>
           {isRecsLoading ? (
             <LoadingSpinner className="h-6 w-6" />
-          ) : isRecsError || !recommendations || recommendations.length === 0 ? (
+          ) : isRecsError ||
+            !recommendations ||
+            recommendations.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Aucune recommandation disponible pour cette personne.
             </p>

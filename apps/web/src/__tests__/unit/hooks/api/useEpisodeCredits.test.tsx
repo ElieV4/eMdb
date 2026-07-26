@@ -35,9 +35,7 @@ function createQueryClient() {
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
   };
 }

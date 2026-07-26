@@ -29,8 +29,7 @@ export function TitleHero({ title, className }: TitleHeroProps) {
   } = title;
 
   const year = date_sortie ? new Date(date_sortie).getFullYear() : null;
-  const displayTitle =
-    titre_vf && titre_vf !== titre_vo ? titre_vo : titre_vo;
+  const displayTitle = titre_vf && titre_vf !== titre_vo ? titre_vo : titre_vo;
 
   return (
     <div
@@ -71,16 +70,12 @@ export function TitleHero({ title, className }: TitleHeroProps) {
           <div>
             <h1 className="text-3xl md:text-4xl font-bold">{displayTitle}</h1>
             {titre_vf && titre_vf !== titre_vo && (
-              <p className="text-lg text-muted-foreground mt-1">
-                {titre_vf}
-              </p>
+              <p className="text-lg text-muted-foreground mt-1">{titre_vf}</p>
             )}
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
-            {year && (
-              <span className="text-muted-foreground">({year})</span>
-            )}
+            {year && <span className="text-muted-foreground">({year})</span>}
             {note_imdb && (
               <span className="flex items-center gap-1 text-amber-400">
                 <Star className="h-4 w-4 fill-current" />

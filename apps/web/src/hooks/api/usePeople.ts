@@ -52,7 +52,7 @@ export function usePeople(params: PeopleSearchParams = {}) {
     queryKey: ["people", "search", query, page, limit],
     queryFn: async (): Promise<PeopleSearchResponse> => {
       const searchParams = new URLSearchParams();
-      if (query) searchParams.set("query", query);
+      if (query) searchParams.set("q", query);
       searchParams.set("page", page.toString());
       searchParams.set("limit", limit.toString());
 

@@ -14,8 +14,22 @@ jest.mock("@/lib/api/apiClient", () => ({
 import { apiFetch } from "@/lib/api/apiClient";
 
 const mockSeasons = [
-  { id: "s1", numero: 1, titre: "Saison 1", date_sortie: "2016-07-15", synopsis: null, nombre_episodes: 10 },
-  { id: "s2", numero: 2, titre: "Saison 2", date_sortie: "2017-10-27", synopsis: null, nombre_episodes: 9 },
+  {
+    id: "s1",
+    numero: 1,
+    titre: "Saison 1",
+    date_sortie: "2016-07-15",
+    synopsis: null,
+    nombre_episodes: 10,
+  },
+  {
+    id: "s2",
+    numero: 2,
+    titre: "Saison 2",
+    date_sortie: "2017-10-27",
+    synopsis: null,
+    nombre_episodes: 9,
+  },
 ];
 
 function createQueryClient() {
@@ -29,9 +43,7 @@ function createQueryClient() {
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
   };
 }

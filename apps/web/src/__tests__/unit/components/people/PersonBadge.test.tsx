@@ -46,9 +46,11 @@ describe("PersonBadge", () => {
     expect(img).toHaveAttribute("src", expect.stringContaining("photo.jpg"));
   });
 
-  it("affiche les initiales dans un avatar quand photoUrl est absent", () => {
+  it("affiche un placeholder quand photoUrl est absent", () => {
     render(<PersonBadge person={mockPersonNoPhoto} />);
-    expect(screen.getByText("UA")).toBeInTheDocument();
+    // Le composant affiche un placeholder image au lieu des initiales
+    const img = screen.getByAltText("Unknown Actor");
+    expect(img).toBeInTheDocument();
   });
 
   it("applique la taille par défaut (md)", () => {
