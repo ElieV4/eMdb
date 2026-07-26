@@ -2,6 +2,7 @@ import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/co
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { ListsService } from '../lists/lists.service';
 import * as bcrypt from 'bcrypt';
 
 type UserRecord = NonNullable<Awaited<ReturnType<PrismaService['users']['findUnique']>>>;
@@ -19,6 +20,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly listsService: ListsService,
   ) {}
 
   async validateUserCredentials(
@@ -65,6 +67,19 @@ export class AuthService {
         password_hash: passwordHash,
       },
     });
+
+    await Promise.all([
+      this.listsService.createList(user.id, {
+        nom: 'Ma Watchlist',
+        type: 'watchlist',
+        description: 'Films et séries à voir',
+      }),
+      this.listsService.createList(user.id, {
+        nom: 'Mes Favoris',
+        type: 'favoris',
+        description: 'Mes titres préférés',
+      }),
+    ]);
 
     const safeUser = this.sanitizeUser(user);
     return {

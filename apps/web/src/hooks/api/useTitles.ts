@@ -13,6 +13,20 @@ import {
 } from "@/lib/types/api";
 
 // ============================================
+// Types backend (snake_case) pour la recherche
+// ============================================
+
+type BackendTitleSearchResult = {
+  tmdb_id: number;
+  titre_vo: string;
+  titre_vf: string | null;
+  poster_path: string | null;
+  type: "film" | "serie";
+  local: boolean;
+  local_id?: string;
+};
+
+// ============================================
 // Types étendus pour les réponses API
 // ============================================
 
@@ -27,6 +41,25 @@ export type TitlesSearchParams = {
 };
 
 export type TitlesSearchResponse = PaginationResult<TitleSearchResult>;
+
+// ============================================
+// Transformation backend → frontend
+// ============================================
+
+function mapBackendTitleToSearchResult(
+  item: BackendTitleSearchResult,
+): TitleSearchResult {
+  const id = item.local_id ?? String(item.tmdb_id);
+  return {
+    id,
+    tmdbId: item.tmdb_id,
+    titre: item.titre_vo,
+    titreOriginal: item.titre_vf && item.titre_vf !== item.titre_vo ? item.titre_vf : undefined,
+    type: item.type,
+    afficheUrl: item.poster_path ?? undefined,
+    local: item.local,
+  };
+}
 
 // ============================================
 // Hook : Recherche de titres
@@ -57,13 +90,24 @@ export function useTitles(params: TitlesSearchParams = {}) {
       searchParams.set("page", page.toString());
       searchParams.set("limit", limit.toString());
 
-      return apiFetch<TitlesSearchResponse>(
+      const data = await apiFetch<BackendTitleSearchResult[]>(
         `/titles/search?${searchParams.toString()}`,
       );
+
+      const items = data.map(mapBackendTitleToSearchResult);
+
+      return {
+        items,
+        total: items.length,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(items.length / limit)),
+      };
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     placeholderData: (previousData) => previousData,
+    enabled: !!query,
   });
 }
 

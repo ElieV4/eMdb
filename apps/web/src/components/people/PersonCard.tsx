@@ -8,7 +8,6 @@ import Image from "next/image";
 import { PersonSearchResult } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 
-const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 const PLACEHOLDER_PERSON = "/placeholder-person.jpg";
 
 interface PersonCardProps {
@@ -26,9 +25,7 @@ export function PersonCard({
 }: PersonCardProps) {
   const { id, nom, photoUrl, rolePrincipal } = person;
 
-  const imageSrc = photoUrl
-    ? `${TMDB_IMAGE_BASE_URL}/w500${photoUrl}`
-    : PLACEHOLDER_PERSON;
+  const imageSrc = photoUrl || PLACEHOLDER_PERSON;
 
   return (
     <Link
@@ -99,11 +96,7 @@ export function PersonCardHorizontal({
       {/* Photo */}
       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-muted/20">
         <Image
-          src={
-            photoUrl
-              ? `${TMDB_IMAGE_BASE_URL}/w185${photoUrl}`
-              : PLACEHOLDER_PERSON
-          }
+          src={photoUrl || PLACEHOLDER_PERSON}
           alt={nom}
           fill
           className="object-cover"

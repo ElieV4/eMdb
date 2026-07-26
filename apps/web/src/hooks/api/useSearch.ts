@@ -14,6 +14,28 @@ import {
 } from "@/lib/types/api";
 
 // ============================================
+// Types backend (snake_case) pour la recherche
+// ============================================
+
+type BackendTitleSearchResult = {
+  tmdb_id: number;
+  titre_vo: string;
+  titre_vf: string | null;
+  poster_path: string | null;
+  type: "film" | "serie";
+  local: boolean;
+  local_id?: string;
+};
+
+type BackendPersonSearchResult = {
+  tmdb_id: number;
+  nom: string;
+  photo_url: string | null;
+  local: boolean;
+  local_id?: string;
+};
+
+// ============================================
 // Types pour la recherche unifiée
 // ============================================
 
@@ -34,6 +56,36 @@ export type UnifiedSearchResult = {
   query: string;
   type?: SearchType;
 };
+
+// ============================================
+// Transformation backend → frontend
+// ============================================
+
+function mapBackendTitleToSearchResult(
+  item: BackendTitleSearchResult,
+): TitleSearchResult {
+  const id = item.local_id ?? String(item.tmdb_id);
+  return {
+    id,
+    tmdbId: item.tmdb_id,
+    titre: item.titre_vo,
+    titreOriginal: item.titre_vf && item.titre_vf !== item.titre_vo ? item.titre_vf : undefined,
+    type: item.type,
+    afficheUrl: item.poster_path ?? undefined,
+  };
+}
+
+function mapBackendPersonToSearchResult(
+  item: BackendPersonSearchResult,
+): PersonSearchResult {
+  const id = item.local_id ?? String(item.tmdb_id);
+  return {
+    id,
+    tmdbId: item.tmdb_id,
+    nom: item.nom,
+    photoUrl: item.photo_url ?? undefined,
+  };
+}
 
 // ============================================
 // Hook : Recherche unifiée
@@ -65,9 +117,19 @@ export function useSearch(params: UnifiedSearchParams) {
       searchParams.set("page", page.toString());
       searchParams.set("limit", limit.toString());
 
-      return apiFetch<PaginationResult<TitleSearchResult>>(
+      const data = await apiFetch<BackendTitleSearchResult[]>(
         `/titles/search?${searchParams.toString()}`,
       );
+
+      const items = data.map(mapBackendTitleToSearchResult);
+
+      return {
+        items,
+        total: items.length,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(items.length / limit)),
+      };
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -83,9 +145,21 @@ export function useSearch(params: UnifiedSearchParams) {
       searchParams.set("page", page.toString());
       searchParams.set("limit", limit.toString());
 
-      return apiFetch<PaginationResult<PersonSearchResult>>(
+      const data = await apiFetch<BackendPersonSearchResult[]>(
         `/people/search?${searchParams.toString()}`,
       );
+
+      const items = data
+        .filter((item) => item.local)
+        .map(mapBackendPersonToSearchResult);
+
+      return {
+        items,
+        total: items.length,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(items.length / limit)),
+      };
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

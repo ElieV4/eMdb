@@ -38,10 +38,7 @@ export function Header() {
   const navLinks = [
     { href: "/", label: "Accueil" },
     { href: "/search", label: "Recherche" },
-    { href: "/calendar", label: "Calendrier" },
-    { href: "/lists", label: "Mes listes" },
-    { href: "/dataviz", label: "Dataviz" },
-    { href: "/notifications", label: "Notifications" },
+    { href: "/profile", label: "Profil" },
   ];
 
   return (

@@ -6,8 +6,8 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-import { Search, X, ChevronDown, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Search, X, ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearch } from "@/hooks/api/useSearch";
 import { TitleSearchResult, PersonSearchResult } from "@/lib/types/api";
@@ -20,6 +20,12 @@ interface TitleSearchBarProps {
 }
 
 const MAX_SUGGESTIONS = 5;
+
+function resolveImageUrl(src?: string | null): string {
+  if (!src) return "/placeholder-poster.jpg";
+  if (src.startsWith("http://") || src.startsWith("https://")) return src;
+  return `https://image.tmdb.org/t/p/w92${src}`;
+}
 
 export function TitleSearchBar({
   placeholder = "Rechercher un film, une série ou une personne...",
@@ -227,7 +233,7 @@ export function TitleSearchBar({
                         <img
                           src={
                             suggestion.afficheUrl
-                              ? `https://image.tmdb.org/t/p/w92${suggestion.afficheUrl}`
+                              ? resolveImageUrl(suggestion.afficheUrl)
                               : "/placeholder-poster.jpg"
                           }
                           alt=""
@@ -237,7 +243,7 @@ export function TitleSearchBar({
                         <img
                           src={
                             suggestion.photoUrl
-                              ? `https://image.tmdb.org/t/p/w92${suggestion.photoUrl}`
+                              ? resolveImageUrl(suggestion.photoUrl)
                               : "/placeholder-person.jpg"
                           }
                           alt=""

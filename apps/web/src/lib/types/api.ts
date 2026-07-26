@@ -279,6 +279,7 @@ export type TitleSearchResult = {
   afficheUrl?: string;
   genres?: Genre[];
   pays?: Country[];
+  local: boolean;
 };
 
 export type PersonSearchResult = {
@@ -287,6 +288,7 @@ export type PersonSearchResult = {
   nom: string;
   photoUrl?: string;
   rolePrincipal?: string;
+  local: boolean;
 };
 
 // ============================================

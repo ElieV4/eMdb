@@ -33,7 +33,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   accessToken: null,
   refreshToken: null,
   isAuthenticated: false,
-  isLoading: true,
+  isLoading: false,
   setUser: (user) =>
     set({
       user,

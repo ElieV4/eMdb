@@ -17,13 +17,17 @@ import {
 } from "lucide-react";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { CalendarEpisodes } from "@/components/watches/CalendarEpisodes";
 import { useAuthStore } from "@/store/authStore";
 import { useTrendingTitles } from "@/hooks/api/useTitles";
 import {
   useRecentWatches,
   useFollowedSeries,
   usePopularTitles,
+  useRecommendations,
 } from "@/hooks/api/useDashboard";
+import { useCalendar } from "@/hooks/api/useCalendar";
+import { useLists } from "@/hooks/api/useLists";
 import { Title, TitleSearchResult } from "@/lib/types/api";
 
 // Convertir Title en TitleSearchResult pour compatibilité avec TitleCard
@@ -186,15 +190,25 @@ export default function HomePage() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
 
   // Hooks pour les données du dashboard
-  const { data: recentWatches } = useRecentWatches(4);
+  const { data: recentWatches } = useRecentWatches(4, isAuthenticated);
 
-  const { data: followedSeries } = useFollowedSeries(4);
+  const { data: followedSeries } = useFollowedSeries(4, isAuthenticated);
 
   const { data: trendingTitles, isLoading: isLoadingTrending } =
     useTrendingTitles(undefined, 6);
 
   const { data: popularTitles, isLoading: isLoadingPopular } =
     usePopularTitles(8);
+
+  const { data: calendarEntries, isLoading: isLoadingCalendar } = useCalendar(isAuthenticated);
+
+  const { data: recommendations, isLoading: isLoadingRecommendations } =
+    useRecommendations(6);
+
+  const { data: userLists } = useLists(isAuthenticated);
+
+  const watchlist = userLists?.find((list) => list.type === "watchlist");
+  const watchlistItems = watchlist?.items ?? [];
 
   // Si l'authentification est encore en cours de vérification
   if (isAuthLoading) {
@@ -249,19 +263,24 @@ export default function HomePage() {
               href="/watches"
             />
             <StatCard icon={Star} label="Notes" value={0} href="/ratings" />
-            <StatCard icon={List} label="Listes" value={0} href="/lists" />
+            <StatCard
+              icon={List}
+              label="Listes"
+              value={userLists?.length || 0}
+              href="/profile"
+            />
             <StatCard
               icon={Calendar}
               label="Séries suivies"
               value={followedSeries?.length || 0}
-              href="/follows"
+              href="/profile"
             />
           </div>
 
-          {/* Continue Watching */}
+          {/* Historique */}
           {recentWatches && recentWatches.length > 0 && (
             <DashboardSection
-              title="Continuer à regarder"
+              title="Historique"
               actionLabel="Voir tout l'historique"
               actionHref="/watches"
             >
@@ -273,32 +292,62 @@ export default function HomePage() {
             </DashboardSection>
           )}
 
-          {/* Séries suivies */}
-          {followedSeries && followedSeries.length > 0 && (
-            <DashboardSection
-              title="Séries en cours"
-              actionLabel="Voir toutes les séries"
-              actionHref="/follows"
-            >
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {followedSeries.slice(0, 4).map((follow) => (
+          {/* Calendrier */}
+          <DashboardSection
+            title="Calendrier"
+            subtitle="Épisodes à venir de vos séries suivies"
+            actionLabel="Voir le calendrier complet"
+            actionHref="/profile"
+          >
+            {isLoadingCalendar ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-24 rounded-lg bg-muted/50 animate-pulse" />
+                ))}
+              </div>
+            ) : calendarEntries && calendarEntries.length > 0 ? (
+              <CalendarEpisodes />
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">
+                Aucun épisode à venir pour le moment.
+              </p>
+            )}
+          </DashboardSection>
+
+          {/* Watchlist */}
+          <DashboardSection
+            title="Watchlist"
+            subtitle="Films et séries à voir"
+            actionLabel={
+              watchlistItems.length > 0 ? "Voir la watchlist" : undefined
+            }
+            actionHref={watchlist ? `/profile` : undefined}
+          >
+            {watchlistItems.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {watchlistItems.slice(0, 6).map((title) => (
                   <TitleCard
-                    key={follow.id}
-                    title={titleToSearchResult(follow.title)}
+                    key={title.id}
+                    title={titleToSearchResult(title)}
                     compact
                   />
                 ))}
               </div>
-            </DashboardSection>
-          )}
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">
+                Votre watchlist est vide. Ajoutez des titres à voir !
+              </p>
+            )}
+          </DashboardSection>
 
-          {/* Tendances */}
+          {/* Recommandés */}
           <DashboardSection
-            title="Tendances"
-            actionLabel="Explorer les titres"
+            title="Recommandés"
+            subtitle="Suggestions basées sur vos goûts"
+            actionLabel="Voir plus"
             actionHref="/search"
           >
-            {isLoadingTrending ? (
+            {isLoadingRecommendations ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {Array.from({ length: 6 }, (_, i) => (
                   <div
@@ -307,9 +356,9 @@ export default function HomePage() {
                   />
                 ))}
               </div>
-            ) : trendingTitles && trendingTitles.length > 0 ? (
+            ) : recommendations && recommendations.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {trendingTitles.slice(0, 6).map((title) => (
+                {recommendations.slice(0, 6).map((title) => (
                   <TitleCard
                     key={title.id}
                     title={titleToSearchResult(title)}
@@ -317,7 +366,11 @@ export default function HomePage() {
                   />
                 ))}
               </div>
-            ) : null}
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">
+                Commencez à noter des titres pour recevoir des recommandations.
+              </p>
+            )}
           </DashboardSection>
         </div>
       ) : (

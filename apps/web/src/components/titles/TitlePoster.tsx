@@ -30,9 +30,10 @@ export function TitlePoster({
   height = 450,
   priority = false,
 }: TitlePosterProps) {
-  // Utiliser l'URL TMDB si disponible, sinon le placeholder
   const imageSrc = src
-    ? `${TMDB_POSTER_BASE_URL}/w500${src}`
+    ? src.startsWith("http://") || src.startsWith("https://")
+      ? src
+      : `${TMDB_POSTER_BASE_URL}/w500${src}`
     : PLACEHOLDER_POSTER;
 
   return (

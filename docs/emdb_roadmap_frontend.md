@@ -57,10 +57,6 @@ emdb/
 │       │   │   └── [id]/
 │       │   ├── (series)/
 │       │   │   └── [id]/
-│       │   ├── calendar/
-│       │   ├── dataviz/
-│       │   ├── lists/
-│       │   ├── notifications/
 │       │   ├── profile/
 │       │   ├── admin/
 │       │   │   └── recommendations/
@@ -180,7 +176,7 @@ emdb/
 
 - [x] `components/layout/Header.tsx` — navigation responsive :
   - Logo eMDB
-  - Liens : Accueil, Recherche, Calendrier, Mes listes, Dataviz, Notifications
+  - Liens : Accueil, Recherche, Profil
   - Bouton connexion/déconnexion
   - Toggle thème sombre/light
   - Menu mobile (hamburger)
@@ -233,6 +229,7 @@ emdb/
   - POST `/auth/register`
   - Stock le token + user + refreshToken dans Zustand
   - Set cookie `emdb_access_token` pour middleware
+  - Création automatique des listes watchlist et favoris
   - Redirect vers `/`
 - [x] `hooks/auth/useLogout()` — mutation :
   - POST `/auth/logout`
@@ -262,11 +259,11 @@ emdb/
 - [x] `app/page.tsx` — dashboard :
   - Si non connecté : page de bienvenue + CTA login/register
   - Si connecté :
-    - Continue watching (séries suivies avec progrès)
+    - Calendrier (prochains épisodes)
     - Watchlist (films/séries à voir)
     - Favoris
-    - Activité récente (watches des 7 derniers jours)
-    - Recommandations personnalisées (si disponibles)
+    - Recommandés personnalisés
+    - Historique des visionnages
 
 ### 2.2 Recherche
 
@@ -288,12 +285,7 @@ emdb/
 - [x] `app/titles/[id]/page.tsx` — page détail titre (stub pour Phase 3)
 - [x] `app/people/[id]/page.tsx` — page détail personne (stub pour Phase 3)
 - [ ] `app/series/[id]/page.tsx` — page détail série (alias de titles/[id] avec type=serie)
-- [ ] `app/calendar/page.tsx` — calendrier épisodes non vus
-- [ ] `app/dataviz/page.tsx` — page dataviz
-- [ ] `app/lists/page.tsx` — page liste des listes
-- [ ] `app/lists/[id]/page.tsx` — détail d'une liste
-- [ ] `app/profile/page.tsx` — profil utilisateur
-- [ ] `app/notifications/page.tsx` — liste des notifications
+- [x] `app/profile/page.tsx` — profil utilisateur (regroupe dataviz, favoris, listes, notifications)
 
 ### 2.4 Hooks
 
@@ -450,14 +442,10 @@ emdb/
 
 #### 4.1.1 Pages
 
-- [ ] `app/calendar/page.tsx` — calendrier épisodes non vus :
-  - Liste des séries suivies avec :
-    - Titre, affiche, saison courante
-    - Nombre d'épisodes non vus (fn_episodes_non_vus)
-    - Prochaine date de diffusion
-  - Tri par nb_non_vus décroissant
-  - Filtre par série (optionnel)
-- [ ] `app/watches/page.tsx` — historique des visionnages :
+- [x] Calendrier intégré dans `app/profile/page.tsx` :
+  - Liste des séries suivies avec épisodes non vus
+  - Accessible depuis le tableau de bord et le profil
+- [x] `app/watches/page.tsx` — historique des visionnages :
   - Liste paginée des watches (date, titre, épisode)
   - Filtres : type (film/serie), date_from, date_to, title_id
   - Tri par date (défaut : récent → ancien)
@@ -539,17 +527,11 @@ emdb/
 
 #### 4.3.1 Pages
 
-- [ ] `app/lists/page.tsx` — mes listes :
+- [x] Listes intégrées dans `app/profile/page.tsx` :
   - Grille de listes (watchlist, favoris, custom)
   - Bouton "Créer une liste"
-  - Chaque liste → clic → page détail
-- [ ] `app/lists/[id]/page.tsx` — détail d'une liste :
-  - Header (nom, type, description, propriétaire)
-  - Liste des items (titles) en grid ou liste
-  - Mode édition : réordonnancement par drag & drop
-  - Bouton "Partager" (si propriétaire)
-  - Bouton "Supprimer" (si propriétaire)
-  - Bouton "Ajouter un item" (si propriétaire ou édition)
+  - Watchlist et favoris créés automatiquement à l'inscription
+  - Accès depuis le profil utilisateur
 - [ ] `app/shared-lists/page.tsx` — listes partagées avec moi :
   - Liste des listes où j'ai accès (lecture/édition)
   - Indicateur de permission (lecture/édition)
@@ -675,11 +657,11 @@ emdb/
 
 > **Correspondance backend** : Phase 6.1 (dataviz API) + Phase 6.2 (admin refresh BullMQ)
 
-### 6.1 Page dataviz
+### 6.1 Dataviz intégrée dans le profil
 
 > **Backend** : `GET /dataviz/watch-time?groupBy=genre|period|country|animation&yearFrom=&yearTo=`, `GET /dataviz/watch-count?groupBy=...`
 
-- [ ] `app/dataviz/page.tsx` — page dataviz :
+- [x] Dataviz intégrée dans `app/profile/page.tsx` :
   - Tabs : Temps de visionnage | Nombre de visionnages
   - Sélecteur de groupement : période | genre | pays | animation
   - Filtres : yearFrom, yearTo (input number)
@@ -748,11 +730,10 @@ emdb/
 
 > **Backend** : `GET /notifications` (non implémenté côté backend, à suivre)
 
-- [ ] `app/notifications/page.tsx` — page notifications :
+- [x] Notifications intégrées dans `app/profile/page.tsx` :
   - Liste des notifications (nouvel épisode, rappel, recommandation)
   - Filtrage : non lues en priorité
   - Marquer comme lue (bouton)
-  - Suppression (optionnel)
   - Icône par type de notification
 
 ### 7.2 Composants
@@ -781,17 +762,16 @@ emdb/
 
 > **Backend** : `GET /users/me`, `PATCH /users/me`, `POST /users/me/avatar`, `DELETE /users/me`
 
-- [ ] `app/profile/page.tsx` — page profil :
+- [x] `app/profile/page.tsx` — page profil :
   - Photo de profil (avatar) + upload
   - Pseudo (modifiable)
   - Email (non modifiable)
   - Date de création du compte
   - Bouton "Supprimer le compte" (avec confirmation)
-  - Section "Mes statistiques" :
-    - Nombre de titres vus
-    - Nombre de notes
-    - Nombre de listes
-    - Nombre de séries suivies
+  - Section "Favoris" : affichage des titres favoris
+  - Section "Gestion des listes" : watchlist, favoris, listes personnalisées
+  - Section "Dataviz" : statistiques de visionnage (graphiques)
+  - Section "Notifications" : notifications récentes
 - [ ] `app/profile/settings/page.tsx` — paramètres (optionnel) :
   - Thème (sombre/light/auto)
   - Langue (fr/en)

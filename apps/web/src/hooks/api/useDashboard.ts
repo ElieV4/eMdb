@@ -45,7 +45,7 @@ export type DashboardStats = {
 // Hook : Historique récent (derniers visionnages)
 // ============================================
 
-export function useRecentWatches(limit: number = 6) {
+export function useRecentWatches(limit: number = 6, enabled: boolean = true) {
   return useQuery({
     queryKey: ["dashboard", "recent-watches", limit],
     queryFn: async (): Promise<DashboardWatch[]> => {
@@ -65,6 +65,7 @@ export function useRecentWatches(limit: number = 6) {
     },
     staleTime: 1 * 60 * 1000, // 1 minute
     gcTime: 5 * 60 * 1000,
+    enabled,
   });
 }
 
@@ -72,7 +73,7 @@ export function useRecentWatches(limit: number = 6) {
 // Hook : Séries suivies (avec progrès)
 // ============================================
 
-export function useFollowedSeries(limit: number = 6) {
+export function useFollowedSeries(limit: number = 6, enabled: boolean = true) {
   return useQuery({
     queryKey: ["dashboard", "followed-series", limit],
     queryFn: async (): Promise<DashboardFollow[]> => {
@@ -86,6 +87,7 @@ export function useFollowedSeries(limit: number = 6) {
     },
     staleTime: 1 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
+    enabled,
   });
 }
 

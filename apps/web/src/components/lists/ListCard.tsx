@@ -6,7 +6,6 @@
 
 "use client";
 
-import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -27,23 +26,21 @@ export function ListCard({ list, className }: ListCardProps) {
   const itemCount = list.items?.length ?? 0;
 
   return (
-    <Link href={`/lists/${list.id}`}>
-      <Card className={cn("p-4 h-full hover:shadow-md transition-shadow", className)}>
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="font-semibold line-clamp-1">{list.nom}</h3>
-          <Badge variant="secondary" className="ml-2 shrink-0">
-            {typeLabels[list.type] ?? list.type}
-          </Badge>
-        </div>
-        {list.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-            {list.description}
-          </p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          {itemCount} titre{itemCount !== 1 ? "s" : ""}
+    <Card className={cn("p-4 h-full", className)}>
+      <div className="flex items-start justify-between mb-2">
+        <h3 className="font-semibold line-clamp-1">{list.nom}</h3>
+        <Badge variant="secondary" className="ml-2 shrink-0">
+          {typeLabels[list.type] ?? list.type}
+        </Badge>
+      </div>
+      {list.description && (
+        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+          {list.description}
         </p>
-      </Card>
-    </Link>
+      )}
+      <p className="text-xs text-muted-foreground">
+        {itemCount} titre{itemCount !== 1 ? "s" : ""}
+      </p>
+    </Card>
   );
 }

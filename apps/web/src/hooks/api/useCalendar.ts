@@ -7,10 +7,11 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/apiClient";
 import { CalendarEntry } from "@/lib/types/api";
 
-export function useCalendar() {
+export function useCalendar(enabled: boolean = true) {
   return useQuery<CalendarEntry[]>({
     queryKey: ["calendar"],
     queryFn: () => apiFetch<CalendarEntry[]>("/calendar"),
     staleTime: 2 * 60 * 1000,
+    enabled,
   });
 }

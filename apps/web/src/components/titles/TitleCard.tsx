@@ -22,7 +22,7 @@ export function TitleCard({
   showType = true,
   compact = false,
 }: TitleCardProps) {
-  const { id, titre, titreOriginal, type, dateSortie, note, afficheUrl } =
+  const { id, titre, titreOriginal, type, dateSortie, note, afficheUrl, local } =
     title;
 
   // Extraire l'année de la date de sortie
@@ -30,9 +30,13 @@ export function TitleCard({
   const displayTitle =
     titreOriginal && titreOriginal !== titre ? titreOriginal : titre;
 
+  const href = local
+    ? `/titles/${id}`
+    : `/titles/tmdb/${title.tmdbId}?type=${type}`;
+
   return (
     <Link
-      href={`/titles/${id}`}
+      href={href}
       className={cn(
         "group block overflow-hidden rounded-lg transition-all duration-200",
         "hover:shadow-md hover:-translate-y-0.5",
@@ -103,13 +107,17 @@ export function TitleCardHorizontal({
   title,
   className,
 }: Omit<TitleCardProps, "compact">) {
-  const { id, titre, titreOriginal, type, dateSortie, note, afficheUrl } =
+  const { id, titre, titreOriginal, type, dateSortie, note, afficheUrl, local } =
     title;
   const year = dateSortie ? new Date(dateSortie).getFullYear() : null;
 
+  const href = local
+    ? `/titles/${id}`
+    : `/titles/tmdb/${title.tmdbId}?type=${type}`;
+
   return (
     <Link
-      href={`/titles/${id}`}
+      href={href}
       className={cn(
         "group flex items-center gap-4 p-3 rounded-lg transition-all duration-200",
         "hover:bg-muted/50",

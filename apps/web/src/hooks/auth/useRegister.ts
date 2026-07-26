@@ -7,6 +7,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/apiClient";
 import { useAuthStore } from "@/store/authStore";
+import { useCreateList } from "@/hooks/api/useCreateList";
 
 export type RegisterInput = {
   email: string;
@@ -37,6 +38,7 @@ export function useRegister() {
   const setUser = useAuthStore((s) => s.setUser);
   const setAccessToken = useAuthStore((s) => s.setAccessToken);
   const setRefreshToken = useAuthStore((s) => s.setRefreshToken);
+  const createList = useCreateList();
 
   return useMutation({
     mutationFn: async (input: RegisterInput) => {
@@ -52,6 +54,13 @@ export function useRegister() {
       setUser(data.user);
       setAuthCookie(data.accessToken);
       queryClient.invalidateQueries();
+
+      createList.mutate(
+        { nom: "Ma Watchlist", type: "watchlist", description: "Films et séries à voir" },
+      );
+      createList.mutate(
+        { nom: "Mes Favoris", type: "favoris", description: "Mes titres préférés" },
+      );
     },
   });
 }

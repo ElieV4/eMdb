@@ -13,6 +13,18 @@ import {
 } from "@/lib/types/api";
 
 // ============================================
+// Types backend (snake_case) pour la recherche
+// ============================================
+
+type BackendPersonSearchResult = {
+  tmdb_id: number;
+  nom: string;
+  photo_url: string | null;
+  local: boolean;
+  local_id?: string;
+};
+
+// ============================================
 // Types étendus pour les réponses API
 // ============================================
 
@@ -42,6 +54,23 @@ export type TitleWithRole = {
 };
 
 // ============================================
+// Transformation backend → frontend
+// ============================================
+
+function mapBackendPersonToSearchResult(
+  item: BackendPersonSearchResult,
+): PersonSearchResult {
+  const id = item.local_id ?? String(item.tmdb_id);
+  return {
+    id,
+    tmdbId: item.tmdb_id,
+    nom: item.nom,
+    photoUrl: item.photo_url ?? undefined,
+    local: item.local,
+  };
+}
+
+// ============================================
 // Hook : Recherche de personnes
 // ============================================
 
@@ -56,9 +85,19 @@ export function usePeople(params: PeopleSearchParams = {}) {
       searchParams.set("page", page.toString());
       searchParams.set("limit", limit.toString());
 
-      return apiFetch<PeopleSearchResponse>(
+      const data = await apiFetch<BackendPersonSearchResult[]>(
         `/people/search?${searchParams.toString()}`,
       );
+
+      const items = data.map(mapBackendPersonToSearchResult);
+
+      return {
+        items,
+        total: items.length,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(items.length / limit)),
+      };
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
