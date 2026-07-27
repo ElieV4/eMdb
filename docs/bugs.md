@@ -99,11 +99,16 @@
 
 ### 11. Page `/lists` manquante
 - **Symptôme :** La route `/lists` renvoie une erreur 404 ou une page vide. Aucune page de gestion des listes n’existe.
-- **Cause racine :** Le répertoire `apps/web/src/app/lists/` existe mais ne contient pas de `page.tsx`.
-- **Fichier concerné :** `apps/web/src/app/lists/page.tsx`
-- **Tests unitaires à créer :**
-  - Vérifier que la page `/lists` existe et affiche les listes de l’utilisateur.
-  - Vérifier que la création/modification/suppression de liste fonctionne.
+- **Cause racine :** Le répertoire `apps/web/src/app/lists/` existait mais ne contenait pas de `page.tsx`.
+- **Correction :** Création de `apps/web/src/app/lists/page.tsx` avec :
+  - Vérification d’authentification
+  - Titre « Mes Listes »
+  - Bouton « Créer une liste » ouvrant `ListDialog`
+  - Grille de `ListCard` alimentée par `useLists`
+  - États loading / error gérés
+- **Fichiers modifiés :** `apps/web/src/app/lists/page.tsx`
+- **Tests unitaires :**
+  - `apps/web/src/__tests__/unit/pages/ListsPage.test.tsx` — vérifie que la page existe, affiche les listes de l’utilisateur et rend `ListDialog`.
 
 ### 12. Module saisons & épisodes : données non chargées sur la page série
 - **Symptôme :** La page détail d’une série n’affiche pas les saisons et épisodes.

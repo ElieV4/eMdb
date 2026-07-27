@@ -907,6 +907,12 @@ npm run test:watch
 | ------ | --------------- | --------- |
 | **Pages** | `__tests__/unit/pages/CalendarPage.test.tsx` | Vérifie que la page `/calendar` existe, affiche le titre « Calendrier » et rend le composant `CalendarEpisodes` (bug #10). |
 
+### Tests Unitaires Frontend — Page des listes (ListsPage)
+
+| Module | Fichier de Test | Cas testé |
+| ------ | --------------- | --------- |
+| **Pages** | `__tests__/unit/pages/ListsPage.test.tsx` | Vérifie que la page `/lists` existe, affiche les listes de l’utilisateur et rend `ListDialog` (bug #11). |
+
 ---
 
 ## 🖥️ Fichiers Sources par Module (Frontend)
