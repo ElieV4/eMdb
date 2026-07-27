@@ -89,10 +89,13 @@
 ### 10. Page `/calendar` manquante
 - **Symptôme :** Aucune page calendrier n’existe pour afficher les épisodes non vus des séries suivies.
 - **Cause racine :** Le fichier `apps/web/src/app/calendar/page.tsx` n’a jamais été créé.
-- **Fichier concerné :** `apps/web/src/app/calendar/page.tsx`
-- **Tests unitaires à créer :**
-  - Vérifier que la page `/calendar` existe et affiche les épisodes non vus.
-  - Vérifier que l’endpoint `/calendar` du backend est bien consommé.
+- **Correction :** Création de la page `apps/web/src/app/calendar/page.tsx` avec :
+  - Vérification d’authentification
+  - Titre de page « Calendrier »
+  - Intégration du composant existant `CalendarEpisodes` (backend `GET /calendar`)
+- **Fichiers modifiés :** `apps/web/src/app/calendar/page.tsx`
+- **Tests unitaires :**
+  - `apps/web/src/__tests__/unit/pages/CalendarPage.test.tsx` — vérifie que la page existe, affiche le titre « Calendrier » et rend le composant `CalendarEpisodes`.
 
 ### 11. Page `/lists` manquante
 - **Symptôme :** La route `/lists` renvoie une erreur 404 ou une page vide. Aucune page de gestion des listes n’existe.
