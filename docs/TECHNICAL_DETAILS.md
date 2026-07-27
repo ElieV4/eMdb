@@ -895,6 +895,14 @@ npm run test:watch
 
 ---
 
+### Tests Unitaires Frontend — Page d'accueil (HomePage)
+
+| Module | Fichier de Test | Cas testé |
+| ------ | --------------- | --------- |
+| **Pages** | `__tests__/unit/pages/HomePage.test.tsx` | Vérifie que le lien « Voir le calendrier complet » a pour `href` `/calendar` (bug #9). |
+
+---
+
 ## 🖥️ Fichiers Sources par Module (Frontend)
 
 ### Phase 0 — Socle technique (`apps/web/`)

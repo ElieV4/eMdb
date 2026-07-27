@@ -76,15 +76,15 @@
   - Vérifier que `TitleCard` gère les valeurs `string` et `number` pour `note`.
   - Vérifier que `RatingBadge` gère les valeurs `string` et `number` pour `note`.
 
-## Bugs restants identifiés
-
 ### 9. Bouton « Voir le calendrier complet » redirige vers la page profil
-- **Symptôme :** Le bouton du calendrier sur la home/profil envoie vers `/profile` au lieu d’une page calendrier dédiée.
-- **Cause racine :** Lien `href` incorrect ou page `/calendar` manquante.
-- **Fichier concerné :** composant home/profil du frontend.
-- **Tests unitaires à créer :**
-  - Vérifier que le bouton pointe vers `/calendar`.
-  - Vérifier que la page `/calendar` existe et affiche le calendrier.
+- **Symptôme :** Le bouton du calendrier sur la home envoie vers `/profile` au lieu de `/calendar`.
+- **Cause racine :** Le `DashboardSection` de `apps/web/src/app/page.tsx` utilisait `actionHref="/profile"` pour le calendrier.
+- **Correction :** Remplacé par `actionHref="/calendar"`.
+- **Fichiers modifiés :** `apps/web/src/app/page.tsx`
+- **Tests unitaires :**
+  - `apps/web/src/__tests__/unit/pages/HomePage.test.tsx` — vérifie que le lien « Voir le calendrier complet » a pour `href` `/calendar`.
+
+## Bugs restants identifiés
 
 ### 10. Page `/calendar` manquante
 - **Symptôme :** Aucune page calendrier n’existe pour afficher les épisodes non vus des séries suivies.

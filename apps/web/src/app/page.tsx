@@ -297,7 +297,7 @@ export default function HomePage() {
             title="Calendrier"
             subtitle="Épisodes à venir de vos séries suivies"
             actionLabel="Voir le calendrier complet"
-            actionHref="/profile"
+            actionHref="/calendar"
           >
             {isLoadingCalendar ? (
               <div className="space-y-3">
