@@ -130,14 +130,18 @@ async function ensureGenreIds(genres: { id: number; name: string }[]) {
   const ids: string[] = [];
 
   for (const genre of mapTmdbGenres(genres)) {
+    if (!genre.nom) {
+      continue;
+    }
+
     const record = await prisma.genres.upsert({
-      where: { tmdb_id: genre.tmdb_id },
+      where: { nom: genre.nom },
       create: {
-        tmdb_id: genre.tmdb_id,
         nom: genre.nom,
+        tmdb_id: genre.tmdb_id,
       },
       update: {
-        nom: genre.nom,
+        tmdb_id: genre.tmdb_id,
       },
     });
     ids.push(record.id);

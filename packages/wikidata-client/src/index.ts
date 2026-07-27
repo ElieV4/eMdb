@@ -13,6 +13,9 @@ export async function getWikipediaUrlFromWikidataId(
   });
 
   if (!res.ok) {
+    if (res.status === 429) {
+      return null;
+    }
     throw new Error(`Wikidata request failed ${res.status}: ${res.statusText}`);
   }
 

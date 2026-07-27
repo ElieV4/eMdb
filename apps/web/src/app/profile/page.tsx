@@ -7,6 +7,7 @@ import { useLists } from "@/hooks/api";
 import { ListCard } from "@/components/lists/ListCard";
 import { ListDialog } from "@/components/lists/ListDialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Plus } from "lucide-react";

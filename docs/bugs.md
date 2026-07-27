@@ -31,33 +31,45 @@
   - Vérifier que toutes les tables déclarées dans `schema.prisma` existent après `db push`.
   - Vérifier qu’une requête CRUD simple sur `titles` fonctionne en test d’intégration.
 
-## Bugs restants identifiés
-
 ### 4. Page film/série : `note_imdb.toFixed is not a function`
 - **Symptôme :** Affichage de « Une erreur est survenue » sur la page de détail d’un titre.
-- **Cause probable :** `note_imdb` est stocké en base sous forme de chaîne (ex: `"8.4"`), mais le composant UI appelle `.toFixed()` qui est une méthode de `number`.
-- **Fichier concerné :** composant de détail de titre (frontend).
+- **Cause racine :** `note_imdb` est stocké en base sous forme de chaîne (ex: `"8.4"`), mais le composant `TitleHero.tsx` appelait `.toFixed()` qui est une méthode de `number`.
+- **Correction :** Converti la valeur en nombre avant appel : `Number(note_imdb).toFixed(1)` dans `apps/web/src/components/titles/TitleHero.tsx`.
+- **Fichiers modifiés :** `apps/web/src/components/titles/TitleHero.tsx`
 - **Tests unitaires à créer :**
   - Vérifier que le formatage de `note_imdb` gère les valeurs `string` et `number`.
   - Vérifier que la page de détail n’affiche pas d’erreur quand `note_imdb` est `null` ou une chaîne.
 
 ### 5. Page film/série : `Wikidata request failed 429`
 - **Symptôme :** Import ou détail d’un titre échoue avec `Wikidata request failed 429`.
-- **Cause probable :** Rate limit dépassé sur l’API Wikidata lors de l’import TMDB (`importPersonByTmdbId`).
-- **Fichier concerné :** `packages/wikidata-client`, `packages/tmdb-sync`
+- **Cause racine :** Rate limit dépassé sur l’API Wikidata lors de l’import TMDB (`importPersonByTmdbId`). `getWikipediaUrlFromWikidataId` throwait sur `429` au lieu de considérer Wikipédia comme optionnelle.
+- **Correction :** Gestion du `429` dans `packages/wikidata-client/src/index.ts` : retour de `null` en cas de rate limit, sans lever d’erreur. Le champ `wiki_url` reste nullable et n’empêche plus l’import.
+- **Fichiers modifiés :** `packages/wikidata-client/src/index.ts`
 - **Tests unitaires à créer :**
   - Vérifier le comportement quand Wikidata retourne `429 Too Many Requests`.
-  - Vérifier la stratégie de retry / backoff.
+  - Vérifier que l’import d’un titre/personne continue sans `wiki_url` en cas de `429`.
 
 ### 6. Next.js : `ReferenceError: Badge is not defined`
 - **Symptôme :** Erreur runtime dans `src/app/profile/page.tsx` ligne 198.
 - **Cause racine :** Le composant `Badge` est utilisé mais non importé.
-- **Fichier concerné :** `apps/web/src/app/profile/page.tsx`
+- **Correction :** Ajout de l’import `import { Badge } from "@/components/ui/badge"` dans `apps/web/src/app/profile/page.tsx`.
+- **Fichiers modifiés :** `apps/web/src/app/profile/page.tsx`
 - **Tests unitaires à créer :**
   - Vérifier que la page profile compile sans erreur.
   - Vérifier que `Badge` est bien importé et utilisé.
 
-### 7. Bouton « Voir le calendrier complet » redirige vers la page profil
+### 7. Import TMDB : `PrismaClientKnownRequestError` sur `genres.upsert()`
+- **Symptôme :** `Unique constraint failed on the fields: (nom)` lors de l’import d’un titre.
+- **Cause racine :** `ensureGenreIds` faisait un `upsert` sur `tmdb_id`, mais la contrainte unique sur `nom` rentrait en conflit quand le genre existait déjà sous un autre `tmdb_id`.
+- **Correction :** L’upsert cherche désormais sur `nom`, met à jour `tmdb_id` si fourni, et ignore les genres sans nom.
+- **Fichiers modifiés :** `packages/tmdb-sync/src/index.ts`
+- **Tests unitaires à créer :**
+  - Vérifier que l’import d’un titre ne crash pas quand un genre existe déjà en base.
+  - Vérifier que `tmdb_id` est bien mis à jour lors d’un re-import.
+
+## Bugs restants identifiés
+
+### 8. Bouton « Voir le calendrier complet » redirige vers la page profil
 - **Symptôme :** Le bouton du calendrier sur la home/profil envoie vers `/profile` au lieu d’une page calendrier dédiée.
 - **Cause racine :** Lien `href` incorrect ou page `/calendar` manquante.
 - **Fichier concerné :** composant home/profil du frontend.
@@ -65,7 +77,7 @@
   - Vérifier que le bouton pointe vers `/calendar`.
   - Vérifier que la page `/calendar` existe et affiche le calendrier.
 
-### 8. Deux boutons « Profil » dans l’en-tête
+### 9. Deux boutons « Profil » dans l’en-tête
 - **Symptôme :** Doublon du bouton Profil dans la navbar.
 - **Cause racine :** Duplication du composant/lien dans le layout header.
 - **Fichier concerné :** composant header/navbar du frontend.
