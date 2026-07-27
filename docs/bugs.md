@@ -31,9 +31,9 @@
   - Vérifier que toutes les tables déclarées dans `schema.prisma` existent après `db push`.
   - Vérifier qu’une requête CRUD simple sur `titles` fonctionne en test d’intégration.
 
-### 4. Page film/série : `note_imdb.toFixed is not a function`
+### 4. Page film/série : `note_imdb.toFixed is not a function` dans `TitleHero.tsx`
 - **Symptôme :** Affichage de « Une erreur est survenue » sur la page de détail d’un titre.
-- **Cause racine :** `note_imdb` est stocké en base sous forme de chaîne (ex: `"8.4"`), mais le composant `TitleHero.tsx` appelait `.toFixed()` qui est une méthode de `number`.
+- **Cause racine :** `note_imdb` est stocké en base sous forme de chaîne (ex: `"8.4"`), mais `TitleHero.tsx` appelait `.toFixed()` qui est une méthode de `number`.
 - **Correction :** Converti la valeur en nombre avant appel : `Number(note_imdb).toFixed(1)` dans `apps/web/src/components/titles/TitleHero.tsx`.
 - **Fichiers modifiés :** `apps/web/src/components/titles/TitleHero.tsx`
 - **Tests unitaires à créer :**
@@ -67,9 +67,18 @@
   - Vérifier que l’import d’un titre ne crash pas quand un genre existe déjà en base.
   - Vérifier que `tmdb_id` est bien mis à jour lors d’un re-import.
 
+### 8. Page titre/série/card : `note.toFixed is not a function` dans `TitleCard.tsx` et `RatingBadge.tsx`
+- **Symptôme :** Affichage de « Une erreur est survenue » sur la page de détail d’un titre ou lors de l’affichage d’une carte titre/rating.
+- **Cause racine :** `note` est stocké en base sous forme de chaîne (ex: `"8.4"`), mais `TitleCard.tsx` et `RatingBadge.tsx` appelaient `.toFixed()` qui est une méthode de `number`.
+- **Correction :** Converti la valeur en nombre avant appel : `Number(note).toFixed(1)` dans `apps/web/src/components/titles/TitleCard.tsx` et `apps/web/src/components/ratings/RatingBadge.tsx`.
+- **Fichiers modifiés :** `apps/web/src/components/titles/TitleCard.tsx`, `apps/web/src/components/ratings/RatingBadge.tsx`
+- **Tests unitaires à créer :**
+  - Vérifier que `TitleCard` gère les valeurs `string` et `number` pour `note`.
+  - Vérifier que `RatingBadge` gère les valeurs `string` et `number` pour `note`.
+
 ## Bugs restants identifiés
 
-### 8. Bouton « Voir le calendrier complet » redirige vers la page profil
+### 9. Bouton « Voir le calendrier complet » redirige vers la page profil
 - **Symptôme :** Le bouton du calendrier sur la home/profil envoie vers `/profile` au lieu d’une page calendrier dédiée.
 - **Cause racine :** Lien `href` incorrect ou page `/calendar` manquante.
 - **Fichier concerné :** composant home/profil du frontend.
@@ -77,12 +86,82 @@
   - Vérifier que le bouton pointe vers `/calendar`.
   - Vérifier que la page `/calendar` existe et affiche le calendrier.
 
-### 9. Deux boutons « Profil » dans l’en-tête
-- **Symptôme :** Doublon du bouton Profil dans la navbar.
-- **Cause racine :** Duplication du composant/lien dans le layout header.
-- **Fichier concerné :** composant header/navbar du frontend.
+### 10. Page `/calendar` manquante
+- **Symptôme :** Aucune page calendrier n’existe pour afficher les épisodes non vus des séries suivies.
+- **Cause racine :** Le fichier `apps/web/src/app/calendar/page.tsx` n’a jamais été créé.
+- **Fichier concerné :** `apps/web/src/app/calendar/page.tsx`
 - **Tests unitaires à créer :**
-  - Vérifier qu’un seul bouton « Profil » est présent dans le header.
+  - Vérifier que la page `/calendar` existe et affiche les épisodes non vus.
+  - Vérifier que l’endpoint `/calendar` du backend est bien consommé.
+
+### 11. Page `/lists` manquante
+- **Symptôme :** La route `/lists` renvoie une erreur 404 ou une page vide. Aucune page de gestion des listes n’existe.
+- **Cause racine :** Le répertoire `apps/web/src/app/lists/` existe mais ne contient pas de `page.tsx`.
+- **Fichier concerné :** `apps/web/src/app/lists/page.tsx`
+- **Tests unitaires à créer :**
+  - Vérifier que la page `/lists` existe et affiche les listes de l’utilisateur.
+  - Vérifier que la création/modification/suppression de liste fonctionne.
+
+### 12. Module saisons & épisodes : données non chargées sur la page série
+- **Symptôme :** La page détail d’une série n’affiche pas les saisons et épisodes.
+- **Cause racine :** Le hook `useSeasons` ou le composant d’affichage des saisons n’est pas correctement appelé ou les données ne sont pas récupérées depuis `GET /titles/:titleId/seasons`.
+- **Fichier concerné :** `apps/web/src/app/series/[id]/page.tsx`, `apps/web/src/hooks/api/useSeasons.ts`
+- **Tests unitaires à créer :**
+  - Vérifier que `useSeasons` récupère bien les saisons d’une série.
+  - Vérifier que la page série affiche la liste des saisons et épisodes.
+
+### 13. Page titre/série : fonctionnalités utilisateur manquantes (watch, liste, follow, note)
+- **Symptôme :** Sur la page de détail d’un titre, les boutons « Marquer comme vu », « Ajouter à une liste », « Suivre » et « Noter » sont absents ou non fonctionnels.
+- **Cause racine :** Les composants `WatchButton`, `FollowButton`, `RatingInput` et les hooks associés ne sont pas intégrés à la page de détail titre/série.
+- **Fichier concerné :** `apps/web/src/app/titles/[id]/page.tsx`, `apps/web/src/app/series/[id]/page.tsx`
+- **Tests unitaires à créer :**
+  - Vérifier que le bouton « Marquer comme vu » est présent et fonctionnel.
+  - Vérifier que le bouton « Suivre » est présent pour les séries.
+  - Vérifier que le composant de notation est présent et fonctionnel.
+
+### 14. Page personne : module filmographie ne charge pas
+- **Symptôme :** La page détail d’une personne n’affiche pas sa filmographie.
+- **Cause racine :** Le hook `usePersonFilmography` ou le composant `Filmography` n’est pas correctement appelé ou les données ne sont pas récupérées depuis `GET /people/:id/filmography`.
+- **Fichier concerné :** `apps/web/src/app/people/[id]/page.tsx`, `apps/web/src/components/people/Filmography.tsx`
+- **Tests unitaires à créer :**
+  - Vérifier que `usePersonFilmography` récupère bien la filmographie.
+  - Vérifier que la page personne affiche la filmographie groupée par rôle.
+
+### 15. Lien personne connexes → erreur TMDB 404
+- **Symptôme :** La navigation vers une personne recommandée depuis la page personne échoue avec `TMDB request failed 404`.
+- **Cause racine :** L’ID TMDB utilisé pour rediriger vers la page personne n’existe pas ou n’est pas correctement transmis.
+- **Fichier concerné :** `apps/web/src/app/people/[id]/page.tsx`, `packages/tmdb-sync/src/index.ts`
+- **Tests unitaires à créer :**
+  - Vérifier que la navigation vers une personne connexe utilise le bon ID.
+  - Vérifier que l’import par TMDB ID gère les IDs invalides.
+
+### 16. Profil : layout onglets au lieu de modules empilés
+- **Symptôme :** La page profil affiche les sections (favoris, listes, dataviz, notifications) sous forme d’onglets au lieu de les afficher les unes sous les autres.
+- **Cause racine :** Le composant `ProfilePage` utilise un état `activeTab` pour n’afficher qu’une section à la fois.
+- **Fichier concerné :** `apps/web/src/app/profile/page.tsx`
+- **Tests unitaires à créer :**
+  - Vérifier que toutes les sections sont visibles simultanément.
+  - Vérifier l’ordre d’affichage : dataviz, favoris, listes, historique de visionnage, notifications.
+
+### 17. Header : barre de recherche à déplacer en sidebar
+- **Symptôme :** La barre de recherche est présente dans le header, ce qui encombre la navigation.
+- **Cause racine :** Le composant `Header.tsx` intègre la barre de recherche.
+- **Fichier concerné :** `apps/web/src/components/layout/Header.tsx`
+- **Tests unitaires à créer :**
+  - Vérifier que la barre de recherche n’est plus dans le header.
+  - Vérifier que la barre de recherche est accessible depuis la sidebar.
+
+---
+
+## Modifications à faire
+
+### A. Module personnes : filtre par badge rôle
+- **Description :** Ajouter un filtre par rôle (acteur, réalisateur, scénariste, autre) dans la page personne et la filmographie, sous forme de badges cliquables.
+- **Fichier concerné :** `apps/web/src/app/people/[id]/page.tsx`, `apps/web/src/components/people/Filmography.tsx`
+
+### B. Module filmographie : filtre par badge rôle
+- **Description :** Ajouter un filtre par badge rôle dans le module filmographie pour afficher/masquer les crédits par rôle.
+- **Fichier concerné :** `apps/web/src/components/people/Filmography.tsx`
 
 ---
 

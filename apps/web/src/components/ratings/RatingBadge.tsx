@@ -19,7 +19,7 @@ export function RatingBadge({ note, className }: RatingBadgeProps) {
     return null;
   }
 
-  const formatted = Number.isInteger(note) ? `${note}/10` : `${note.toFixed(1)}/10`;
+  const formatted = Number.isInteger(note) ? `${note}/10` : `${Number(note).toFixed(1)}/10`;
 
   return (
     <span

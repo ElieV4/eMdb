@@ -79,7 +79,7 @@ export function TitleCard({
             {note && (
               <span className="flex items-center gap-0.5 text-amber-400">
                 <Star className="h-3.5 w-3.5 fill-current" />
-                <span>{note.toFixed(1)}</span>
+                <span>{Number(note).toFixed(1)}</span>
               </span>
             )}
 
@@ -148,7 +148,7 @@ export function TitleCardHorizontal({
           {note && (
             <span className="flex items-center gap-0.5 text-amber-400">
               <Star className="h-3 w-3 fill-current" />
-              {note.toFixed(1)}
+              {Number(note).toFixed(1)}
             </span>
           )}
           <span
