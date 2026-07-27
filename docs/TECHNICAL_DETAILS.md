@@ -913,6 +913,12 @@ npm run test:watch
 | ------ | --------------- | --------- |
 | **Pages** | `__tests__/unit/pages/ListsPage.test.tsx` | Vérifie que la page `/lists` existe, affiche les listes de l’utilisateur et rend `ListDialog` (bug #11). |
 
+### Tests Unitaires Frontend — Page détail série (SeriesDetailPage)
+
+| Module | Fichier de Test | Cas testé |
+| ------ | --------------- | --------- |
+| **Pages** | `__tests__/unit/pages/SeriesDetailPage.test.tsx` | Vérifie que la page `/series/:id` rend le titre, la section « Saisons » et la liste des saisons (bug #12). |
+
 ---
 
 ## 🖥️ Fichiers Sources par Module (Frontend)

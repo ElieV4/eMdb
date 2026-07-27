@@ -84,8 +84,6 @@
 - **Tests unitaires :**
   - `apps/web/src/__tests__/unit/pages/HomePage.test.tsx` — vérifie que le lien « Voir le calendrier complet » a pour `href` `/calendar`.
 
-## Bugs restants identifiés
-
 ### 10. Page `/calendar` manquante
 - **Symptôme :** Aucune page calendrier n’existe pour afficher les épisodes non vus des séries suivies.
 - **Cause racine :** Le fichier `apps/web/src/app/calendar/page.tsx` n’a jamais été créé.
@@ -110,13 +108,19 @@
 - **Tests unitaires :**
   - `apps/web/src/__tests__/unit/pages/ListsPage.test.tsx` — vérifie que la page existe, affiche les listes de l’utilisateur et rend `ListDialog`.
 
+## Bugs restants identifiés
+
 ### 12. Module saisons & épisodes : données non chargées sur la page série
 - **Symptôme :** La page détail d’une série n’affiche pas les saisons et épisodes.
-- **Cause racine :** Le hook `useSeasons` ou le composant d’affichage des saisons n’est pas correctement appelé ou les données ne sont pas récupérées depuis `GET /titles/:titleId/seasons`.
-- **Fichier concerné :** `apps/web/src/app/series/[id]/page.tsx`, `apps/web/src/hooks/api/useSeasons.ts`
-- **Tests unitaires à créer :**
-  - Vérifier que `useSeasons` récupère bien les saisons d’une série.
-  - Vérifier que la page série affiche la liste des saisons et épisodes.
+- **Cause racine :** Le fichier `apps/web/src/app/series/[id]/page.tsx` n’existait pas. Seule la page générique `titles/[id]/page.tsx` gérait films et séries, mais la route dédiée `/series/:id` était manquante.
+- **Correction :** Création de `apps/web/src/app/series/[id]/page.tsx` :
+  - Page serveur Next.js dédiée aux séries
+  - Réutilise les hooks existants : `useTitle`, `useTitleCredits`, `useTitleRecommendations`, `useSeasons`
+  - Vérifie `title.type === "serie"` et renvoie `notFound()` sinon
+  - Affiche hero, métadonnées, distribution, saisons et recommandations
+- **Fichiers modifiés :** `apps/web/src/app/series/[id]/page.tsx`
+- **Tests unitaires :**
+  - `apps/web/src/__tests__/unit/pages/SeriesDetailPage.test.tsx` — vérifie que la page `/series/:id` rend le titre, la section « Saisons » et la liste des saisons.
 
 ### 13. Page titre/série : fonctionnalités utilisateur manquantes (watch, liste, follow, note)
 - **Symptôme :** Sur la page de détail d’un titre, les boutons « Marquer comme vu », « Ajouter à une liste », « Suivre » et « Noter » sont absents ou non fonctionnels.
