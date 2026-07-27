@@ -1,4 +1,1 @@
-export declare function getWikipediaUrlFromWikidataId(
-  wikidataId: string,
-  lang?: string,
-): Promise<string | null>;
+export declare function getWikipediaUrlFromWikidataId(wikidataId: string, lang?: string): Promise<string | null>;

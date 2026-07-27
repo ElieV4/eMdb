@@ -92,14 +92,17 @@ async function importEpisodeGuestCredits(episodeId, tmdbId, seasonNumber, episod
 async function ensureGenreIds(genres) {
     const ids = [];
     for (const genre of (0, tmdb_mapper_1.mapTmdbGenres)(genres)) {
+        if (!genre.nom) {
+            continue;
+        }
         const record = await db_1.prisma.genres.upsert({
-            where: { tmdb_id: genre.tmdb_id },
+            where: { nom: genre.nom },
             create: {
-                tmdb_id: genre.tmdb_id,
                 nom: genre.nom,
+                tmdb_id: genre.tmdb_id,
             },
             update: {
-                nom: genre.nom,
+                tmdb_id: genre.tmdb_id,
             },
         });
         ids.push(record.id);

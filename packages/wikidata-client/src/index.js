@@ -9,6 +9,9 @@ async function getWikipediaUrlFromWikidataId(wikidataId, lang = 'fr') {
         },
     });
     if (!res.ok) {
+        if (res.status === 429) {
+            return null;
+        }
         throw new Error(`Wikidata request failed ${res.status}: ${res.statusText}`);
     }
     const json = (await res.json());
@@ -19,3 +22,4 @@ async function getWikipediaUrlFromWikidataId(wikidataId, lang = 'fr') {
     const siteKey = `${lang}wiki`;
     return siteLinks[siteKey]?.url ?? null;
 }
+//# sourceMappingURL=index.js.map
