@@ -919,6 +919,24 @@ npm run test:watch
 | ------ | --------------- | --------- |
 | **Pages** | `__tests__/unit/pages/SeriesDetailPage.test.tsx` | Vérifie que la page `/series/:id` rend le titre, la section « Saisons » et la liste des saisons (bug #12). |
 
+### Backend — Import saisons TMDB (`packages/tmdb-client`)
+
+| Élément | Description |
+| ------- | ----------- |
+| `getTvDetails()` | Inclut désormais `seasons` dans `append_to_response` pour garantir la remontée de la liste des saisons depuis TMDB lors de l'import d'une série. |
+
+### Backend — Tests `tmdb-sync`
+
+| Fichier de test | Cas testé |
+| ---------------- | --------- |
+| `packages/tmdb-sync/src/index.spec.ts` | Vérifie que `importSeasonsForSerie` appelle `getTvDetails` avec le `tmdb_id` du titre (bug #12). |
+
+### Backend — Backfill séries existantes
+
+| Script | Description |
+| ------ | ----------- |
+| `scripts/backfill-seasons.js` | Parcourt les séries sans saisons et appelle `importSeasonsForSerie` pour chaque titre avec `tmdb_id`. |
+
 ---
 
 ## 🖥️ Fichiers Sources par Module (Frontend)

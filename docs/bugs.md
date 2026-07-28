@@ -108,19 +108,30 @@
 - **Tests unitaires :**
   - `apps/web/src/__tests__/unit/pages/ListsPage.test.tsx` — vérifie que la page existe, affiche les listes de l’utilisateur et rend `ListDialog`.
 
-## Bugs restants identifiés
-
 ### 12. Module saisons & épisodes : données non chargées sur la page série
-- **Symptôme :** La page détail d’une série n’affiche pas les saisons et épisodes.
-- **Cause racine :** Le fichier `apps/web/src/app/series/[id]/page.tsx` n’existait pas. Seule la page générique `titles/[id]/page.tsx` gérait films et séries, mais la route dédiée `/series/:id` était manquante.
-- **Correction :** Création de `apps/web/src/app/series/[id]/page.tsx` :
-  - Page serveur Next.js dédiée aux séries
-  - Réutilise les hooks existants : `useTitle`, `useTitleCredits`, `useTitleRecommendations`, `useSeasons`
-  - Vérifie `title.type === "serie"` et renvoie `notFound()` sinon
-  - Affiche hero, métadonnées, distribution, saisons et recommandations
-- **Fichiers modifiés :** `apps/web/src/app/series/[id]/page.tsx`
+- **Symptôme :** La page détail d’une série affiche « Aucune saison disponible pour cette série. » même pour des titres comme Stranger Things. L’ajout d’une nouvelle série via la recherche frontend ne déclenchait pas l’import de ses saisons.
+- **Cause racine :** `importTitleByTmdbId` appelait bien `importSeasonsForSerie` pour les séries, mais `getTvDetails()` dans `packages/tmdb-client` ne demandait pas `seasons` à l’API TMDB. Sans `seasons` dans `append_to_response`, TMDB ne renvoie pas la liste des saisons, donc `tvDetails.seasons` était `undefined` et la boucle d’import ne créait rien.
+- **Correction :**
+  - Ajout de `seasons` dans `append_to_response` de `getTvDetails()` (`packages/tmdb-client/src/tmdbClient.ts`).
+  - Rebuild du package `tmdb-client` pour que le fix soit effectif.
+  - Ajout d’un test unitaire dans `tmdb-sync` pour vérifier que `importSeasonsForSerie` appelle bien `getTvDetails` avec le `tmdb_id` du titre.
+- **Fichiers modifiés :** `packages/tmdb-client/src/tmdbClient.ts`, `packages/tmdb-sync/src/index.spec.ts`
 - **Tests unitaires :**
-  - `apps/web/src/__tests__/unit/pages/SeriesDetailPage.test.tsx` — vérifie que la page `/series/:id` rend le titre, la section « Saisons » et la liste des saisons.
+  - `packages/tmdb-sync/src/index.spec.ts` — vérifie que `importSeasonsForSerie` appelle `getTvDetails(123)` quand le titre a `tmdb_id: 123`.
+  - `apps/web/src/__tests__/unit/pages/SeriesDetailPage.test.tsx` — vérifie que la page `/series/:id` rend la section « Saisons » lorsque le hook `useSeasons` retourne des données.
+- **Vérification manuelle :** Ajouter une nouvelle série via la recherche frontend et confirmer que les saisons apparaissent sur la page de détail.
+
+### 12bis. Saisons manquantes pour les séries existantes
+- **Symptôme :** Les séries déjà présentes en base n’affichent aucune saison, même après import initial. Seules les séries ayant subi un import forcé ont des saisons.
+- **Cause racine :** `getTvDetails()` dans `packages/tmdb-client` ne demandait pas `seasons` à l’API TMDB. Sans `seasons` dans `append_to_response`, `tvDetails.seasons` était `undefined` et `importSeasonsForSerie` ne créait rien. Les séries importées avant ce fix sont donc restées vides.
+- **Correction :**
+  - Ajout de `seasons` dans `append_to_response` de `getTvDetails()` (`packages/tmdb-client/src/tmdbClient.ts`).
+  - Rebuild du package `tmdb-client`.
+  - Script de backfill `scripts/backfill-seasons.js` pour importer les saisons des séries existantes sans saisons.
+- **Fichiers modifiés :** `packages/tmdb-client/src/tmdbClient.ts`, `scripts/backfill-seasons.js`
+- **Tests unitaires :**
+  - `packages/tmdb-sync/src/index.spec.ts` — vérifie que `importSeasonsForSerie` appelle `getTvDetails(123)` quand le titre a `tmdb_id: 123`.
+- **Vérification manuelle :** Exécuter `node scripts/backfill-seasons.js` et confirmer que les saisons apparaissent pour les séries existantes.
 
 ### 13. Page titre/série : fonctionnalités utilisateur manquantes (watch, liste, follow, note)
 - **Symptôme :** Sur la page de détail d’un titre, les boutons « Marquer comme vu », « Ajouter à une liste », « Suivre » et « Noter » sont absents ou non fonctionnels.

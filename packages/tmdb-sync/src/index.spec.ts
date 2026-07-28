@@ -284,6 +284,19 @@ describe('tmdb-sync', () => {
     );
   });
 
+  it('importSeasonsForSerie appelle getTvDetails avec le tmdb_id du titre', async () => {
+    asMock(prismaMock.titles.findUnique).mockResolvedValue({
+      id: 'serie-uuid',
+      tmdb_id: 123,
+      type: 'serie',
+    });
+    asMock(getTvDetails).mockResolvedValue({ seasons: [] });
+
+    await importSeasonsForSerie('serie-uuid');
+
+    expect(getTvDetails).toHaveBeenCalledWith(123);
+  });
+
   describe('generateNewEpisodeNotifications', () => {
     it('crée des notifications pour les followers quand un nouvel épisode sort', async () => {
       asMock(prismaMock.titles.findMany).mockResolvedValue([

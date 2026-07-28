@@ -284,7 +284,7 @@ export async function getMovieDetails(tmdbId: number): Promise<any> {
 
 export async function getTvDetails(tmdbId: number): Promise<any> {
   const url = buildUrl(`/tv/${tmdbId}`, {
-    append_to_response: 'credits,images,content_ratings',
+    append_to_response: 'credits,images,content_ratings,seasons',
   });
   return fetchJson<any>(url);
 }

@@ -348,10 +348,16 @@ export async function refreshTitleData(titleId: string) {
   const updatePayload =
     title.type === 'film' ? mapTmdbMovieToTitle(tmdbData) : mapTmdbTvToTitle(tmdbData);
 
-  return prisma.titles.update({
+  const updated = await prisma.titles.update({
     where: { id: titleId },
     data: updatePayload,
   });
+
+  if (title.type === 'serie') {
+    await importSeasonsForSerie(titleId);
+  }
+
+  return updated;
 }
 
 /**
