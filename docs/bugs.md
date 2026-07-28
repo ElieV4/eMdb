@@ -135,12 +135,31 @@
 
 ### 13. Page titre/série : fonctionnalités utilisateur manquantes (watch, liste, follow, note)
 - **Symptôme :** Sur la page de détail d’un titre, les boutons « Marquer comme vu », « Ajouter à une liste », « Suivre » et « Noter » sont absents ou non fonctionnels.
-- **Cause racine :** Les composants `WatchButton`, `FollowButton`, `RatingInput` et les hooks associés ne sont pas intégrés à la page de détail titre/série.
-- **Fichier concerné :** `apps/web/src/app/titles/[id]/page.tsx`, `apps/web/src/app/series/[id]/page.tsx`
-- **Tests unitaires à créer :**
-  - Vérifier que le bouton « Marquer comme vu » est présent et fonctionnel.
-  - Vérifier que le bouton « Suivre » est présent pour les séries.
-  - Vérifier que le composant de notation est présent et fonctionnel.
+- **Cause racine :** Les composants `WatchButton`, `FollowButton`, `RatingInput` et les hooks associés existaient, mais n’étaient pas intégrés dans les pages de détail. De plus, les hooks de gestion des favoris/listes (`useUserFollows`, `useUserLists`, `useAddListItem`, `useRemoveListItem`) manquaient.
+- **Correction :**
+  - Création du composant unifié `TitleActions` (`apps/web/src/components/titles/TitleActions.tsx`) qui regroupe :
+    - **Watch** : bouton « Marquer comme vu » avec dropdown (vu maintenant / annuler le visionnage)
+    - **Suivi** : bouton toggle bookmark pour les séries
+    - **Listes** : menu burger avec watchlist, favoris, listes personnalisées + création de nouvelle liste
+    - **Historique** : voir l’historique de visionnage du titre
+    - **Supprimer historique** : suppression avec confirmation
+    - **Rating** : étoiles interactives
+    - **Favori** : toggle cœur rouge
+  - Intégration de `TitleActions` dans `apps/web/src/app/titles/[id]/page.tsx` et `apps/web/src/app/series/[id]/page.tsx`
+  - Création des hooks manquants : `useUserFollows`, `useUserLists`, `useAddListItem`, `useRemoveListItem`
+- **Fichiers modifiés :**
+  - `apps/web/src/components/titles/TitleActions.tsx` (nouveau)
+  - `apps/web/src/app/titles/[id]/page.tsx`
+  - `apps/web/src/app/series/[id]/page.tsx`
+  - `apps/web/src/hooks/api/useUserFollows.ts` (nouveau)
+  - `apps/web/src/hooks/api/useUserLists.ts` (nouveau)
+  - `apps/web/src/hooks/api/useAddListItem.ts` (nouveau)
+  - `apps/web/src/hooks/api/useRemoveListItem.ts` (nouveau)
+  - `apps/web/src/hooks/api/index.ts`
+- **Tests unitaires :**
+  - `apps/web/src/__tests__/unit/components/titles/TitleActions.test.tsx` — vérifie que les actions principales sont présentes pour un film et une série.
+  - `apps/web/src/__tests__/unit/pages/TitleDetailPage.test.tsx` — vérifie que la page `/titles/:id` rend `TitleActions`.
+  - `apps/web/src/__tests__/unit/pages/SeriesDetailPage.test.tsx` — vérifie que la page `/series/:id` rend `TitleActions`.
 
 ### 14. Page personne : module filmographie ne charge pas
 - **Symptôme :** La page détail d’une personne n’affiche pas sa filmographie.

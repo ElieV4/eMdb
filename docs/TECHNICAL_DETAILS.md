@@ -937,6 +937,19 @@ npm run test:watch
 | ------ | ----------- |
 | `scripts/backfill-seasons.js` | Parcourt les séries sans saisons et appelle `importSeasonsForSerie` pour chaque titre avec `tmdb_id`. |
 
+### Tests Unitaires Frontend — Page détail titre/série (TitleDetailPage / SeriesDetailPage)
+
+| Module | Fichier de Test | Cas testé |
+| ------ | --------------- | --------- |
+| **Pages** | `__tests__/unit/pages/TitleDetailPage.test.tsx` | Vérifie que la page `/titles/:id` affiche les boutons watch/follow/rating quand l’utilisateur est connecté (bug #13). |
+| **Pages** | `__tests__/unit/pages/SeriesDetailPage.test.tsx` | Vérifie que la page `/series/:id` affiche les boutons watch/follow/rating quand l’utilisateur est connecté (bug #13). |
+
+### Tests Unitaires Frontend — Composant TitleActions
+
+| Module | Fichier de Test | Cas testé |
+| ------ | --------------- | --------- |
+| **Components** | `__tests__/unit/components/titles/TitleActions.test.tsx` | Vérifie que les actions principales sont présentes pour un film et une série (bug #13). |
+
 ---
 
 ## 🖥️ Fichiers Sources par Module (Frontend)

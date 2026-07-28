@@ -1,12 +1,12 @@
 /**
- * Tests unitaires pour la page détail série (SeriesDetailPage).
+ * Tests unitaires pour la page détail titre/série.
  * Bug #13 — Vérifie la présence des fonctionnalités utilisateur : watch, follow, rating.
  */
 
 jest.mock("@/hooks/api/useTitles", () => ({
   useTitle: () => ({
     data: {
-      id: "serie-1",
+      id: "title-1",
       type: "serie",
       titre_vo: "Stranger Things",
       titre_vf: "Stranger Things",
@@ -84,25 +84,25 @@ jest.mock("@/store/authStore", () => ({
 import { render, screen } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/api/queryClient";
-import SeriesDetailPage from "@/app/series/[id]/page";
+import TitleDetailPage from "@/app/titles/[id]/page";
 
 function renderWithClient(ui: React.ReactNode) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
-describe("SeriesDetailPage", () => {
+describe("TitleDetailPage", () => {
   it("affiche le bouton Marquer comme vu quand connecte", () => {
-    renderWithClient(<SeriesDetailPage params={{ id: "serie-1" }} />);
+    renderWithClient(<TitleDetailPage params={{ id: "title-1" }} />);
     expect(screen.getByTestId("watch-button")).toBeInTheDocument();
   });
 
   it("affiche le bouton Suivre pour une série quand connecte", () => {
-    renderWithClient(<SeriesDetailPage params={{ id: "serie-1" }} />);
+    renderWithClient(<TitleDetailPage params={{ id: "title-1" }} />);
     expect(screen.getByTestId("follow-button")).toBeInTheDocument();
   });
 
   it("affiche le composant de notation quand connecte", () => {
-    renderWithClient(<SeriesDetailPage params={{ id: "serie-1" }} />);
+    renderWithClient(<TitleDetailPage params={{ id: "title-1" }} />);
     expect(screen.getByTestId("rating-input")).toBeInTheDocument();
   });
 });

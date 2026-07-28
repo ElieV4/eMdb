@@ -13,6 +13,7 @@ import { TitleInfo } from "@/components/titles/TitleInfo";
 import { TitleCredits } from "@/components/titles/TitleCredits";
 import { TitleRecommendations } from "@/components/titles/TitleRecommendations";
 import { SeasonCard } from "@/components/seasons/SeasonCard";
+import { TitleActions } from "@/components/titles/TitleActions";
 import { useTitle } from "@/hooks/api/useTitles";
 import { useTitleCredits } from "@/hooks/api/useTitleCredits";
 import { useTitleRecommendations } from "@/hooks/api/useTitleRecommendations";
@@ -61,6 +62,9 @@ export default function TitleDetailPage({
       <div className="space-y-10">
         {/* Hero */}
         <TitleHero title={title} />
+
+        {/* Actions utilisateur */}
+        <TitleActions titleId={id} type={title.type} />
 
         {/* Métadonnées */}
         <TitleInfo title={title} />
