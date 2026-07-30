@@ -90,16 +90,15 @@ function DashboardSection({
 
 // Composant de card pour "Continue Watching"
 function ContinueWatchingCard({ watch }: { watch: any }) {
-  const title = watch.title?.titre || watch.episode?.titre || "Inconnu";
-  const progress = watch.progress || 0;
-  const imageUrl = watch.title?.afficheUrl || watch.episode?.stillUrl;
+  const title = watch.titles?.titre_vf || watch.titles?.titre_vo || watch.episodes?.titre || "Inconnu";
+  const imageUrl = watch.titles?.affiche_url;
 
   return (
     <Link
       href={
-        watch.episode
-          ? `/episodes/${watch.episode.id}`
-          : `/titles/${watch.titleId}`
+        watch.episodes
+          ? `/episodes/${watch.episodes.id}`
+          : `/titles/${watch.title_id}`
       }
       className="group relative block overflow-hidden rounded-lg"
     >
@@ -116,30 +115,15 @@ function ContinueWatchingCard({ watch }: { watch: any }) {
           </div>
         )}
 
-        {/* Overlay avec progress */}
+        {/* Overlay */}
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
           <div className="text-center text-white">
             <div className="flex items-center gap-2">
               <PlayCircle className="h-10 w-10 fill-white/80" />
               <span className="text-sm font-medium">Continuer</span>
             </div>
-            {progress > 0 && (
-              <div className="mt-2 text-xs">
-                {Math.round(progress)}% termine
-              </div>
-            )}
           </div>
         </div>
-
-        {/* Barre de progression */}
-        {progress > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
-            <div
-              className="h-full bg-primary"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        )}
       </div>
 
       <div className="p-3 bg-background">
@@ -147,9 +131,9 @@ function ContinueWatchingCard({ watch }: { watch: any }) {
           {title}
         </h3>
         <p className="text-xs text-muted-foreground">
-          {watch.episode
-            ? `Episode ${watch.episode.numero}`
-            : watch.title?.type === "serie"
+          {watch.episodes
+            ? `Episode ${watch.episodes.numero}`
+            : watch.titles?.type === "serie"
               ? "Serie"
               : "Film"}
         </p>

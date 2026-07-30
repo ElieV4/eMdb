@@ -17,7 +17,7 @@ export function useCreateWatch() {
         body: data,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["watches"] });
+      queryClient.invalidateQueries({ queryKey: ["watches"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["calendar"] });
       queryClient.invalidateQueries({ queryKey: ["serie-progress"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });

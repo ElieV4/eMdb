@@ -55,11 +55,29 @@ jest.mock("@/components/ratings/RatingInput", () => ({
   RatingInput: () => <div data-testid="rating-input" />,
 }));
 
-jest.mock("@/store/authStore", () => ({
-  useAuthStore: () => ({
-    isAuthenticated: true,
+jest.mock("@/hooks/api/useWatches", () => ({
+  useWatches: () => ({
+    data: { items: [] },
+    isLoading: false,
+    isError: false,
   }),
 }));
+
+jest.mock("@/store/authStore", () => {
+  const mockUseAuthStore = () => ({
+    isAuthenticated: true,
+    user: { id: "u1", email: "test@example.com", pseudo: "test" },
+  });
+
+  Object.defineProperty(mockUseAuthStore, "getState", {
+    value: () => ({
+      isAuthenticated: true,
+      user: { id: "u1", email: "test@example.com", pseudo: "test" },
+    }),
+  });
+
+  return { useAuthStore: mockUseAuthStore };
+});
 
 import { render, screen } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";

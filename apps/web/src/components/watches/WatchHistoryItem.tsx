@@ -31,21 +31,21 @@ type WatchHistoryItemProps = {
 export function WatchHistoryItem({ watch, className }: WatchHistoryItemProps) {
   const deleteWatch = useDeleteWatch();
 
-  const title = watch.title || watch.episode;
+  const title = watch.episodes
+    ? `Épisode ${watch.episodes.numero}${watch.episodes.titre ? ` - ${watch.episodes.titre}` : ""}`
+    : watch.titles?.titre_vf || watch.titles?.titre_vo || "Titre";
   if (!title) return null;
 
   const handleDelete = async () => {
     await deleteWatch.mutateAsync(watch.id);
   };
 
-  const formattedDate = new Date(watch.date).toLocaleDateString("fr-FR");
+  const formattedDate = new Date(watch.date_vue).toLocaleDateString("fr-FR");
 
   return (
     <div className={cn("flex items-center justify-between p-3 border rounded-md", className)}>
       <div className="flex-1">
-        <p className="font-medium text-sm">
-          {watch.title ? (watch.title as any).titre : `Episode ${watch.episode?.numero}`}
-        </p>
+        <p className="font-medium text-sm">{title}</p>
         <p className="text-xs text-muted-foreground">{formattedDate}</p>
       </div>
       <AlertDialog>

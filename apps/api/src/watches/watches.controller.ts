@@ -47,6 +47,16 @@ export class WatchesController {
   }
 
   /**
+   * DELETE /watches/title/:titleId
+   * Supprime tous les visionnages d'un titre pour l'utilisateur connecté.
+   */
+  @Delete('watches/title/:titleId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteAllWatchesByTitle(@CurrentUser() user: any, @Param('titleId') titleId: string): Promise<void> {
+    await this.watchesService.deleteAllWatchesByTitle(titleId, user.id);
+  }
+
+  /**
    * DELETE /watches/:id
    * Supprime un visionnage (vérifie l'appartenance).
    */

@@ -193,6 +193,51 @@
   - Vérifier que la barre de recherche n’est plus dans le header.
   - Vérifier que la barre de recherche est accessible depuis la sidebar.
 
+### 18. Bouton visionnage ne change pas d'état et historique vide
+- **Symptôme :** Le bouton "Marquer comme vu" ne passe pas en "Vu" après clic, et l'historique de visionnage affiche "Aucun visionnage" même quand des données existent dans `user_watches`.
+- **Cause racine (bouton) :** Le backend retournait `{ data: [...], total, page, limit }` mais le frontend attendait `{ items: [...], ... }` (type `PaginationResult`). Le frontend accédait `watchesData?.items` qui était toujours `undefined`.
+- **Cause racine (historique vide) :** Même cause — `watches` était toujours `[]` car `items` n'existait pas dans la réponse.
+- **Cause racine (historique "titre" et "Invalid Date") :** Le type `UserWatch` définissait `date`, `title`, `episode` mais le backend retournait `date_vue`, `titles`, `episodes`.
+- **Correction :**
+  - Backend : `data` → `items` + ajout de `totalPages` dans `listWatches()`
+  - Frontend : mise à jour du type `UserWatch` pour correspondre au backend
+  - Correction de tous les composants utilisant `UserWatch` (`TitleActions`, `WatchHistoryItem`, `page.tsx`)
+- **Fichiers modifiés :**
+  - `apps/api/src/watches/watches.service.ts`
+  - `apps/api/src/watches/watches.service.spec.ts`
+  - `apps/web/src/lib/types/api.ts`
+  - `apps/web/src/components/titles/TitleActions.tsx`
+  - `apps/web/src/components/watches/WatchHistoryItem.tsx`
+  - `apps/web/src/app/page.tsx`
+  - `apps/web/src/hooks/api/useDashboard.ts`
+  - `apps/web/src/hooks/api/useCreateWatch.ts`
+  - `apps/web/src/hooks/api/useDeleteWatch.ts`
+
+### 19. Invalidation des requêtes watches incorrecte
+- **Symptôme :** Après avoir marqué un titre comme vu, le bouton ne se mettait pas à jour tant qu'on ne rafraîchissait pas la page.
+- **Cause racine :** `queryClient.invalidateQueries({ queryKey: ["watches"] })` n'invalidait pas `["watches", filters]` (les requêtes avec filtres).
+- **Correction :** Ajout de `exact: false` pour invalider toutes les requêtes commençant par `["watches"]`.
+- **Fichiers modifiés :**
+  - `apps/web/src/hooks/api/useCreateWatch.ts`
+  - `apps/web/src/hooks/api/useDeleteWatch.ts`
+  - `apps/web/src/components/titles/TitleActions.tsx`
+
+### 20. "Annuler visionnage" non fonctionnel
+- **Symptôme :** Le menu "Annuler le visionnage" ne supprimait pas les visionnages.
+- **Cause racine :** Le bouton appelait juste `onWatchSuccess` sans effectuer de suppression.
+- **Correction :**
+  - Ajout d'un endpoint backend `DELETE /watches/title/:titleId` pour supprimer tous les visionnages d'un titre
+  - Création du hook `useDeleteAllWatches`
+  - Ajout d'une boîte de dialogue de confirmation
+  - Ajout des options "Revu" (date personnalisée, date inconnue) dans le menu "Vu"
+  - Ajout de l'affichage "Vu x3" si plusieurs visionnages
+- **Fichiers modifiés :**
+  - `apps/api/src/watches/watches.controller.ts`
+  - `apps/api/src/watches/watches.service.ts`
+  - `apps/web/src/hooks/api/useDeleteAllWatches.ts` (nouveau)
+  - `apps/web/src/components/watches/WatchButton.tsx`
+  - `apps/web/src/components/titles/TitleActions.tsx`
+
 ---
 
 ## Modifications à faire

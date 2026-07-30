@@ -11,14 +11,7 @@ import { Title, UserWatch, PaginationResult } from "@/lib/types/api";
 // Types pour le dashboard
 // ============================================
 
-export type DashboardWatch = UserWatch & {
-  title: {
-    id: string;
-    titre: string;
-    afficheUrl?: string;
-    type: "film" | "serie";
-  };
-};
+export type DashboardWatch = UserWatch;
 
 export type DashboardFollow = {
   id: string;
@@ -58,9 +51,6 @@ export function useRecentWatches(limit: number = 6, enabled: boolean = true) {
         `/watches?${searchParams.toString()}`,
       );
 
-      // Enrichir avec les détails du titre
-      // Pour l'instant, on retourne juste les watches
-      // À améliorer avec le backend qui devrait déjà inclure le titre
       return response.items as unknown as DashboardWatch[];
     },
     staleTime: 1 * 60 * 1000, // 1 minute

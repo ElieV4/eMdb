@@ -127,6 +127,18 @@ export class WatchesService {
   }
 
   /**
+   * Supprime tous les visionnages d'un titre pour un utilisateur.
+   *
+   * @param titleId - UUID du titre
+   * @param userId - UUID de l'utilisateur connecté
+   */
+  async deleteAllWatchesByTitle(titleId: string, userId: string): Promise<void> {
+    await this.prisma.user_watches.deleteMany({
+      where: { title_id: titleId, user_id: userId },
+    });
+  }
+
+  /**
    * Liste paginée des visionnages de l'utilisateur.
    *
    * Filtres optionnels : type (film/serie), date_from, date_to, title_id.
@@ -187,7 +199,8 @@ export class WatchesService {
       this.prisma.user_watches.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    const totalPages = Math.ceil(total / limit);
+    return { items: data, total, page, limit, totalPages };
   }
 
   // ======================================================================

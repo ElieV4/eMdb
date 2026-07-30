@@ -93,9 +93,23 @@ export type Country = {
 
 export type UserWatch = {
   id: string;
-  date: string;
-  title?: Title;
-  episode?: Episode;
+  date_vue: string;
+  title_id: string;
+  episode_id: string | null;
+  titles?: {
+    id: string;
+    tmdb_id: number | null;
+    titre_vo: string;
+    titre_vf: string | null;
+    affiche_url: string | null;
+    type: string;
+  };
+  episodes?: {
+    id: string;
+    numero: number;
+    titre: string | null;
+    seasons: { numero: number };
+  };
 };
 
 export type UserRating = {

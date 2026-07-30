@@ -209,7 +209,7 @@ describe('WatchesService', () => {
 
       const result = await service.listWatches(userId, {});
 
-      expect(result.data).toEqual(mockData);
+      expect(result.items).toEqual(mockData);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
       expect(result.limit).toBe(20);
