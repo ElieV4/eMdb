@@ -10,8 +10,7 @@ import { TitleRatingsSummary } from "@/lib/types/api";
 export function useTitleRatingsSummary(titleId: string) {
   return useQuery<TitleRatingsSummary>({
     queryKey: ["title-ratings-summary", titleId],
-    queryFn: () =>
-      apiFetch<TitleRatingsSummary>(`/titles/${titleId}/ratings`),
+    queryFn: () => apiFetch<TitleRatingsSummary>(`/titles/${titleId}/ratings`),
     enabled: !!titleId,
     staleTime: 5 * 60 * 1000,
   });

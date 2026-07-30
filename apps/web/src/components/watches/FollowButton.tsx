@@ -19,7 +19,11 @@ type FollowButtonProps = {
   className?: string;
 };
 
-export function FollowButton({ titleId, initialFollowed = false, className }: FollowButtonProps) {
+export function FollowButton({
+  titleId,
+  initialFollowed = false,
+  className,
+}: FollowButtonProps) {
   const { user } = useAuth();
   const follow = useFollow();
   const unfollow = useUnfollow();

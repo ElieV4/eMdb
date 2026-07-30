@@ -19,7 +19,11 @@ type ListItemsGridProps = {
   canEdit?: boolean;
 };
 
-export function ListItemsGrid({ items, onRemove, canEdit = false }: ListItemsGridProps) {
+export function ListItemsGrid({
+  items,
+  onRemove,
+  canEdit = false,
+}: ListItemsGridProps) {
   if (items.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">

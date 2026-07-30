@@ -79,7 +79,9 @@ export function TitleHero({ title, className }: TitleHeroProps) {
             {note_imdb && (
               <span className="flex items-center gap-1 text-amber-400">
                 <Star className="h-4 w-4 fill-current" />
-                <span className="font-medium">{Number(note_imdb).toFixed(1)}</span>
+                <span className="font-medium">
+                  {Number(note_imdb).toFixed(1)}
+                </span>
               </span>
             )}
             {statut && (

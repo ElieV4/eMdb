@@ -3,5 +3,7 @@
  */
 
 export { SeasonCard } from "./SeasonCard";
+export { SeasonCompact } from "./SeasonCompact";
+export { EpisodeSnapshot } from "./EpisodeSnapshot";
 export { EpisodeRow, type EpisodeRowItem } from "./EpisodeRow";
 export { EpisodeCard } from "./EpisodeCard";

@@ -54,7 +54,10 @@ function mapBackendTitleToSearchResult(
     id,
     tmdbId: item.tmdb_id,
     titre: item.titre_vo,
-    titreOriginal: item.titre_vf && item.titre_vf !== item.titre_vo ? item.titre_vf : undefined,
+    titreOriginal:
+      item.titre_vf && item.titre_vf !== item.titre_vo
+        ? item.titre_vf
+        : undefined,
     type: item.type,
     afficheUrl: item.poster_path ?? undefined,
     local: item.local,

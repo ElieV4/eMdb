@@ -50,11 +50,14 @@ export function CalendarEpisodes() {
   }
 
   // Regrouper par série
-  const grouped = entries.reduce<Record<string, CalendarEntry[]>>((acc, entry) => {
-    if (!acc[entry.title_id]) acc[entry.title_id] = [];
-    acc[entry.title_id].push(entry);
-    return acc;
-  }, {});
+  const grouped = entries.reduce<Record<string, CalendarEntry[]>>(
+    (acc, entry) => {
+      if (!acc[entry.title_id]) acc[entry.title_id] = [];
+      acc[entry.title_id].push(entry);
+      return acc;
+    },
+    {},
+  );
 
   return (
     <div className="space-y-6">
@@ -86,11 +89,16 @@ export function CalendarEpisodes() {
                       className="text-sm flex justify-between text-muted-foreground"
                     >
                       <span>
-                        S{String(ep.saison).padStart(2, "0")}E{String(ep.episode_numero).padStart(2, "0")}{" "}
+                        S{String(ep.saison).padStart(2, "0")}E
+                        {String(ep.episode_numero).padStart(2, "0")}{" "}
                         {ep.episode_titre}
                       </span>
                       {ep.date_diffusion && (
-                        <span>{new Date(ep.date_diffusion).toLocaleDateString("fr-FR")}</span>
+                        <span>
+                          {new Date(ep.date_diffusion).toLocaleDateString(
+                            "fr-FR",
+                          )}
+                        </span>
                       )}
                     </div>
                   ))}

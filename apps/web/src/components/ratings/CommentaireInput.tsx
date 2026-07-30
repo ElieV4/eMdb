@@ -16,7 +16,11 @@ type CommentaireInputProps = {
   className?: string;
 };
 
-export function CommentaireInput({ value, onChange, className }: CommentaireInputProps) {
+export function CommentaireInput({
+  value,
+  onChange,
+  className,
+}: CommentaireInputProps) {
   return (
     <div className={cn("space-y-2", className)}>
       <Label htmlFor="rating-commentaire">Commentaire (optionnel)</Label>
@@ -29,7 +33,7 @@ export function CommentaireInput({ value, onChange, className }: CommentaireInpu
         rows={3}
       />
       <p className="text-xs text-muted-foreground">
-        {(value?.length ?? 0)}/2000 caractères
+        {value?.length ?? 0}/2000 caractères
       </p>
     </div>
   );

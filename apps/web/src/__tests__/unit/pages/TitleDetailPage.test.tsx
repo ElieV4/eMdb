@@ -87,7 +87,9 @@ import { queryClient } from "@/lib/api/queryClient";
 import TitleDetailPage from "@/app/titles/[id]/page";
 
 function renderWithClient(ui: React.ReactNode) {
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
 }
 
 describe("TitleDetailPage", () => {

@@ -11,7 +11,13 @@ export function useAddItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ listId, data }: { listId: string; data: ListItemAddInput }) =>
+    mutationFn: ({
+      listId,
+      data,
+    }: {
+      listId: string;
+      data: ListItemAddInput;
+    }) =>
       apiFetch(`/lists/${listId}/items`, {
         method: "POST",
         body: data,

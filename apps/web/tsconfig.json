@@ -6,7 +6,6 @@
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "preserve",
-    "ignoreDeprecations": "6.0",
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {

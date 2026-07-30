@@ -15,13 +15,7 @@ export function useReorderItems() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      listId,
-      items,
-    }: {
-      listId: string;
-      items: ReorderItem[];
-    }) =>
+    mutationFn: ({ listId, items }: { listId: string; items: ReorderItem[] }) =>
       apiFetch(`/lists/${listId}/items/reorder`, {
         method: "PATCH",
         body: { items },

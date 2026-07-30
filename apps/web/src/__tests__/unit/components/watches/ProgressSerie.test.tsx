@@ -38,12 +38,16 @@ describe("ProgressSerie", () => {
   });
 
   it("affiche un message si aucune donnée", () => {
-    jest.spyOn(require("@/hooks/api/useSerieProgress"), "useSerieProgress").mockReturnValue({
-      data: [],
-      isLoading: false,
-      error: null,
-    });
+    jest
+      .spyOn(require("@/hooks/api/useSerieProgress"), "useSerieProgress")
+      .mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+      });
     render(<ProgressSerie titleId="1" />);
-    expect(screen.getByText("Aucune donnée de progression.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Aucune donnée de progression."),
+    ).toBeInTheDocument();
   });
 });

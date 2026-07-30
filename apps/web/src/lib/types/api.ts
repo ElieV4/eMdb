@@ -470,6 +470,7 @@ export function titleRecommendationToSearchResult(
     afficheUrl: rec.affiche_url ?? undefined,
     genres: undefined,
     pays: undefined,
+    local: true,
   };
 }
 
@@ -491,5 +492,6 @@ export function filmographyToSearchResult(
     afficheUrl: item.titre.affiche_url ?? undefined,
     genres: undefined,
     pays: undefined,
+    local: true,
   };
 }

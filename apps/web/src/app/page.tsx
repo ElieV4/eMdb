@@ -19,7 +19,6 @@ import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { CalendarEpisodes } from "@/components/watches/CalendarEpisodes";
 import { useAuthStore } from "@/store/authStore";
-import { useTrendingTitles } from "@/hooks/api/useTitles";
 import {
   useRecentWatches,
   useFollowedSeries,
@@ -44,6 +43,7 @@ function titleToSearchResult(title: Title): TitleSearchResult {
     afficheUrl: title.afficheUrl,
     genres: title.genres,
     pays: title.pays,
+    local: true,
   };
 }
 
@@ -90,7 +90,11 @@ function DashboardSection({
 
 // Composant de card pour "Continue Watching"
 function ContinueWatchingCard({ watch }: { watch: any }) {
-  const title = watch.titles?.titre_vf || watch.titles?.titre_vo || watch.episodes?.titre || "Inconnu";
+  const title =
+    watch.titles?.titre_vf ||
+    watch.titles?.titre_vo ||
+    watch.episodes?.titre ||
+    "Inconnu";
   const imageUrl = watch.titles?.affiche_url;
 
   return (
@@ -178,13 +182,11 @@ export default function HomePage() {
 
   const { data: followedSeries } = useFollowedSeries(4, isAuthenticated);
 
-  const { data: trendingTitles, isLoading: isLoadingTrending } =
-    useTrendingTitles(undefined, 6);
-
   const { data: popularTitles, isLoading: isLoadingPopular } =
     usePopularTitles(8);
 
-  const { data: calendarEntries, isLoading: isLoadingCalendar } = useCalendar(isAuthenticated);
+  const { data: calendarEntries, isLoading: isLoadingCalendar } =
+    useCalendar(isAuthenticated);
 
   const { data: recommendations, isLoading: isLoadingRecommendations } =
     useRecommendations(6);
@@ -286,7 +288,10 @@ export default function HomePage() {
             {isLoadingCalendar ? (
               <div className="space-y-3">
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="h-24 rounded-lg bg-muted/50 animate-pulse" />
+                  <div
+                    key={i}
+                    className="h-24 rounded-lg bg-muted/50 animate-pulse"
+                  />
                 ))}
               </div>
             ) : calendarEntries && calendarEntries.length > 0 ? (

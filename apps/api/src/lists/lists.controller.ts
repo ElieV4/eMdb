@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -63,9 +64,13 @@ export class ListsController {
   /**
    * GET /lists
    * Liste des listes de l'utilisateur connecté.
+   * Peut accepter ?title_id=xxx pour vérifier si le titre est dans chaque liste.
    */
   @Get('lists')
-  async getUserLists(@CurrentUser() user: any) {
+  async getUserLists(@CurrentUser() user: any, @Query('title_id') titleId?: string) {
+    if (titleId) {
+      return this.listsService.getUserListsWithTitleCheck(user.id, titleId);
+    }
     return this.listsService.getUserLists(user.id);
   }
 

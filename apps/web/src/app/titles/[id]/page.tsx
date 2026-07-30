@@ -10,9 +10,9 @@ import { notFound } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { TitleHero } from "@/components/titles/TitleHero";
 import { TitleInfo } from "@/components/titles/TitleInfo";
-import { TitleCredits } from "@/components/titles/TitleCredits";
+import { TitleCreditsSplit } from "@/components/titles/TitleCreditsSplit";
 import { TitleRecommendations } from "@/components/titles/TitleRecommendations";
-import { SeasonCard } from "@/components/seasons/SeasonCard";
+import { SeasonCompact } from "@/components/seasons/SeasonCompact";
 import { TitleActions } from "@/components/titles/TitleActions";
 import { useTitle } from "@/hooks/api/useTitles";
 import { useTitleCredits } from "@/hooks/api/useTitleCredits";
@@ -71,7 +71,7 @@ export default function TitleDetailPage({
 
         {/* Distribution (crédits) */}
         <section>
-          <h2 className="text-2xl font-bold mb-4">Distribution</h2>
+          <h2 className="text-2xl font-bold mb-4">Distribution & Équipe</h2>
           {isCreditsLoading ? (
             <LoadingSpinner className="h-6 w-6" />
           ) : isCreditsError || !credits ? (
@@ -79,7 +79,7 @@ export default function TitleDetailPage({
               Aucun crédit disponible pour ce titre.
             </p>
           ) : (
-            <TitleCredits credits={credits} />
+            <TitleCreditsSplit credits={credits} titleType={title.type} />
           )}
         </section>
 
@@ -96,7 +96,7 @@ export default function TitleDetailPage({
             ) : (
               <div className="space-y-3">
                 {seasons.map((season) => (
-                  <SeasonCard key={season.id} season={season} titleId={id} />
+                  <SeasonCompact key={season.id} season={season} titleId={id} />
                 ))}
               </div>
             )}

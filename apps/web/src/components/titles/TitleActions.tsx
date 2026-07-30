@@ -80,7 +80,9 @@ function WatchHistoryDialog({
         </DialogHeader>
         <div className="max-h-80 overflow-y-auto space-y-2">
           {watches.length === 0 && (
-            <p className="text-sm text-muted-foreground">Aucun visionnage pour ce titre.</p>
+            <p className="text-sm text-muted-foreground">
+              Aucun visionnage pour ce titre.
+            </p>
           )}
           {watches.map((watch: WatchEntry) => (
             <div
@@ -91,7 +93,9 @@ function WatchHistoryDialog({
                 <p className="text-sm font-medium">
                   {watch.episodes
                     ? `Épisode ${watch.episodes.numero}${watch.episodes.titre ? ` - ${watch.episodes.titre}` : ""}`
-                    : watch.titles?.titre_vf || watch.titles?.titre_vo || "Titre"}
+                    : watch.titles?.titre_vf ||
+                      watch.titles?.titre_vo ||
+                      "Titre"}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(watch.date_vue).toLocaleString("fr-FR")}
@@ -120,7 +124,7 @@ function WatchHistoryDialog({
 export function TitleActions({ titleId, type, className }: TitleActionsProps) {
   const { isAuthenticated } = useAuthStore();
   const { data: follows } = useUserFollows();
-  const { data: userLists } = useUserLists();
+  const { data: userLists } = useUserLists(titleId);
   const { data: ratingsSummary } = useTitleRatingsSummary(titleId);
   const { data: watchesData } = useWatches({ title_id: titleId, limit: 50 });
   const queryClient = useQueryClient();
@@ -158,7 +162,8 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
   const customLists = userLists?.filter((l) => l.type === "custom") ?? [];
 
   const isInList = (listId: string) => {
-    return userLists?.some((l) => l.id === listId) ?? false;
+    const list = userLists?.find((l) => l.id === listId);
+    return list?.contains_title ?? false;
   };
 
   const handleToggleList = async (listId: string) => {
@@ -211,13 +216,15 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
     <div className={cn("space-y-3", className)}>
       {/* Ligne 1 : vu / suivi / burger */}
       <div className="flex flex-wrap items-center gap-2">
-        <WatchButton
-          titleId={titleId}
-          onWatchSuccess={handleWatchSuccess}
-          watched={isWatched}
-          watchCount={watchCount}
-          onDeleteAll={handleDeleteAll}
-        />
+        {type === "film" && (
+          <WatchButton
+            titleId={titleId}
+            onWatchSuccess={handleWatchSuccess}
+            watched={isWatched}
+            watchCount={watchCount}
+            onDeleteAll={handleDeleteAll}
+          />
+        )}
         {type === "serie" && (
           <FollowButton titleId={titleId} initialFollowed={isFollowed} />
         )}
@@ -237,7 +244,7 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
                 <Check
                   className={cn(
                     "mr-2 h-4 w-4",
-                    isInList(watchlist.id) && "text-primary"
+                    isInList(watchlist.id) && "text-primary",
                   )}
                 />
                 Watchlist
@@ -245,11 +252,13 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
             )}
             {/* Favoris */}
             {favoriteList && (
-              <DropdownMenuItem onClick={() => handleToggleList(favoriteList.id)}>
+              <DropdownMenuItem
+                onClick={() => handleToggleList(favoriteList.id)}
+              >
                 <Heart
                   className={cn(
                     "mr-2 h-4 w-4",
-                    isInList(favoriteList.id) && "text-red-500 fill-red-500"
+                    isInList(favoriteList.id) && "text-red-500 fill-red-500",
                   )}
                 />
                 Favoris
@@ -264,7 +273,7 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
                 <Check
                   className={cn(
                     "mr-2 h-4 w-4",
-                    isInList(list.id) && "text-primary"
+                    isInList(list.id) && "text-primary",
                   )}
                 />
                 {list.nom}
@@ -302,7 +311,9 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
           <Heart
             className={cn(
               "h-5 w-5",
-              favoriteList && isInList(favoriteList.id) && "text-red-500 fill-red-500"
+              favoriteList &&
+                isInList(favoriteList.id) &&
+                "text-red-500 fill-red-500",
             )}
           />
         </Button>
@@ -335,10 +346,16 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
               />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreateList(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateList(false)}
+              >
                 Annuler
               </Button>
-              <Button onClick={handleCreateList} disabled={createList.isPending}>
+              <Button
+                onClick={handleCreateList}
+                disabled={createList.isPending}
+              >
                 {createList.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}

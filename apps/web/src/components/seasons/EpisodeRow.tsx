@@ -30,7 +30,7 @@ interface EpisodeRowProps {
 
 export function EpisodeRow({
   episode,
-  titleId,
+  titleId: _titleId,
   seasonNumero,
   isWatched = false,
   className,

@@ -14,8 +14,20 @@ jest.mock("@/hooks/api/useUserFollows", () => ({
 jest.mock("@/hooks/api/useUserLists", () => ({
   useUserLists: () => ({
     data: [
-      { id: "fav-1", nom: "Favoris", type: "favoris", user_id: "u1", created_at: "2026-01-01" },
-      { id: "watch-1", nom: "Watchlist", type: "watchlist", user_id: "u1", created_at: "2026-01-01" },
+      {
+        id: "fav-1",
+        nom: "Favoris",
+        type: "favoris",
+        user_id: "u1",
+        created_at: "2026-01-01",
+      },
+      {
+        id: "watch-1",
+        nom: "Watchlist",
+        type: "watchlist",
+        user_id: "u1",
+        created_at: "2026-01-01",
+      },
     ],
     isLoading: false,
     isError: false,
@@ -85,7 +97,9 @@ import { queryClient } from "@/lib/api/queryClient";
 import { TitleActions } from "@/components/titles/TitleActions";
 
 function renderWithClient(ui: React.ReactNode) {
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
 }
 
 describe("TitleActions", () => {

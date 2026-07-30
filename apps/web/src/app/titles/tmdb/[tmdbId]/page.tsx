@@ -35,7 +35,9 @@ export default function TmdbTitleImportPage({
         router.replace(`/titles/${localId}`);
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : "Erreur lors de l'import du titre.";
+          err instanceof Error
+            ? err.message
+            : "Erreur lors de l'import du titre.";
         console.error("[TmdbTitleImportPage]", tmdbId, type, message);
         setError(message);
       }

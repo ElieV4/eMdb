@@ -26,13 +26,17 @@ export default function TmdbPersonImportPage({
 
         const localId = data?.id;
         if (!localId) {
-          throw new Error("Réponse inattendue lors de l'import de la personne.");
+          throw new Error(
+            "Réponse inattendue lors de l'import de la personne.",
+          );
         }
 
         router.replace(`/people/${localId}`);
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : "Erreur lors de l'import de la personne.";
+          err instanceof Error
+            ? err.message
+            : "Erreur lors de l'import de la personne.";
         console.error("[TmdbPersonImportPage]", message);
         setError(message);
       }

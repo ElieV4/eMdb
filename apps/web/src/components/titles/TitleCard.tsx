@@ -22,8 +22,16 @@ export function TitleCard({
   showType = true,
   compact = false,
 }: TitleCardProps) {
-  const { id, titre, titreOriginal, type, dateSortie, note, afficheUrl, local } =
-    title;
+  const {
+    id,
+    titre,
+    titreOriginal,
+    type,
+    dateSortie,
+    note,
+    afficheUrl,
+    local,
+  } = title;
 
   // Extraire l'année de la date de sortie
   const year = dateSortie ? new Date(dateSortie).getFullYear() : null;
@@ -107,8 +115,16 @@ export function TitleCardHorizontal({
   title,
   className,
 }: Omit<TitleCardProps, "compact">) {
-  const { id, titre, titreOriginal, type, dateSortie, note, afficheUrl, local } =
-    title;
+  const {
+    id,
+    titre,
+    titreOriginal,
+    type,
+    dateSortie,
+    note,
+    afficheUrl,
+    local,
+  } = title;
   const year = dateSortie ? new Date(dateSortie).getFullYear() : null;
 
   const href = local

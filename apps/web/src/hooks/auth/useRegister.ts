@@ -55,12 +55,16 @@ export function useRegister() {
       setAuthCookie(data.accessToken);
       queryClient.invalidateQueries();
 
-      createList.mutate(
-        { nom: "Ma Watchlist", type: "watchlist", description: "Films et séries à voir" },
-      );
-      createList.mutate(
-        { nom: "Mes Favoris", type: "favoris", description: "Mes titres préférés" },
-      );
+      createList.mutate({
+        nom: "Ma Watchlist",
+        type: "watchlist",
+        description: "Films et séries à voir",
+      });
+      createList.mutate({
+        nom: "Mes Favoris",
+        type: "favoris",
+        description: "Mes titres préférés",
+      });
     },
   });
 }

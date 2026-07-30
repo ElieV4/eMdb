@@ -34,7 +34,9 @@ type ListDialogProps = {
 
 export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
   const [nom, setNom] = useState("");
-  const [type, setType] = useState<"watchlist" | "favoris" | "custom">("watchlist");
+  const [type, setType] = useState<"watchlist" | "favoris" | "custom">(
+    "watchlist",
+  );
   const [description, setDescription] = useState("");
 
   const createList = useCreateList();
@@ -62,7 +64,11 @@ export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
           data: { nom, description: description || undefined },
         });
       } else {
-        await createList.mutateAsync({ nom, type, description: description || undefined });
+        await createList.mutateAsync({
+          nom,
+          type,
+          description: description || undefined,
+        });
       }
       onOpenChange(false);
     } catch {
@@ -74,7 +80,9 @@ export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{list ? "Modifier la liste" : "Créer une liste"}</DialogTitle>
+          <DialogTitle>
+            {list ? "Modifier la liste" : "Créer une liste"}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -111,10 +119,17 @@ export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
             />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Annuler
             </Button>
-            <Button type="submit" disabled={createList.isPending || updateList.isPending}>
+            <Button
+              type="submit"
+              disabled={createList.isPending || updateList.isPending}
+            >
               {list ? "Enregistrer" : "Créer"}
             </Button>
           </DialogFooter>

@@ -58,7 +58,7 @@ export function RatingInput({ value, onChange, className }: RatingInputProps) {
                   ? "fill-yellow-400 text-yellow-400"
                   : halfFilled
                     ? "fill-yellow-400/50 text-yellow-400"
-                    : "text-gray-300"
+                    : "text-gray-300",
               )}
             />
           </button>

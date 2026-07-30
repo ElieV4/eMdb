@@ -225,10 +225,20 @@ export class PeopleService {
       },
     });
 
+    // Dédupliquer par (title_id, role_id) en gardant le premier
+    // (évite les doublons causés par episode_id = NULL)
+    const seen = new Set<string>();
+    const uniqueCredits = credits.filter((credit) => {
+      const key = `${credit.title_id}-${credit.role_id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
     // Grouper par rôle
     const grouped: Record<string, any[]> = {};
 
-    for (const credit of credits) {
+    for (const credit of uniqueCredits) {
       const roleKey = credit.roles?.libelle ?? 'Autre';
 
       if (!grouped[roleKey]) {

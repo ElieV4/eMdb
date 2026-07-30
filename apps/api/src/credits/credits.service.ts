@@ -36,6 +36,9 @@ export class CreditsService {
     }
 
     // Récupérer les credits du titre (sans episode_id = credits génériques)
+    // Déduplication nécessaire car la contrainte unique sur
+    // (title_id, person_id, role_id, episode_id) ne fonctionne pas
+    // correctement quand episode_id est NULL (SQL traite chaque NULL comme distinct)
     const credits = await this.prisma.credits.findMany({
       where: {
         title_id: titleId,
@@ -59,6 +62,15 @@ export class CreditsService {
       },
     });
 
+    // Dédupliquer par (person_id, role_id) en gardant le premier
+    const seen = new Set<string>();
+    const uniqueCredits = credits.filter((credit) => {
+      const key = `${credit.person_id}-${credit.role_id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
     // Grouper par rôle
     const grouped: Record<
       string,
@@ -75,7 +87,7 @@ export class CreditsService {
       }>
     > = {};
 
-    for (const credit of credits) {
+    for (const credit of uniqueCredits) {
       const roleKey = credit.roles?.libelle ?? 'Autre';
 
       if (!grouped[roleKey]) {

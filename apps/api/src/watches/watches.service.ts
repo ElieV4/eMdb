@@ -139,6 +139,105 @@ export class WatchesService {
   }
 
   /**
+   * Marque tous les épisodes d'une série comme vus jusqu'à un épisode donné.
+   *
+   * Trouve tous les épisodes du titre dont le numéro de saison est inférieur
+   * à celui de l'épisode cible, ou dans la même saison mais avec un numéro
+   * d'épisode inférieur ou égal. Crée un visionnage pour chacun.
+   *
+   * @param userId - UUID de l'utilisateur connecté
+   * @param titleId - UUID du titre (série)
+   * @param episodeId - UUID de l'épisode jusqu'auquel marquer comme vu
+   * @param dateVue - Date du visionnage (optionnelle, défaut: maintenant)
+   * @returns Nombre de visionnages créés
+   */
+  async createWatchesUntilEpisode(
+    userId: string,
+    titleId: string,
+    episodeId: string,
+    dateVue?: string,
+  ): Promise<number> {
+    // Vérifier que l'épisode existe et récupérer sa saison/numéro
+    const targetEpisode = await this.prisma.episodes.findUnique({
+      where: { id: episodeId },
+      select: {
+        id: true,
+        numero: true,
+        seasons: { select: { numero: true, title_id: true } },
+      },
+    });
+
+    if (!targetEpisode) {
+      throw new NotFoundException('Épisode introuvable.');
+    }
+
+    // Vérifier que l'épisode appartient bien au titre
+    if (targetEpisode.seasons.title_id !== titleId) {
+      throw new BadRequestException("Cet épisode n'appartient pas à ce titre.");
+    }
+
+    const targetSeason = targetEpisode.seasons.numero;
+    const targetEpisodeNum = targetEpisode.numero;
+    const dateVueValue = dateVue ? new Date(dateVue) : new Date();
+
+    // Trouver tous les épisodes à marquer comme vus
+    // (saison < targetSeason) OU (saison == targetSeason ET episode <= targetEpisodeNum)
+    const episodesToMark = await this.prisma.episodes.findMany({
+      where: {
+        seasons: {
+          title_id: titleId,
+        },
+        OR: [
+          { seasons: { numero: { lt: targetSeason } } },
+          {
+            AND: [
+              { seasons: { numero: { equals: targetSeason } } },
+              { numero: { lte: targetEpisodeNum } },
+            ],
+          },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (episodesToMark.length === 0) {
+      return 0;
+    }
+
+    // Vérifier quels épisodes sont déjà vus pour éviter les doublons
+    const existingWatches = await this.prisma.user_watches.findMany({
+      where: {
+        user_id: userId,
+        episode_id: { in: episodesToMark.map((e) => e.id) },
+      },
+      select: { episode_id: true },
+    });
+
+    const existingEpisodeIds = new Set(
+      existingWatches.map((w) => w.episode_id),
+    );
+
+    const newWatches = episodesToMark.filter(
+      (e) => !existingEpisodeIds.has(e.id),
+    );
+
+    if (newWatches.length === 0) {
+      return 0;
+    }
+
+    await this.prisma.user_watches.createMany({
+      data: newWatches.map((e) => ({
+        user_id: userId,
+        title_id: titleId,
+        episode_id: e.id,
+        date_vue: dateVueValue,
+      })),
+    });
+
+    return newWatches.length;
+  }
+
+  /**
    * Liste paginée des visionnages de l'utilisateur.
    *
    * Filtres optionnels : type (film/serie), date_from, date_to, title_id.

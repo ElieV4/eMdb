@@ -151,6 +151,34 @@ export class ListsService {
   }
 
   /**
+   * GET /lists?title_id=xxx
+   * Liste des listes de l'utilisateur avec un flag indiquant si le titre est dans chaque liste.
+   *
+   * @param userId - UUID de l'utilisateur connecté
+   * @param titleId - UUID du titre à vérifier
+   * @returns Tableau des listes avec `contains_title: boolean`
+   */
+  async getUserListsWithTitleCheck(userId: string, titleId: string) {
+    const lists = await this.getUserLists(userId);
+
+    // Vérifier quels items existent pour ce titre
+    const existingItems = await this.prisma.list_items.findMany({
+      where: {
+        list_id: { in: lists.map((l) => l.id) },
+        title_id: titleId,
+      },
+      select: { list_id: true },
+    });
+
+    const listIdsWithTitle = new Set(existingItems.map((i) => i.list_id));
+
+    return lists.map((list) => ({
+      ...list,
+      contains_title: listIdsWithTitle.has(list.id),
+    }));
+  }
+
+  /**
    * GET /lists/:id
    * Détail d'une liste avec ses items (titles).
    * Accessible au propriétaire et aux utilisateurs avec qui la liste est partagée.
@@ -269,6 +297,34 @@ export class ListsService {
 
     if (!title) {
       throw new NotFoundException('Titre introuvable.');
+    }
+
+    // Vérifier si le titre est déjà dans la liste (évite les doublons)
+    const existingItem = await this.prisma.list_items.findUnique({
+      where: {
+        list_id_title_id: { list_id: listId, title_id: titleId },
+      },
+    });
+
+    if (existingItem) {
+      // Déjà présent, retourner l'existant avec les infos du titre
+      return this.prisma.list_items.findUnique({
+        where: {
+          list_id_title_id: { list_id: listId, title_id: titleId },
+        },
+        include: {
+          titles: {
+            select: {
+              id: true,
+              tmdb_id: true,
+              titre_vo: true,
+              titre_vf: true,
+              affiche_url: true,
+              type: true,
+            },
+          },
+        },
+      });
     }
 
     // Trouver la position max actuelle

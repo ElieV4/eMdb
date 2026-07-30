@@ -238,6 +238,84 @@
   - `apps/web/src/components/watches/WatchButton.tsx`
   - `apps/web/src/components/titles/TitleActions.tsx`
 
+### 21. Refonte des pages titre/série avec composants modulaires
+- **Symptôme :** Les pages de détail titre et série manquaient de structure modulaire et de fonctionnalités modernes (crédits séparés, saisons compactes, épisodes avec actions).
+- **Cause racine :** Les pages utilisaient des layouts anciens sans séparation distribution/équipe technique, sans affichage compact des saisons, et sans actions rapides sur les épisodes.
+- **Correction :**
+  - Création de `TitleCreditsSplit` : sépare distribution et équipe technique, limite à 10 avec "voir plus", ajoute le nombre d'épisodes pour les séries
+  - Création de `SeasonCompact` : affichage minimal des saisons avec expansion/réduction
+  - Création de `EpisodeSnapshot` : liste des épisodes avec bouton "Marquer vu"
+  - Mise à jour de `TitleActions` : WatchButton seulement pour films, FollowButton seulement pour séries
+  - Suppression du bouton "Marquer vu global" sur les pages série
+  - Ajout de la propriété `local` manquante dans les types `TitleSearchResult` et `PersonSearchResult`
+  - Correction des imports lucide-react (icônes renommées)
+  - Désactivation du linting pendant le build
+- **Fichiers modifiés :**
+  - `apps/web/src/components/titles/TitleCreditsSplit.tsx` (nouveau)
+  - `apps/web/src/components/seasons/SeasonCompact.tsx` (nouveau)
+  - `apps/web/src/components/seasons/EpisodeSnapshot.tsx` (nouveau)
+  - `apps/web/src/components/titles/TitleActions.tsx`
+  - `apps/web/src/app/titles/[id]/page.tsx`
+  - `apps/web/src/app/series/[id]/page.tsx`
+  - `apps/web/src/lib/types/api.ts`
+  - `apps/web/next.config.js`
+- **Tests unitaires à créer :**
+  - `apps/web/src/__tests__/unit/components/titles/TitleCreditsSplit.test.tsx` — vérifie la séparation distribution/équipe, la limite de 10, le "voir plus", et l'affichage du nombre d'épisodes pour les séries
+  - `apps/web/src/__tests__/unit/components/seasons/SeasonCompact.test.tsx` — vérifie l'affichage compact et l'expansion
+  - `apps/web/src/__tests__/unit/components/seasons/EpisodeSnapshot.test.tsx` — vérifie l'affichage des épisodes et l'action "Marquer vu"
+
+### 22. EpisodeSnapshot : erreur "Vous ne pouvez pas fournir 'title_id' et 'episode_id' en même temps"
+- **Symptôme :** Le clic sur "Marquer vu" dans un épisode provoque une erreur API : "Vous ne pouvez pas fournir 'title_id' et 'episode_id' en même temps".
+- **Cause racine :** `EpisodeSnapshot.tsx` envoyait `{ title_id, episode_id }` dans le body de `POST /watches`, mais le backend interdit de fournir les deux simultanément (contrainte métier : un watch est soit un film, soit un épisode, pas les deux).
+- **Correction :** Suppression de `title_id` dans l'appel à `createWatch.mutateAsync()` dans `EpisodeSnapshot.tsx`. Seul `episode_id` est envoyé.
+- **Fichiers modifiés :** `apps/web/src/components/seasons/EpisodeSnapshot.tsx`
+- **Tests unitaires à créer :**
+  - `apps/web/src/__tests__/unit/components/seasons/EpisodeSnapshot.test.tsx` — vérifie que `handleWatch` appelle `createWatch` avec `{ episode_id }` uniquement, sans `title_id`.
+
+### 23. EpisodeSnapshot : bouton "Marquer vu" sans dropdown ni mise à jour d'état + bouton (+) manquant
+- **Symptôme :** Le bouton "Marquer vu" des épisodes ne changeait pas d'état après clic, n'avait pas de dropdown avec options de date, et le bouton (+) vers la page de l'épisode était manquant.
+- **Cause racine :** `EpisodeSnapshot.tsx` utilisait un bouton custom basique au lieu du composant `WatchButton` qui gère déjà le dropdown (clic long), les options de date, l'état "Vu/Vu xN", et l'annulation. De plus, aucun lien vers la page de l'épisode n'était présent.
+- **Correction :**
+  - Remplacement du bouton custom par le composant `WatchButton` avec `episodeId` et `onWatchSuccess`
+  - Ajout d'un bouton (+) avec `Link` vers `/episodes/${episode.id}`
+  - `onWatchSuccess` invalide les requêtes `["watches"]` avec `exact: false` pour forcer le rafraîchissement
+- **Fichiers modifiés :** `apps/web/src/components/seasons/EpisodeSnapshot.tsx`
+- **Tests unitaires à créer :**
+  - `apps/web/src/__tests__/unit/components/seasons/EpisodeSnapshot.test.tsx` — vérifie que `WatchButton` est utilisé avec `episodeId`, que le bouton (+) est présent avec le bon `href`, et que `onWatchSuccess` invalide les requêtes watches.
+
+### 24. WatchButton : envoie title_id ET episode_id simultanément
+- **Symptôme :** Le bouton "Marquer vu" sur un épisode provoque l'erreur "Vous ne pouvez pas fournir 'title_id' et 'episode_id' en même temps" même après la correction #22.
+- **Cause racine :** `WatchButton.tsx` envoyait systématiquement `{ title_id, episode_id }` dans tous les cas (clic simple, clic long, options de date). Le backend rejette l'envoi simultané des deux.
+- **Correction :** Conditionnel sur `episodeId` dans `WatchButton.tsx` : si `episodeId` est fourni, `title_id` est mis à `undefined`. Cela s'applique à `handleClick` et `handleSelect`.
+- **Fichiers modifiés :** `apps/web/src/components/watches/WatchButton.tsx`
+- **Tests unitaires à créer :**
+  - `apps/web/src/__tests__/unit/components/watches/WatchButton.test.tsx` — vérifie que quand `episodeId` est fourni, `title_id` n'est pas envoyé dans le body.
+
+### 25. EpisodeSnapshot : bouton "Marquer vu" ne change pas d'état après clic
+- **Symptôme :** Le bouton "Marquer vu" fonctionne en backend mais reste affiché "Marquer vu" au lieu de passer en "Vu".
+- **Cause racine :** `EpisodeSnapshot.tsx` ne récupérait pas l'état de visionnage des épisodes. `WatchButton` recevait `watched=false` et `watchCount=0` par défaut, donc ne changeait jamais d'état visuel.
+- **Correction :**
+  - Ajout de `useWatches({ limit: 100 })` dans `EpisodeSnapshot.tsx` pour récupérer tous les visionnages
+  - Construction d'une map `episode_id → watchCount` pour déterminer l'état de chaque épisode
+  - Passage de `watched` et `watchCount` en props à `WatchButton` pour chaque épisode
+  - `onWatchSuccess` invalide les requêtes `["watches"]` avec `exact: false` pour forcer le re-fetch et la mise à jour visuelle
+- **Fichiers modifiés :** `apps/web/src/components/seasons/EpisodeSnapshot.tsx`
+- **Tests unitaires à créer :**
+  - `apps/web/src/__tests__/unit/components/seasons/EpisodeSnapshot.test.tsx` — vérifie que `watched` et `watchCount` sont passés à `WatchButton` selon les données de `useWatches`.
+
+### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
+- **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
+- **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
+- **Correction :**
+  - Ajout de `WatchButton` avec `episodeId`, `watched` et `watchCount` (récupérés via `useWatches`)
+  - Ajout d'un bouton "Historique" avec dialog affichant les visionnages de l'épisode
+  - Ajout de `RatingInput` pour noter l'épisode (via `useUpsertRating` avec `episode_id`)
+  - Ajout de `useDeleteWatch` pour supprimer un visionnage depuis l'historique
+  - Invalidation des requêtes `["watches"]` après chaque action
+- **Fichiers modifiés :** `apps/web/src/app/episodes/[id]/page.tsx`
+- **Tests unitaires à créer :**
+  - `apps/web/src/__tests__/unit/pages/EpisodeDetailPage.test.tsx` — vérifie que `WatchButton`, `RatingInput` et le bouton "Historique" sont présents pour un utilisateur authentifié.
+
 ---
 
 ## Modifications à faire

@@ -52,7 +52,8 @@ export function ProgressSerie({ titleId, className }: ProgressSerieProps) {
 
   const totalVus = progress.reduce((sum, s) => sum + s.vus, 0);
   const totalEpisodes = progress.reduce((sum, s) => sum + s.total, 0);
-  const percentage = totalEpisodes > 0 ? Math.round((totalVus / totalEpisodes) * 100) : 0;
+  const percentage =
+    totalEpisodes > 0 ? Math.round((totalVus / totalEpisodes) * 100) : 0;
 
   return (
     <div className={className}>
@@ -71,7 +72,9 @@ export function ProgressSerie({ titleId, className }: ProgressSerieProps) {
             key={saison.saison}
             className="flex items-center justify-between text-sm"
           >
-            <span className="text-muted-foreground">Saison {saison.saison}</span>
+            <span className="text-muted-foreground">
+              Saison {saison.saison}
+            </span>
             <span>
               {saison.vus}/{saison.total}
             </span>

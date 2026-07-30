@@ -11,13 +11,7 @@ export function useShareList() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      listId,
-      data,
-    }: {
-      listId: string;
-      data: ShareListInput;
-    }) =>
+    mutationFn: ({ listId, data }: { listId: string; data: ShareListInput }) =>
       apiFetch(`/lists/${listId}/shares`, {
         method: "POST",
         body: data,

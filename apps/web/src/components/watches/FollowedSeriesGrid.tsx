@@ -14,7 +14,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Tv } from "lucide-react";
 import Link from "next/link";
-import { FollowDetail } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 
 type FollowedSeriesGridProps = {
@@ -26,7 +25,12 @@ export function FollowedSeriesGrid({ className }: FollowedSeriesGridProps) {
 
   if (isLoading) {
     return (
-      <div className={cn("grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4", className)}>
+      <div
+        className={cn(
+          "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4",
+          className,
+        )}
+      >
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="h-64 w-full" />
         ))}
@@ -55,7 +59,12 @@ export function FollowedSeriesGrid({ className }: FollowedSeriesGridProps) {
   }
 
   return (
-    <div className={cn("grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4", className)}>
+    <div
+      className={cn(
+        "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4",
+        className,
+      )}
+    >
       {series.map((serie) => (
         <Card key={serie.id} className="p-4">
           <div className="flex gap-4">
@@ -65,15 +74,22 @@ export function FollowedSeriesGrid({ className }: FollowedSeriesGridProps) {
               className="w-16 h-24 object-cover rounded"
             />
             <div className="flex-1">
-              <Link href={`/titles/${serie.id}`} className="font-semibold hover:underline">
+              <Link
+                href={`/titles/${serie.id}`}
+                className="font-semibold hover:underline"
+              >
                 {serie.titre_vf || serie.titre_vo}
               </Link>
               <p className="text-xs text-muted-foreground mt-1">
-                Suivi depuis le {new Date(serie.followed_at).toLocaleDateString("fr-FR")}
+                Suivi depuis le{" "}
+                {new Date(serie.followed_at).toLocaleDateString("fr-FR")}
               </p>
               {serie.next_episode_air_date && (
                 <Badge variant="outline" className="mt-2">
-                  Prochain épisode : {new Date(serie.next_episode_air_date).toLocaleDateString("fr-FR")}
+                  Prochain épisode :{" "}
+                  {new Date(serie.next_episode_air_date).toLocaleDateString(
+                    "fr-FR",
+                  )}
                 </Badge>
               )}
               <div className="mt-2">

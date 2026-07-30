@@ -39,7 +39,9 @@ export function ListShareDialog({
 }: ListShareDialogProps) {
   const [query, setQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [permission, setPermission] = useState<"lecture" | "edition">("lecture");
+  const [permission, setPermission] = useState<"lecture" | "edition">(
+    "lecture",
+  );
   const [users, setUsers] = useState<UserOption[]>([]);
   const [error, setError] = useState("");
 
@@ -109,7 +111,9 @@ export function ListShareDialog({
             <select
               id="permission"
               value={permission}
-              onChange={(e) => setPermission(e.target.value as "lecture" | "edition")}
+              onChange={(e) =>
+                setPermission(e.target.value as "lecture" | "edition")
+              }
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               <option value="lecture">Lecture</option>
@@ -118,7 +122,11 @@ export function ListShareDialog({
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Annuler
             </Button>
             <Button type="submit" disabled={shareList.isPending}>

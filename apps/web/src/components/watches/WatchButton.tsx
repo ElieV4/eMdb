@@ -35,7 +35,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Check, Clock, CalendarClock, HelpCircle, Trash2, Eye } from "lucide-react";
+import {
+  Check,
+  Clock,
+  CalendarClock,
+  HelpCircle,
+  Trash2,
+  Eye,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type WatchButtonProps = {
@@ -50,7 +57,15 @@ type WatchButtonProps = {
 
 type WatchAction = "now" | "custom" | "unknown" | "unwatch";
 
-export function WatchButton({ titleId, episodeId, className, onWatchSuccess, watched = false, watchCount = 0, onDeleteAll }: WatchButtonProps) {
+export function WatchButton({
+  titleId,
+  episodeId,
+  className,
+  onWatchSuccess,
+  watched = false,
+  watchCount = 0,
+  onDeleteAll,
+}: WatchButtonProps) {
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,20 +76,32 @@ export function WatchButton({ titleId, episodeId, className, onWatchSuccess, wat
     if (watched) {
       // Revu maintenant
       createWatch.mutate(
-        { title_id: titleId, episode_id: episodeId, date_vue: new Date().toISOString() },
-        { onSuccess: () => {
-          setOpen(false);
-          onWatchSuccess?.();
-        }}
+        {
+          title_id: episodeId ? undefined : titleId,
+          episode_id: episodeId,
+          date_vue: new Date().toISOString(),
+        },
+        {
+          onSuccess: () => {
+            setOpen(false);
+            onWatchSuccess?.();
+          },
+        },
       );
       return;
     }
     createWatch.mutate(
-      { title_id: titleId, episode_id: episodeId, date_vue: undefined },
-      { onSuccess: () => {
-        setOpen(false);
-        onWatchSuccess?.();
-      }}
+      {
+        title_id: episodeId ? undefined : titleId,
+        episode_id: episodeId,
+        date_vue: undefined,
+      },
+      {
+        onSuccess: () => {
+          setOpen(false);
+          onWatchSuccess?.();
+        },
+      },
     );
   }, [createWatch, episodeId, onWatchSuccess, open, titleId, watched]);
 
@@ -100,7 +127,7 @@ export function WatchButton({ titleId, episodeId, className, onWatchSuccess, wat
       } else if (action === "custom") {
         const selected = window.prompt(
           "Date du visionnage (YYYY-MM-DD) :",
-          new Date().toISOString().split("T")[0]
+          new Date().toISOString().split("T")[0],
         );
         if (selected) date_vue = new Date(selected).toISOString();
       } else if (action === "unwatch") {
@@ -112,15 +139,21 @@ export function WatchButton({ titleId, episodeId, className, onWatchSuccess, wat
 
       if (date_vue !== undefined || action === "unknown") {
         createWatch.mutate(
-          { title_id: titleId, episode_id: episodeId, date_vue },
-          { onSuccess: () => {
-            setOpen(false);
-            onWatchSuccess?.();
-          }}
+          {
+            title_id: episodeId ? undefined : titleId,
+            episode_id: episodeId,
+            date_vue,
+          },
+          {
+            onSuccess: () => {
+              setOpen(false);
+              onWatchSuccess?.();
+            },
+          },
         );
       }
     },
-    [createWatch, episodeId, onWatchSuccess, titleId]
+    [createWatch, episodeId, onWatchSuccess, titleId],
   );
 
   const handleConfirmDelete = useCallback(() => {
@@ -134,7 +167,10 @@ export function WatchButton({ titleId, episodeId, className, onWatchSuccess, wat
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger>
           <Button
-            className={cn(className, watched && "bg-primary text-primary-foreground")}
+            className={cn(
+              className,
+              watched && "bg-primary text-primary-foreground",
+            )}
             onMouseDown={handleLongPressStart}
             onMouseUp={handleLongPressEnd}
             onMouseLeave={handleLongPressEnd}
@@ -221,7 +257,8 @@ export function WatchButton({ titleId, episodeId, className, onWatchSuccess, wat
           <DialogHeader>
             <DialogTitle>Confirmer l'annulation</DialogTitle>
             <DialogDescription>
-              Êtes-vous sûr de vouloir supprimer tous les visionnages de ce titre&nbsp;?
+              Êtes-vous sûr de vouloir supprimer tous les visionnages de ce
+              titre&nbsp;?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

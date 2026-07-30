@@ -43,7 +43,12 @@ export function WatchHistoryItem({ watch, className }: WatchHistoryItemProps) {
   const formattedDate = new Date(watch.date_vue).toLocaleDateString("fr-FR");
 
   return (
-    <div className={cn("flex items-center justify-between p-3 border rounded-md", className)}>
+    <div
+      className={cn(
+        "flex items-center justify-between p-3 border rounded-md",
+        className,
+      )}
+    >
       <div className="flex-1">
         <p className="font-medium text-sm">{title}</p>
         <p className="text-xs text-muted-foreground">{formattedDate}</p>
@@ -63,7 +68,9 @@ export function WatchHistoryItem({ watch, className }: WatchHistoryItemProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Supprimer</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete}>
+              Supprimer
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

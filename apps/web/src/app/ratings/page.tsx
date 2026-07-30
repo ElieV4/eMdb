@@ -4,6 +4,8 @@
  * Phase 4.2 — Ratings
  */
 
+export const dynamic = 'force-dynamic';
+
 import { useUserRatings } from "@/hooks/api/useUserRatings";
 import { RatingBadge } from "@/components/ratings/RatingBadge";
 import { useDeleteRating } from "@/hooks/api/useDeleteRating";
@@ -45,25 +47,33 @@ export default function RatingsPage() {
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-6">Mes notes</h1>
       {!data || data.items.length === 0 ? (
-        <p className="text-muted-foreground">Vous n'avez pas encore de notes.</p>
+        <p className="text-muted-foreground">
+          Vous n'avez pas encore de notes.
+        </p>
       ) : (
         <div className="space-y-4">
           {data.items.map((rating) => {
             const titleName = rating.title
-              ? (rating.title as any)?.titre_vf || (rating.title as any)?.titre_vo
+              ? (rating.title as any)?.titre_vf ||
+                (rating.title as any)?.titre_vo
               : rating.episode
                 ? `S${(rating.episode as any).seasons?.numero ?? "?"}E${rating.episode.numero}`
                 : "Titre inconnu";
 
             return (
-              <div key={rating.id} className="flex items-center justify-between p-4 border rounded-md">
+              <div
+                key={rating.id}
+                className="flex items-center justify-between p-4 border rounded-md"
+              >
                 <div className="flex-1">
                   <p className="font-medium">{titleName}</p>
                   <p className="text-sm text-muted-foreground">
                     {new Date(rating.createdAt).toLocaleDateString("fr-FR")}
                   </p>
                   {rating.commentaire && (
-                    <p className="text-sm mt-1 line-clamp-2">{rating.commentaire}</p>
+                    <p className="text-sm mt-1 line-clamp-2">
+                      {rating.commentaire}
+                    </p>
                   )}
                 </div>
                 <div className="flex items-center gap-4">

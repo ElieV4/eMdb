@@ -19,13 +19,15 @@ export function RatingBadge({ note, className }: RatingBadgeProps) {
     return null;
   }
 
-  const formatted = Number.isInteger(note) ? `${note}/10` : `${Number(note).toFixed(1)}/10`;
+  const formatted = Number.isInteger(note)
+    ? `${note}/10`
+    : `${Number(note).toFixed(1)}/10`;
 
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full bg-yellow-400/10 px-2 py-0.5 text-xs font-medium text-yellow-600 dark:text-yellow-400",
-        className
+        className,
       )}
     >
       <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />

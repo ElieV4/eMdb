@@ -16,7 +16,6 @@ import { usePersonRecommendations } from "@/hooks/api/usePersonRecommendations";
 import {
   FilmographyGrouped,
   PersonRecommendation,
-  titleRecommendationToSearchResult,
 } from "@/lib/types/api";
 import { TitleCard } from "@/components/titles/TitleCard";
 
@@ -100,6 +99,7 @@ export default function PersonDetailPage({
                       afficheUrl: rec.photo_url ?? undefined,
                       genres: undefined,
                       pays: undefined,
+                      local: true,
                     }}
                     compact
                     showType={false}

@@ -21,8 +21,8 @@ interface EpisodeCardProps {
 
 export function EpisodeCard({
   episode,
-  titleId,
-  seasonNumero,
+  titleId: _titleId,
+  seasonNumero: _seasonNumero,
   isWatched = false,
   className,
 }: EpisodeCardProps) {

@@ -10,9 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Plus } from "lucide-react";
 import { TitleCard } from "@/components/titles/TitleCard";
-import { UserList } from "@/lib/types/api";
 
 type ProfileTab = "favorites" | "lists" | "dataviz" | "notifications";
 
@@ -21,11 +21,13 @@ export default function ProfilePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>("favorites");
 
-  const { data: lists, isLoading: isLoadingLists, error: listsError } = useLists(isAuthenticated);
+  const {
+    data: lists,
+    isLoading: isLoadingLists,
+    error: listsError,
+  } = useLists(isAuthenticated);
 
-  const watchlist = lists?.find((list) => list.type === "watchlist");
   const favorites = lists?.find((list) => list.type === "favoris");
-  const customLists = lists?.filter((list) => list.type === "custom") ?? [];
 
   if (!isAuthenticated || !user) {
     return (
@@ -93,7 +95,7 @@ export default function ProfilePage() {
                 {favorites.items.map((title) => (
                   <TitleCard
                     key={title.id}
-                    title={title}
+                    title={{ ...title, local: true }}
                     compact
                   />
                 ))}
@@ -191,7 +193,9 @@ export default function ProfilePage() {
                   <Bell className="h-4 w-4 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">Nouvel épisode disponible</p>
+                  <p className="text-sm font-medium">
+                    Nouvel épisode disponible
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     Une série que vous suivez a un nouvel épisode.
                   </p>
@@ -201,7 +205,10 @@ export default function ProfilePage() {
             </div>
             <div className="mt-4 p-8 border-2 border-dashed rounded-lg text-center text-muted-foreground">
               <Bell className="mx-auto h-12 w-12 mb-4 opacity-50" />
-              <p>La gestion complète des notifications sera disponible prochainement.</p>
+              <p>
+                La gestion complète des notifications sera disponible
+                prochainement.
+              </p>
             </div>
           </div>
         )}

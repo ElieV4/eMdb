@@ -23,11 +23,13 @@ describe("WatchButton", () => {
 
   it("appelle createWatch au clic simple", async () => {
     const mutate = jest.fn();
-    jest.spyOn(require("@/hooks/api/useCreateWatch"), "useCreateWatch").mockReturnValue({
-      mutate,
-      mutateAsync: jest.fn(() => Promise.resolve()),
-      isPending: false,
-    });
+    jest
+      .spyOn(require("@/hooks/api/useCreateWatch"), "useCreateWatch")
+      .mockReturnValue({
+        mutate,
+        mutateAsync: jest.fn(() => Promise.resolve()),
+        isPending: false,
+      });
 
     render(<WatchButton titleId="1" />);
     const button = screen.getByText("Marquer comme vu");
