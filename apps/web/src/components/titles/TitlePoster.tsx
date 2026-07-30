@@ -1,9 +1,11 @@
 /**
  * Composant d'affiche de titre avec fallback.
  * Affiche l'affiche TMDB ou un placeholder si non disponible.
+ * Affiche une icone bookmark (haut) si la série est suivie, et une icone œil rouge (bas) si le titre est vu.
  */
 
 import Image from "next/image";
+import { Eye, Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p";
@@ -18,6 +20,8 @@ interface TitlePosterProps {
   width?: number;
   height?: number;
   priority?: boolean;
+  watched?: boolean;
+  followed?: boolean;
 }
 
 export function TitlePoster({
@@ -29,6 +33,8 @@ export function TitlePoster({
   width = 300,
   height = 450,
   priority = false,
+  watched = false,
+  followed = false,
 }: TitlePosterProps) {
   const imageSrc = src
     ? src.startsWith("http://") || src.startsWith("https://")
@@ -71,6 +77,26 @@ export function TitlePoster({
           {type === "film" ? "Film" : "Série"}
         </span>
       </div>
+
+      {/* Icone bookmark (série suivie) — milieu haut */}
+      {followed && (
+        <div className="absolute top-2 right-2 z-20 flex items-center justify-center rounded-full bg-black/70 p-1.5">
+          <Bookmark
+            className="h-4 w-4 text-white fill-white"
+            aria-label="Série suivie"
+          />
+        </div>
+      )}
+
+      {/* Icone vu (œil rouge) — milieu bas */}
+      {watched && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center rounded-full bg-black/70 p-1.5">
+          <Eye
+            className="h-4 w-4 text-red-500 fill-red-500"
+            aria-label="Déjà vu"
+          />
+        </div>
+      )}
     </div>
   );
 }

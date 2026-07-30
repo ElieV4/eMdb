@@ -458,8 +458,11 @@ export type PersonDetail = Person & {
 export function titleRecommendationToSearchResult(
   rec: TitleRecommendation,
 ): TitleSearchResult {
+  // Si rec.id est absent (titre non-local, fallback TMDB), on met local=false
+  // pour que TitleCard génère le href /titles/tmdb/:tmdbId?type=...
+  const isLocal = !!rec.id;
   return {
-    id: rec.id,
+    id: rec.id ?? "",
     tmdbId: rec.tmdb_id ?? undefined,
     titre: rec.titre_vo,
     titreOriginal:
@@ -470,7 +473,7 @@ export function titleRecommendationToSearchResult(
     afficheUrl: rec.affiche_url ?? undefined,
     genres: undefined,
     pays: undefined,
-    local: true,
+    local: isLocal,
   };
 }
 

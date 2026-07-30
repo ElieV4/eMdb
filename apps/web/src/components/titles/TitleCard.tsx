@@ -14,6 +14,8 @@ interface TitleCardProps {
   className?: string;
   showType?: boolean;
   compact?: boolean;
+  watched?: boolean;
+  followed?: boolean;
 }
 
 export function TitleCard({
@@ -21,6 +23,8 @@ export function TitleCard({
   className,
   showType = true,
   compact = false,
+  watched = false,
+  followed = false,
 }: TitleCardProps) {
   const {
     id,
@@ -59,6 +63,8 @@ export function TitleCard({
         width={compact ? 150 : 200}
         height={compact ? 225 : 300}
         priority={false}
+        watched={watched}
+        followed={followed}
       />
 
       <div className="p-3 bg-background">

@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/", "/login", "/register"];
+const PUBLIC_PATHS = ["/login", "/register"];
 const COOKIE_NAME = "emdb_access_token";
 
 export async function middleware(request: NextRequest) {

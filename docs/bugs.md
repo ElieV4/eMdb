@@ -318,6 +318,72 @@
 
 ---
 
+## Bugs à corriger — Page People
+
+### 27. Filmographie : pas de mise à jour TMDB au chargement de la page
+- **Symptôme :** La filmographie d'une personne n'affiche que les données déjà présentes en base, sans jamais se mettre à jour depuis TMDB. Les nouveaux films d'un acteur/réalisateur n'apparaissent pas.
+- **Cause racine :** `usePersonFilmography` appelle `GET /people/:id/filmography` qui lit uniquement les credits en base (`people.service.ts:getFilmography()`). Aucun refresh TMDB n'est déclenché au chargement de la page.
+- **Fichiers concernés :** `apps/web/src/app/people/[id]/page.tsx`, `apps/web/src/hooks/api/usePeople.ts`, `apps/api/src/people/people.service.ts`, `apps/api/src/people/people.controller.ts`
+- **Correction proposée :**
+  - Backend : ajouter un endpoint `POST /people/:id/filmography/refresh` qui appelle `getPersonCombinedCredits(tmdb_id)`, importe les titres manquants via `importTitleByTmdbId`, puis re-lit la filmographie
+  - Frontend : créer un hook `useRefreshFilmography()` (mutation) déclenché au mount de la page people (fire-and-forget avec invalidation React Query)
+- **Tests unitaires à créer :**
+  - Vérifier que le refresh importe les titres manquants depuis TMDB
+  - Vérifier que la filmographie est mise à jour après refresh
+  - Vérifier que le refresh ne crash pas si la personne n'a pas de tmdb_id
+
+### 28. Module filmographie : menu filtre manquant
+- **Symptôme :** Le module filmographie n'a aucun filtre. Impossible de filtrer par date de sortie, pays de production, genre, rating IMDB ou user_rating.
+- **Cause racine :** `Filmography.tsx` affiche les groupes par rôle sans aucun contrôle de filtrage.
+- **Fichiers concernés :** `apps/web/src/components/people/Filmography.tsx`, `apps/api/src/people/people.service.ts` (enrichissement des données)
+- **Correction proposée :**
+  - Créer un composant `FilmographyFilters` avec filtres : date de sortie (année min/max), pays de production, genre, rating IMDB (min), user_rating (min)
+  - Enrichir le backend `getFilmography()` pour inclure `title_genres` et `title_countries` dans la réponse
+  - Filtrage côté frontend sur les `FilmographyItem` déjà chargés
+- **Tests unitaires à créer :**
+  - Vérifier que les filtres réduisent la liste des titres
+  - Vérifier que le filtre par genre fonctionne
+  - Vérifier que le filtre par année fonctionne
+
+### 29. Icone vu (œil rouge) manquante sur les affiches
+- **Symptôme :** Aucune icone visuelle n'indique qu'un titre a déjà été vu par l'utilisateur quand il apparaît sous forme d'affiche.
+- **Cause racine :** `TitlePoster.tsx` n'affiche aucune icone de visionnage. Les composants qui utilisent `TitleCard` ne propagent pas l'état de visionnage.
+- **Fichiers concernés :** `apps/web/src/components/titles/TitlePoster.tsx`, `apps/web/src/components/titles/TitleCard.tsx`, et tous les modules affichant des affiches (recommandés, listes, watchlist, filmographie, recherche, episodes)
+- **Correction proposée :**
+  - Ajouter une prop `watched?: boolean` à `TitlePoster` et afficher une icone `Eye` rouge au milieu-bas de l'affiche
+  - Propager cette prop depuis `TitleCard` vers tous les modules
+  - Créer un hook `useWatchedTitles()` qui retourne un `Set<string>` des title_ids visionnés
+- **Tests unitaires à créer :**
+  - Vérifier que l'icone œil rouge s'affiche quand `watched=true`
+  - Vérifier que l'icone ne s'affiche pas quand `watched=false`
+  - Vérifier que `TitleCard` propage correctement la prop `watched`
+
+### 30. Icone bookmark manquante sur les affiches de séries suivies
+- **Symptôme :** Aucune icone visuelle n'indique qu'une série est suivie par l'utilisateur quand elle apparaît sous forme d'affiche.
+- **Cause racine :** `TitlePoster.tsx` n'affiche aucune icone de suivi. Les composants qui utilisent `TitleCard` ne propagent pas l'état de suivi.
+- **Fichiers concernés :** `apps/web/src/components/titles/TitlePoster.tsx`, `apps/web/src/components/titles/TitleCard.tsx`, et tous les modules affichant des affiches (séries recommandées, listes, watchlist, filmographie, recherche)
+- **Correction proposée :**
+  - Ajouter une prop `followed?: boolean` à `TitlePoster` et afficher une icone `Bookmark` au milieu-haut de l'affiche
+  - Propager cette prop depuis `TitleCard` vers tous les modules
+  - Réutiliser le hook `useUserFollows()` pour obtenir les séries suivies
+- **Tests unitaires à créer :**
+  - Vérifier que l'icone bookmark s'affiche quand `followed=true`
+  - Vérifier que l'icone ne s'affiche pas quand `followed=false`
+  - Vérifier que `TitleCard` propage correctement la prop `followed`
+
+### 31. Titres recommandés : URL `undefined` au clic sur une affiche
+- **Symptôme :** Quand on clique sur une affiche dans "Titres recommandés", l'URL devient `/titles/undefined` et la page est introuvable.
+- **Cause racine :** `titleRecommendationToSearchResult()` met systématiquement `local: true` et `id: rec.id`. Mais quand le titre recommandé n'est pas en local (fallback TMDB), `rec.id` est `undefined` → le href devient `/titles/undefined`.
+- **Fichiers concernés :** `apps/web/src/lib/types/api.ts`, `apps/web/src/components/titles/TitleCard.tsx`
+- **Correction proposée :**
+  - Corriger `titleRecommendationToSearchResult()` : mettre `local: !!rec.id`, et s'assurer que `tmdbId` est défini quand `id` est absent
+  - Le href devient `/titles/tmdb/:tmdbId?type=...` pour les titres non-locaux
+- **Tests unitaires à créer :**
+  - Vérifier que le href est `/titles/tmdb/123?type=film` quand `id` est absent et `tmdb_id=123`
+  - Vérifier que le href est `/titles/1` quand `id="1"` et `local=true`
+
+---
+
 ## Modifications à faire
 
 ### A. Module personnes : filtre par badge rôle
@@ -327,6 +393,54 @@
 ### B. Module filmographie : filtre par badge rôle
 - **Description :** Ajouter un filtre par badge rôle dans le module filmographie pour afficher/masquer les crédits par rôle.
 - **Fichier concerné :** `apps/web/src/components/people/Filmography.tsx`
+
+---
+
+## Bugs à corriger — Header & Navigation
+
+### 32. Site accessible sans authentification
+- **Symptôme :** Le site est accessible sans être connecté, les pages protégées ne redirigent pas vers `/login`.
+- **Cause racine :** Le middleware Next.js ne bloque pas correctement les routes protégées. Le cookie `emdb_access_token` n'est pas vérifié efficacement, ou le matcher du middleware ne couvre pas toutes les routes.
+- **Fichiers concernés :** `apps/web/middleware.ts`, `apps/web/src/app/layout.tsx`, `apps/web/src/app/(frontend)/layout.tsx`
+- **Correction proposée :**
+  - Vérifier la configuration du middleware (matcher, cookie check)
+  - S'assurer que le layout racine est minimal (déjà fait)
+  - Vérifier que les pages protégées sont bien dans le groupe `(frontend)`
+  - Ajouter une vérification côté client dans le layout frontend
+
+### 33. Filtres de type du header (Tout/Film/Série/Personne) inopérants sur la page recherche
+- **Symptôme :** Les boutons de filtre dans le header (Tout, Film, Série, Personne) ne changent pas les résultats de la page recherche.
+- **Cause racine :** Le `activeFilter` est un état local du `Header.tsx` qui n'est pas synchronisé avec la page recherche. La page recherche a ses propres tabs supprimés, mais le header ne communique pas le filtre actif à la page.
+- **Fichiers concernés :** `apps/web/src/components/layout/Header.tsx`, `apps/web/src/app/(frontend)/search/page.tsx`
+- **Correction proposée :**
+  - Passer le filtre actif via les paramètres d'URL (`?type=film`, `?type=serie`, etc.)
+  - Ou utiliser un store Zustand partagé pour l'état du filtre
+  - La page recherche doit lire ce filtre et l'appliquer à ses appels API
+
+### 34. Menu filtre du header à refondre
+- **Symptôme :** Le menu "Filtres" dans le header est un simple dropdown de texte inutile. Il doit contenir des contrôles fonctionnels : dropdown pour genres/région/statut, curseur pour durée et date de sortie, toggle pour vu et watchlist.
+- **Cause racine :** Le menu filtre a été implémenté comme un placeholder avec des `DropdownMenuItem` vides.
+- **Fichiers concernés :** `apps/web/src/components/layout/Header.tsx`
+- **Correction proposée :**
+  - Remplacer le dropdown simple par :
+    - Dropdown pour **Genre** (multi-select)
+    - Dropdown pour **Région (pays)** (multi-select)
+    - Dropdown pour **Statut** (disponible, prévu, etc.)
+    - Curseur (range slider) pour **Durée** (min-max)
+    - Curseur (range slider) pour **Date de sortie** (année min-max)
+    - Toggle pour **Dans vu**
+    - Toggle pour **Dans watchlist**
+  - Le menu ne doit être accessible que sur les pages : recherche, calendrier, watchlist, historique, listes
+  - Ne pas afficher le menu sur les pages : titres, épisodes, séries
+
+### 35. URL `?type=film` ou `?type=serie` dans les recommandations cause "The operation was aborted"
+- **Symptôme :** Quand on clique sur un film dans "Titres recommandés", l'URL contient `?type=film` ou `?type=serie` et la page affiche "The operation was aborted". La page charge normalement si on retire le suffixe de l'URL.
+- **Cause racine :** Le paramètre `type` dans l'URL n'est pas géré correctement par la page de détail du titre. La page `/titles/[id]` ne sait pas traiter `?type=film` et cela cause une erreur de requête.
+- **Fichiers concernés :** `apps/web/src/app/(frontend)/titles/[id]/page.tsx`, `apps/web/src/lib/types/api.ts`
+- **Correction proposée :**
+  - Nettoyer le paramètre `type` de l'URL avant de faire les appels API
+  - Ou gérer le paramètre `type` dans la page de détail pour déterminer le type de contenu
+  - Vérifier la fonction `titleRecommendationToSearchResult()` qui génère ces URLs
 
 ---
 

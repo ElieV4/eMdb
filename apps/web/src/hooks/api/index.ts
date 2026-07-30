@@ -78,3 +78,7 @@ export { useShares } from "./useShares";
 export { useShareList } from "./useShareList";
 export { useRemoveShare } from "./useRemoveShare";
 export { useSharedLists } from "./useSharedLists";
+
+// Hooks utilitaires pour les icones d'affiche
+export { useWatchedTitles } from "./useWatchedTitles";
+export { useFollowedTitleIds } from "./useFollowedTitleIds";
