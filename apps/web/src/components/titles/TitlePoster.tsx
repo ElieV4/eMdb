@@ -1,12 +1,15 @@
 /**
  * Composant d'affiche de titre avec fallback.
  * Affiche l'affiche TMDB ou un placeholder si non disponible.
- * Affiche une icone bookmark (haut) si la série est suivie, et une icone œil rouge (bas) si le titre est vu.
+ * Empile en haut à gauche, sur le bord, les icones d'état pour l'utilisateur
+ * connecté (dans cet ordre) : favori, watchlist, vu.
  */
 
+import type { ReactNode } from "react";
 import Image from "next/image";
-import { Eye, Bookmark } from "lucide-react";
+import { Eye, Bookmark, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p";
 const PLACEHOLDER_POSTER = "/placeholder-poster.jpg";
@@ -21,7 +24,8 @@ interface TitlePosterProps {
   height?: number;
   priority?: boolean;
   watched?: boolean;
-  followed?: boolean;
+  inWatchlist?: boolean;
+  inFavorites?: boolean;
 }
 
 export function TitlePoster({
@@ -34,7 +38,8 @@ export function TitlePoster({
   height = 450,
   priority = false,
   watched = false,
-  followed = false,
+  inWatchlist = false,
+  inFavorites = false,
 }: TitlePosterProps) {
   const imageSrc = src
     ? src.startsWith("http://") || src.startsWith("https://")
@@ -65,7 +70,7 @@ export function TitlePoster({
       />
 
       {/* Badge de type (film/serie) */}
-      <div className="absolute top-2 left-2 z-10">
+      <div className="absolute top-2 right-2 z-10">
         <span
           className={cn(
             "px-2 py-1 text-xs font-medium rounded-full",
@@ -78,25 +83,50 @@ export function TitlePoster({
         </span>
       </div>
 
-      {/* Icone bookmark (série suivie) — milieu haut */}
-      {followed && (
-        <div className="absolute top-2 right-2 z-20 flex items-center justify-center rounded-full bg-black/70 p-1.5">
-          <Bookmark
-            className="h-4 w-4 text-white fill-white"
-            aria-label="Série suivie"
-          />
-        </div>
-      )}
-
-      {/* Icone vu (œil rouge) — milieu bas */}
-      {watched && (
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center rounded-full bg-black/70 p-1.5">
-          <Eye
-            className="h-4 w-4 text-red-500 fill-red-500"
-            aria-label="Déjà vu"
-          />
-        </div>
-      )}
+      {/* Icones d'état utilisateur — empilées en haut à gauche, sur le bord :
+          favori, watchlist, vu (dans cet ordre). */}
+      <div className="absolute top-2 left-2 z-20 flex flex-col items-center gap-1.5">
+        {inFavorites && (
+          <PosterIconBadge label="Dans les favoris">
+            <Heart className="h-4 w-4 text-red-500 fill-red-500" />
+          </PosterIconBadge>
+        )}
+        {inWatchlist && (
+          <PosterIconBadge label="Dans la watchlist">
+            <Bookmark className="h-4 w-4 text-white fill-white" />
+          </PosterIconBadge>
+        )}
+        {watched && (
+          <PosterIconBadge label="Déjà vu">
+            <Eye className="h-4 w-4 text-white fill-white" />
+          </PosterIconBadge>
+        )}
+      </div>
     </div>
+  );
+}
+
+/** Icone circulaire avec bulle d'aide au survol, pour les icones d'état sur l'affiche. */
+function PosterIconBadge({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <div
+            className="flex items-center justify-center rounded-full bg-black/70 p-1.5"
+            aria-label={label}
+          >
+            {children}
+          </div>
+        }
+      />
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }

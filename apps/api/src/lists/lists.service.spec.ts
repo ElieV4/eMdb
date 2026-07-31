@@ -201,6 +201,7 @@ describe('ListsService', () => {
       expect(result[0].id).toBe('list-1');
       expect(result[0].items).toEqual([
         {
+          titleId,
           type: 'film',
           year: 2020,
           note: 7.5,
@@ -218,6 +219,7 @@ describe('ListsService', () => {
             select: {
               titles: {
                 select: {
+                  id: true,
                   type: true,
                   date_sortie: true,
                   note_imdb: true,

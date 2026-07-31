@@ -14,7 +14,7 @@ import {
 } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 import { TitleCard } from "@/components/titles/TitleCard";
-import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
+import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { parseTitleFilters } from "@/lib/titleFilters";
 
 interface FilmographyProps {
@@ -31,7 +31,7 @@ export function Filmography({ filmography, className }: FilmographyProps) {
     {},
   );
   const { data: watchedTitles } = useWatchedTitles();
-  const { data: followedTitleIds } = useFollowedTitleIds();
+  const { watchlistIds, favoriteIds } = useListMembership();
 
   const allRoles = Object.keys(filmography);
 
@@ -118,7 +118,8 @@ export function Filmography({ filmography, className }: FilmographyProps) {
                       compact
                       showType={false}
                       watched={watchedTitles?.has(item.titre.id)}
-                      followed={followedTitleIds?.has(item.titre.id)}
+                      inWatchlist={watchlistIds.has(item.titre.id)}
+                      inFavorites={favoriteIds.has(item.titre.id)}
                     />
                   ))}
                 </div>

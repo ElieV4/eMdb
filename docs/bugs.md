@@ -509,6 +509,20 @@
 - **Limite connue (non corrigée) :** le libellé affiché sur `/history` pour un visionnage d'épisode reste générique ("Série — Épisode N") plutôt que le nom de la série — `listWatches()` ne remonte pas le titre de la série parente pour la branche épisode (`episodes.seasons` ne sélectionne que `numero`). Amélioration possible mais hors scope de ce fix (le filtre, lui, fonctionne).
 - **Vérification manuelle :** watch créé sur un épisode (`title_id` bien `null`) — apparaît désormais dans `/history` en filtrant "Série".
 
+### 45. Icônes "vu"/"watchlist"/"favori" non fonctionnelles sur les affiches
+- **Symptôme :** Signalé par l'utilisateur — sur la page titre, les boutons "Marquer comme vu" et "Listes" (ajout à la watchlist/favoris) ne faisaient rien au clic. En conséquence, aucune icone n'apparaissait jamais sur les affiches puisqu'il était impossible de passer un titre "vu" ou de l'ajouter à une liste depuis cette page.
+- **Cause racine :** `WatchButton.tsx` et `TitleActions.tsx` enveloppaient un composant `<Button>` complet à l'intérieur de `<DropdownMenuTrigger>` sans utiliser sa prop `render` (pattern de fusion "asChild" de Base UI) — ce qui générait un **`<button>` imbriqué dans un `<button>`**, HTML invalide. Vérifié empiriquement : un clic réel (souris ET synthétique) sur le bouton visible ne déclenchait ni `onClick`, ni l'ouverture du menu — aucune requête `POST /watches` ni `POST /lists/:id/items` ne partait.
+- **Correction :**
+  - `WatchButton.tsx` et `TitleActions.tsx` : le bouton visible est désormais fusionné sur le déclencheur via `<DropdownMenuTrigger render={<Button>...</Button>} />` — un seul `<button>` dans le DOM.
+  - `WatchButton.tsx` avait en plus un conflit d'interaction (clic simple = action, clic long = menu, géré à la main) avec le comportement par défaut de Base UI (ouverture du menu au clic) : `onOpenChange` ignore désormais les demandes d'ouverture venant du déclencheur (seul le clic long, via `setOpen(true)` direct, ouvre le menu) et n'honore que les demandes de fermeture.
+- **Changement de design des icones (demandé par l'utilisateur en même temps) :** plutôt que corriger l'ancien binôme bookmark (`followed`, piloté par "Suivre")/œil (`watched`), l'affiche montre désormais **trois icones indépendantes**, empilées en haut à gauche sur le bord (favori, watchlist, vu, dans cet ordre) — chacune reflétant directement l'appartenance aux listes `Mes Favoris`/`Ma Watchlist` et l'état "vu". Résout au passage la modification D (bookmark/watchlist) sans avoir à choisir entre union et fusion avec le mécanisme "Suivre" : celui-ci n'alimente plus l'affiche. Le badge de type (Film/Série) est déplacé en haut à droite pour laisser la place.
+  - Nouveau hook `useListMembership()` (dérivé de `useLists()`, déjà en cache) exposant les Sets `watchlistIds`/`favoriteIds`.
+  - `GET /lists` inclut désormais aussi `titleId` dans les items allégés (nécessaire pour construire ces Sets).
+  - `TitleCard`/`TitleCardHorizontal`/`TitlePoster` : prop `followed` remplacée par `inWatchlist`/`inFavorites`. Tous les consommateurs mis à jour (`search`, `watchlist`, `lists/[id]`, accueil, profil, `ListItemsGrid`, `ListReorder`, `Filmography`, `TitleRecommendations`).
+  - Tooltips ajoutés sur les 3 icones (modification I, cf. ci-dessus).
+- **Fichiers modifiés :** `apps/web/src/components/watches/WatchButton.tsx`, `apps/web/src/components/titles/TitleActions.tsx`, `apps/web/src/components/titles/TitlePoster.tsx`, `apps/web/src/components/titles/TitleCard.tsx`, `apps/web/src/hooks/api/useListMembership.ts` (nouveau), `apps/web/src/hooks/api/index.ts`, `apps/api/src/lists/lists.service.ts`, `apps/api/src/lists/lists.service.spec.ts`, `apps/web/src/lib/types/api.ts`, et tous les consommateurs de `TitleCard` listés ci-dessus.
+- **Vérification manuelle :** sur la page titre, "Marquer comme vu" déclenche bien `POST /watches` (201) et le bouton passe à "Vu" (rouge) ; "Listes" ouvre le menu et cocher "Favoris" déclenche `POST /lists/:id/items` (201) ; sur `/watchlist`, l'affiche affiche bien cœur (favori) + bookmark (watchlist) + œil (vu) empilés en haut à gauche, avec tooltip au survol de chacun.
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -542,20 +556,10 @@
 - **Fichiers concernés :** `apps/web/src/components/titles/TitleCreditsSplit.tsx`, `apps/web/src/components/people/Filmography.tsx`, `apps/web/src/components/people/PersonBadge.tsx` (badge(s) de rôle par personne), `apps/web/src/lib/types/api.ts`
 - **Note :** `TitleCreditsSplit.tsx` sépare actuellement "Distribution" et "Équipe technique" via une constante `CREW_ROLES` en anglais (`Director`, `Producer`, ...) comparée aux libellés de rôle stockés en base, qui sont en français (`Réalisateur`, `Producteur`, ...) — la comparaison ne matche jamais, donc tout le monde atterrit dans "Distribution" aujourd'hui. Cette modification remplace ce mécanisme cassé plutôt que de le corriger isolément.
 
-### D. Unifier "Watchlist" et "Suivre" — le bookmark doit refléter la watchlist
+### D. Unifier "Watchlist" et "Suivre" — le bookmark doit refléter la watchlist — ✅ fait (résolu autrement)
 - **Description demandée :** "Watchlist" et "Suivre" doivent devenir la même chose. Concrètement : ajouter un film (pas seulement une série) à la watchlist doit faire apparaître l'icone bookmark sur son affiche (actuellement le bookmark n'est piloté que par le mécanisme "Suivre", cf. bug #30).
-- **Constat de l'existant (deux mécanismes aujourd'hui totalement indépendants) :**
-  - **Watchlist** : une liste comme une autre — une ligne `user_lists` avec `type = 'watchlist'`, des `list_items` classiques. Ajout via `POST /lists/:listId/items` (`apps/api/src/lists/`), UI dans `TitleActions.tsx` (menu burger "Listes" → toggle "Watchlist"). Fonctionne pour films et séries indifféremment.
-  - **Suivre** : table dédiée `user_follows_serie` (`user_id`, `title_id`). Endpoints `POST/DELETE/GET /follows` (`apps/api/src/watches/`). **`WatchesService.follow()` rejette explicitement les films** : `if (title.type !== 'serie') throw new BadRequestException('Seules les séries peuvent être suivies.')` (`watches.service.ts:410`). UI : bouton dédié dans `TitleActions.tsx`, affiché seulement pour les séries.
-  - Le bookmark (`followed` sur `TitlePoster`/`TitleCard`, bug #30) est alimenté uniquement par `useFollowedTitleIds()` → `GET /follows` — aucun lien avec la watchlist aujourd'hui.
-  - Le suivi (`follow`) sert aussi de base au calendrier des épisodes à venir et aux notifications de nouveaux épisodes (module Watches/notifications) — un film n'a pas d'épisodes, donc cette partie ne peut pas s'appliquer telle quelle aux films.
-- **Décision de conception à trancher avant implémentation (à valider avec l'utilisateur) :**
-  1. Le bookmark reflète **l'union** watchlist ∪ suivi (le plus simple : `useFollowedTitleIds` ou son équivalent regarde aussi les `list_items` de la liste `watchlist`), sans toucher à la restriction séries-only de `follow()` — un film ajouté à la watchlist affiche le bookmark, une série ajoutée à la watchlist OU suivie affiche le bookmark.
-  2. Fusion plus profonde : ajouter un titre à la watchlist déclenche automatiquement un `follow` quand c'est une série (unifie réellement les deux actions utilisateur), et retire la restriction séries-only uniquement pour la relation watchlist↔bookmark, pas pour le calendrier/notifications qui restent séries-only par nature.
-- **Fichiers concernés (pressentis) :** `apps/api/src/watches/watches.service.ts` (`follow`), `apps/api/src/lists/lists.service.ts` (`addItem`/`removeItem`), `apps/web/src/hooks/api/useFollowedTitleIds.ts`, `apps/web/src/components/titles/TitleActions.tsx`
-- **Tests à créer :**
-  - Vérifier qu'ajouter un film à la watchlist fait apparaître le bookmark sur son affiche
-  - Vérifier qu'ajouter une série à la watchlist fait apparaître le bookmark sans dupliquer une notification/calendrier si elle n'est pas explicitement suivie (selon l'option retenue)
+- **Décision finale (donnée par l'utilisateur en marge du bug #45) :** plutôt que de trancher entre les deux options d'union/fusion avec le mécanisme "Suivre" envisagées ci-dessous, l'affiche affiche désormais **trois icones indépendantes** reflétant directement l'appartenance aux listes `watchlist`/`favoris` et l'état "vu" — le "Suivre" (table `user_follows_serie`, restreint aux séries, base du calendrier/notifications) n'est plus du tout lié à l'affichage des icones sur les affiches. Voir bug #45 pour l'implémentation.
+- **Constat de l'existant qui a motivé cette demande (pour mémoire) :** le bookmark (`followed` sur `TitlePoster`/`TitleCard`, bug #30) n'était alimenté que par `useFollowedTitleIds()` → `GET /follows`, sans aucun lien avec la watchlist — d'où l'incohérence remontée.
 
 ### E. Retirer le module "Listes" de la page profil — ✅ fait
 - **Description demandée :** Supprimer la section "Gestion des listes" (grille de listes + bouton "Créer une liste") de `app/(frontend)/profile/page.tsx` — les listes ont désormais leur propre page dédiée (`/lists`, cf. bug #43), ce module est redondant sur le profil.
@@ -578,10 +582,10 @@
   - Marquer comme vu, avec un sous-menu/dropdown de sélection de date — ou Retirer de l'historique si déjà vu
 - **Fichiers concernés (pressentis) :** `apps/web/src/components/titles/TitleCard.tsx`, `apps/web/src/components/titles/TitlePoster.tsx`, réutilisation des hooks existants (`useAddItem`/`useRemoveItem`, `useCreateWatch`/`useDeleteWatch`) déjà utilisés dans `TitleActions.tsx` sur la page titre — à factoriser plutôt que dupliquer la logique.
 
-### I. Tooltip au survol des icônes "vu" et "bookmark" sur les affiches
-- **Description demandée :** Ajouter une bulle d'aide (tooltip) expliquant ce que représente l'icône au survol des icônes "vu" (œil rouge, bug #29) et "bookmark" (bug #30) sur les affiches.
-- **Fichiers concernés :** `apps/web/src/components/titles/TitlePoster.tsx` (ou équivalent portant ces icônes)
-- **Dépend de :** bug #44 ci-dessous (icônes non fonctionnelles) — à vérifier/corriger avant ou en même temps que l'ajout du tooltip.
+### I. Tooltip au survol des icônes "vu"/"watchlist"/"favori" sur les affiches — ✅ fait
+- **Description demandée :** Ajouter une bulle d'aide (tooltip) expliquant ce que représente l'icône au survol.
+- **Fait :** nouveau composant `apps/web/src/components/ui/tooltip.tsx` (wrapper autour de `@base-ui/react/tooltip`, même convention que `dropdown-menu.tsx`), utilisé par les 3 icones de `TitlePoster.tsx` ("Dans les favoris" / "Dans la watchlist" / "Déjà vu"). Implémenté en même temps que le bug #45.
+- **Fichiers modifiés :** `apps/web/src/components/ui/tooltip.tsx` (nouveau), `apps/web/src/components/titles/TitlePoster.tsx`
 
 ---
 
@@ -645,11 +649,6 @@
   - Aligner `listUserRatings()` sur le même format que `listWatches()` : renommer `data` → `items`, ajouter `totalPages`
   - Aligner `formatRating()` sur le type frontend `UserRating` (`note`, `createdAt`) ou aligner le type frontend sur le format backend (`note_perso`, `created_at`) — choisir un seul sens de vérité plutôt que deux formats parallèles
   - Vérifier tous les consommateurs de `useUserRatings()` (page profil, historique de notes) une fois corrigé
-
-### 45. Icônes "vu" et "bookmark" non fonctionnelles sur les affiches
-- **Symptôme :** Signalé par l'utilisateur — les icônes "vu" (œil rouge, bug #29) et "bookmark" (bug #30) sur les affiches de titres (`TitleCard`/`TitlePoster`) ne fonctionnent pas. Ces bugs avaient été marqués résolus précédemment (cf. entrées #29/#30 dans "Bugs corrigés") — à reproduire pour déterminer s'il s'agit d'une régression ou d'un cas non couvert par la correction initiale (ex. affiches dans un module particulier, comme les nouvelles pages `/watchlist`, `/lists/:id`, sections de l'accueil introduites par le bug #43).
-- **Fichiers concernés (pressentis) :** `apps/web/src/components/titles/TitlePoster.tsx`, `apps/web/src/components/titles/TitleCard.tsx`, `apps/web/src/hooks/api/useWatchedTitles.ts`, `apps/web/src/hooks/api/useFollowedTitleIds.ts`
-- **Statut :** non investigué — symptôme signalé, cause à identifier.
 
 ---
 

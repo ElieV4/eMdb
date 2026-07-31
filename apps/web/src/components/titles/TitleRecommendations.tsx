@@ -12,7 +12,7 @@ import {
 } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 import { TitleCard } from "./TitleCard";
-import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
+import { useWatchedTitles, useListMembership } from "@/hooks/api";
 
 interface TitleRecommendationsProps {
   recommendations: TitleRecommendation[];
@@ -24,7 +24,7 @@ export function TitleRecommendations({
   className,
 }: TitleRecommendationsProps) {
   const { data: watchedTitles } = useWatchedTitles();
-  const { data: followedTitleIds } = useFollowedTitleIds();
+  const { watchlistIds, favoriteIds } = useListMembership();
 
   if (!recommendations || recommendations.length === 0) {
     return (
@@ -47,7 +47,8 @@ export function TitleRecommendations({
                 compact
                 showType={false}
                 watched={rec.id ? watchedTitles?.has(rec.id) : undefined}
-                followed={rec.id ? followedTitleIds?.has(rec.id) : undefined}
+                inWatchlist={rec.id ? watchlistIds.has(rec.id) : undefined}
+                inFavorites={rec.id ? favoriteIds.has(rec.id) : undefined}
               />
             </div>
           ))}

@@ -7,7 +7,7 @@ import { useList } from "@/hooks/api/useList";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { TitleCard } from "@/components/titles/TitleCard";
-import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
+import { useWatchedTitles, useListMembership } from "@/hooks/api";
 
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuthStore();
@@ -17,7 +17,7 @@ export default function ProfilePage() {
   // page dédiée (`/lists`).
   const { data: lists } = useLists(isAuthenticated);
   const { data: watchedTitles } = useWatchedTitles();
-  const { data: followedTitleIds } = useFollowedTitleIds();
+  const { watchlistIds, favoriteIds } = useListMembership();
 
   const favorisId = lists?.find((list) => list.type === "favoris")?.id;
   // GET /lists ne renvoie pas les titres au format affichable — on récupère
@@ -70,7 +70,8 @@ export default function ProfilePage() {
                   title={{ ...title, local: true }}
                   compact
                   watched={watchedTitles?.has(title.id)}
-                  followed={followedTitleIds?.has(title.id)}
+                  inWatchlist={watchlistIds.has(title.id)}
+                  inFavorites={favoriteIds.has(title.id)}
                 />
               ))}
             </div>

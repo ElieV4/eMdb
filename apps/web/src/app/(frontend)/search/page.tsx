@@ -14,7 +14,7 @@ import { PersonCard } from "@/components/people/PersonCard";
 import { SimplePagination } from "@/components/common/SimplePagination";
 import { useTitles } from "@/hooks/api/useTitles";
 import { usePeople } from "@/hooks/api/usePeople";
-import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
+import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import {
   TitleSearchResult,
   PersonSearchResult,
@@ -94,7 +94,7 @@ export default function SearchPage() {
   });
 
   const { data: watchedTitles } = useWatchedTitles();
-  const { data: followedTitleIds } = useFollowedTitleIds();
+  const { watchlistIds, favoriteIds } = useListMembership();
 
   // État de chargement
   const isLoading = isTitlesLoading || isPeopleLoading;
@@ -190,7 +190,8 @@ export default function SearchPage() {
                         title={title}
                         compact
                         watched={watchedTitles?.has(title.id)}
-                        followed={followedTitleIds?.has(title.id)}
+                        inWatchlist={watchlistIds.has(title.id)}
+                        inFavorites={favoriteIds.has(title.id)}
                       />
                     ))}
               </div>

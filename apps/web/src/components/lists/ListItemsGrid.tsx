@@ -7,7 +7,7 @@
 "use client";
 
 import { TitleCard } from "@/components/titles/TitleCard";
-import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
+import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { TitleSearchResult } from "@/lib/types/api";
 
 type ListItemsGridProps = {
@@ -26,7 +26,7 @@ export function ListItemsGrid({
   canEdit = false,
 }: ListItemsGridProps) {
   const { data: watchedTitles } = useWatchedTitles();
-  const { data: followedTitleIds } = useFollowedTitleIds();
+  const { watchlistIds, favoriteIds } = useListMembership();
 
   if (items.length === 0) {
     return (
@@ -44,7 +44,8 @@ export function ListItemsGrid({
             title={item.titles}
             showType={false}
             watched={watchedTitles?.has(item.title_id)}
-            followed={followedTitleIds?.has(item.title_id)}
+            inWatchlist={watchlistIds.has(item.title_id)}
+            inFavorites={favoriteIds.has(item.title_id)}
           />
           {canEdit && onRemove && (
             <button

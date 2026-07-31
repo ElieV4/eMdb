@@ -231,12 +231,17 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
 
         {/* Menu burger */}
         <DropdownMenu>
-          <DropdownMenuTrigger>
-            <Button variant="outline" size="sm">
-              <ListPlus className="mr-2 h-4 w-4" />
-              Listes
-            </Button>
-          </DropdownMenuTrigger>
+          {/* `render` fusionne le déclencheur du menu sur CE bouton au lieu
+              d'imbriquer un <button> dans un autre <button> (HTML invalide qui
+              empêchait le clic d'ouvrir le menu, bug #45). */}
+          <DropdownMenuTrigger
+            render={
+              <Button variant="outline" size="sm">
+                <ListPlus className="mr-2 h-4 w-4" />
+                Listes
+              </Button>
+            }
+          />
           <DropdownMenuContent align="end" className="w-56">
             {/* Watchlist */}
             {watchlist && (

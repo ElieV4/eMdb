@@ -122,8 +122,10 @@ export type UserRating = {
 };
 
 /** Métadonnées allégées d'un item de liste, suffisantes pour le filtrage par
- * type/genre/pays/année/note — pas les champs d'affichage (cf. `GET /lists`). */
+ * type/genre/pays/année/note et pour savoir si un titre appartient à la liste
+ * (`titleId`) — pas les champs d'affichage (cf. `GET /lists`). */
 export type ListItemFilterMeta = {
+  titleId: string;
   type: "film" | "serie";
   year: number | null;
   note: number | null;

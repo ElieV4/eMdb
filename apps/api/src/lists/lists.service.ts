@@ -170,6 +170,7 @@ export class ListsService {
           select: {
             titles: {
               select: {
+                id: true,
                 type: true,
                 date_sortie: true,
                 note_imdb: true,
@@ -186,6 +187,7 @@ export class ListsService {
     return lists.map(({ list_items, ...list }) => ({
       ...list,
       items: list_items.map((item) => ({
+        titleId: item.titles.id,
         type: item.titles.type,
         year: item.titles.date_sortie ? item.titles.date_sortie.getFullYear() : null,
         note: item.titles.note_imdb ? Number(item.titles.note_imdb) : null,

@@ -21,7 +21,7 @@ import {
 import { useCalendar } from "@/hooks/api/useCalendar";
 import { useLists } from "@/hooks/api/useLists";
 import { useList } from "@/hooks/api/useList";
-import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
+import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import {
   parseTitleFilters,
   titleMatchesFilters,
@@ -169,7 +169,7 @@ export default function HomePage() {
   // le détail de la liste watchlist pour avoir ses items complets.
   const { data: watchlistDetail } = useList(watchlistId ?? "");
   const { data: watchedTitles } = useWatchedTitles();
-  const { data: followedTitleIds } = useFollowedTitleIds();
+  const { watchlistIds, favoriteIds } = useListMembership();
 
   const watchlistItems = (watchlistDetail?.items ?? []).filter((item) =>
     titleMatchesFilters(toFilterableTitle(item), filters),
@@ -281,7 +281,8 @@ export default function HomePage() {
                     title={titleToSearchResult(title)}
                     compact
                     watched={watchedTitles?.has(title.id)}
-                    followed={followedTitleIds?.has(title.id)}
+                    inWatchlist={watchlistIds.has(title.id)}
+                    inFavorites={favoriteIds.has(title.id)}
                   />
                 ))}
               </div>
@@ -316,7 +317,8 @@ export default function HomePage() {
                     title={titleToSearchResult(title)}
                     compact
                     watched={watchedTitles?.has(title.id)}
-                    followed={followedTitleIds?.has(title.id)}
+                    inWatchlist={watchlistIds.has(title.id)}
+                    inFavorites={favoriteIds.has(title.id)}
                   />
                 ))}
               </div>
@@ -354,7 +356,8 @@ export default function HomePage() {
                     title={titleToSearchResult(title)}
                     compact
                     watched={watchedTitles?.has(title.id)}
-                    followed={followedTitleIds?.has(title.id)}
+                    inWatchlist={watchlistIds.has(title.id)}
+                    inFavorites={favoriteIds.has(title.id)}
                   />
                 ))}
               </div>

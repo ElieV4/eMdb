@@ -14,7 +14,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useList } from "@/hooks/api/useList";
-import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
+import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -56,7 +56,7 @@ export default function ListDetailPage() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const { data: list, isLoading, error } = useList(params.id);
   const { data: watchedTitles } = useWatchedTitles();
-  const { data: followedTitleIds } = useFollowedTitleIds();
+  const { watchlistIds, favoriteIds } = useListMembership();
 
   const filters = parseTitleFilters(searchParams);
 
@@ -144,7 +144,8 @@ export default function ListDetailPage() {
                 title={titleToSearchResult(title)}
                 compact
                 watched={watchedTitles?.has(title.id)}
-                followed={followedTitleIds?.has(title.id)}
+                inWatchlist={watchlistIds.has(title.id)}
+                inFavorites={favoriteIds.has(title.id)}
               />
             ))}
           </div>

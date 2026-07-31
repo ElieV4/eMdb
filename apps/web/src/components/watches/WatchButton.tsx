@@ -118,6 +118,15 @@ export function WatchButton({
     }
   }, []);
 
+  // Le déclencheur du menu (Base UI) ouvre le menu sur un simple clic par
+  // défaut, ce qui entre en conflit avec le clic simple = action / clic long
+  // = menu voulu ici. On ignore ses demandes d'ouverture (seul le clic long
+  // ci-dessus ouvre le menu, via setOpen direct) et on n'honore que les
+  // demandes de fermeture (Échap, clic extérieur, sélection d'un item).
+  const handleOpenChange = useCallback((next: boolean) => {
+    if (!next) setOpen(false);
+  }, []);
+
   const handleSelect = useCallback(
     (action: WatchAction) => {
       let date_vue: string | undefined;
@@ -164,33 +173,38 @@ export function WatchButton({
 
   return (
     <>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger>
-          <Button
-            className={cn(
-              className,
-              watched && "bg-primary text-primary-foreground",
-            )}
-            onMouseDown={handleLongPressStart}
-            onMouseUp={handleLongPressEnd}
-            onMouseLeave={handleLongPressEnd}
-            onTouchStart={handleLongPressStart}
-            onTouchEnd={handleLongPressEnd}
-            onClick={handleClick}
-          >
-            {watched ? (
-              <>
-                <Eye className="mr-2 h-4 w-4" />
-                {watchCount > 1 ? `Vu x${watchCount}` : "Vu"}
-              </>
-            ) : (
-              <>
-                <Check className="mr-2 h-4 w-4" />
-                Marquer comme vu
-              </>
-            )}
-          </Button>
-        </DropdownMenuTrigger>
+      <DropdownMenu open={open} onOpenChange={handleOpenChange}>
+        {/* `render` fusionne le déclencheur du menu sur CE bouton au lieu
+            d'imbriquer un <button> dans un autre <button> (HTML invalide qui
+            empêchait le clic de marquer comme vu, bug #45). */}
+        <DropdownMenuTrigger
+          render={
+            <Button
+              className={cn(
+                className,
+                watched && "bg-primary text-primary-foreground",
+              )}
+              onMouseDown={handleLongPressStart}
+              onMouseUp={handleLongPressEnd}
+              onMouseLeave={handleLongPressEnd}
+              onTouchStart={handleLongPressStart}
+              onTouchEnd={handleLongPressEnd}
+              onClick={handleClick}
+            >
+              {watched ? (
+                <>
+                  <Eye className="mr-2 h-4 w-4" />
+                  {watchCount > 1 ? `Vu x${watchCount}` : "Vu"}
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Marquer comme vu
+                </>
+              )}
+            </Button>
+          }
+        />
         <DropdownMenuContent align="end">
           {!watched ? (
             <>

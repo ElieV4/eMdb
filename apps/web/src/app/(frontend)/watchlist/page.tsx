@@ -14,7 +14,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useLists } from "@/hooks/api/useLists";
 import { useList } from "@/hooks/api/useList";
-import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
+import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,7 +55,7 @@ export default function WatchlistPage() {
     error,
   } = useList(watchlistId ?? "");
   const { data: watchedTitles } = useWatchedTitles();
-  const { data: followedTitleIds } = useFollowedTitleIds();
+  const { watchlistIds, favoriteIds } = useListMembership();
 
   const filters = parseTitleFilters(searchParams);
   const isLoading = isListsLoading || (!!watchlistId && isDetailLoading);
@@ -124,7 +124,8 @@ export default function WatchlistPage() {
                 title={titleToSearchResult(title)}
                 compact
                 watched={watchedTitles?.has(title.id)}
-                followed={followedTitleIds?.has(title.id)}
+                inWatchlist={watchlistIds.has(title.id)}
+                inFavorites={favoriteIds.has(title.id)}
               />
             ))}
           </div>

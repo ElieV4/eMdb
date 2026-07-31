@@ -15,7 +15,8 @@ interface TitleCardProps {
   showType?: boolean;
   compact?: boolean;
   watched?: boolean;
-  followed?: boolean;
+  inWatchlist?: boolean;
+  inFavorites?: boolean;
 }
 
 export function TitleCard({
@@ -24,7 +25,8 @@ export function TitleCard({
   showType = true,
   compact = false,
   watched = false,
-  followed = false,
+  inWatchlist = false,
+  inFavorites = false,
 }: TitleCardProps) {
   const {
     id,
@@ -64,7 +66,8 @@ export function TitleCard({
         height={compact ? 225 : 300}
         priority={false}
         watched={watched}
-        followed={followed}
+        inWatchlist={inWatchlist}
+        inFavorites={inFavorites}
       />
 
       <div className="p-3 bg-background">
@@ -121,7 +124,8 @@ export function TitleCardHorizontal({
   title,
   className,
   watched = false,
-  followed = false,
+  inWatchlist = false,
+  inFavorites = false,
 }: Omit<TitleCardProps, "compact">) {
   const {
     id,
@@ -157,7 +161,8 @@ export function TitleCardHorizontal({
         height={120}
         className="shrink-0"
         watched={watched}
-        followed={followed}
+        inWatchlist={inWatchlist}
+        inFavorites={inFavorites}
       />
 
       <div className="flex-1 min-w-0">
