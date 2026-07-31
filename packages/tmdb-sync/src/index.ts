@@ -24,8 +24,11 @@ import {
   mapTmdbSeason,
   mapTmdbEpisode,
   mapTmdbPerson,
+  resolveCrewRole,
 } from '@emdb/tmdb-mapper';
 import { getWikipediaUrlFromWikidataId } from '@emdb/wikidata-client';
+
+export { resolveCrewRole };
 
 const ROLE_LIBELLES: Record<string, string> = {
   acteur: 'Acteur',
@@ -34,17 +37,54 @@ const ROLE_LIBELLES: Record<string, string> = {
   autre: 'Autre',
 };
 
-async function ensureRoleId(role: 'acteur' | 'realisateur' | 'scenariste' | 'autre') {
-  const code = role;
-  const libelle = ROLE_LIBELLES[role] ?? 'Autre';
+async function ensureRoleId(code: string, libelle?: string) {
+  const resolvedLibelle = libelle ?? ROLE_LIBELLES[code] ?? 'Autre';
 
   const roleRecord = await prisma.roles.upsert({
     where: { code },
-    update: { libelle },
-    create: { code, libelle },
+    update: { libelle: resolvedLibelle },
+    create: { code, libelle: resolvedLibelle },
   });
 
   return roleRecord.id;
+}
+
+/**
+ * Crée le credit reliant une personne déjà connue (person_id) à un titre déjà
+ * importé (title_id), sans importer le reste du casting/équipe du titre.
+ * Utilisé par le refresh de filmographie (bug 27) : contrairement à
+ * importTitleByTmdbId, on connaît déjà la personne et son rôle exact via
+ * getPersonCombinedCredits, donc pas besoin de réimporter tous les autres
+ * membres du casting pour retrouver cette seule ligne de credit.
+ */
+export async function ensureCreditRecord(params: {
+  titleId: string;
+  personId: string;
+  role: string;
+  roleLibelle: string;
+  personnage?: string | null;
+  ordre?: number | null;
+  episodeId?: string | null;
+}) {
+  const roleId = await ensureRoleId(params.role, params.roleLibelle);
+  try {
+    await prisma.credits.create({
+      data: {
+        title_id: params.titleId,
+        person_id: params.personId,
+        episode_id: params.episodeId ?? null,
+        role_id: roleId,
+        personnage: params.personnage ?? null,
+        ordre: params.ordre ?? null,
+        source: 'tmdb',
+      },
+    });
+  } catch (error: any) {
+    if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
+      return;
+    }
+    throw error;
+  }
 }
 
 type SyncAction = 'importTitle' | 'importPerson' | 'dailySyncNewEpisodes' | 'weeklyResyncChanges';
@@ -170,7 +210,12 @@ async function ensureCountryIds(countries: { iso_3166_1: string; name: string }[
   return ids;
 }
 
-export async function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie') {
+export async function importTitleByTmdbId(
+  tmdbId: number,
+  type: 'film' | 'serie',
+  options: { withCredits?: boolean } = {},
+) {
+  const withCredits = options.withCredits ?? true;
   console.log('[importTitleByTmdbId] start', tmdbId, type);
   await createSyncLog({
     tmdb_id: tmdbId,
@@ -212,12 +257,12 @@ export async function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie'
       });
     }
 
-    if (tmdbData.credits) {
+    if (withCredits && tmdbData.credits) {
       console.log('[importTitleByTmdbId] credits', tmdbId, tmdbData.credits?.cast?.length, tmdbData.credits?.crew?.length);
       const creditInserts = mapTmdbCredits(tmdbData.credits, title.id, null);
       for (const credit of creditInserts) {
         const person = await importPersonByTmdbId(credit.tmdb_person_id);
-        const roleId = await ensureRoleId(credit.role);
+        const roleId = await ensureRoleId(credit.role, credit.role_libelle);
         try {
           await prisma.credits.create({
             data: {

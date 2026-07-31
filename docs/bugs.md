@@ -303,6 +303,54 @@
 - **Tests unitaires à créer :**
   - `apps/web/src/__tests__/unit/components/seasons/EpisodeSnapshot.test.tsx` — vérifie que `watched` et `watchCount` sont passés à `WatchButton` selon les données de `useWatches`.
 
+### 27. Filmographie : pas de mise à jour TMDB au chargement de la page
+- **Symptôme :** La filmographie d'une personne n'affichait que les données déjà présentes en base. Une fois le refresh TMDB partiellement câblé, le chargement devenait *aléatoire* : selon les personnes, la page affichait tantôt seulement les titres déjà en base, tantôt ceux-ci plus quelques titres supplémentaires, jamais la filmographie complète de façon fiable.
+- **Cause racine (absence de refresh) :** `usePersonFilmography` appelle `GET /people/:id/filmography`, qui lit uniquement les credits en base. Le hook `useRefreshFilmography` (mutation `POST /people/:id/filmography/refresh`) avait été créé mais n'était jamais appelé : la page `people/[id]/page.tsx` ne le déclenchait pas au montage (le `TODO.md` marquait cette étape comme faite à tort).
+- **Cause racine (aléatoire une fois câblé) :** `apiFetch` applique un timeout fixe de 10s à tous les appels. `refreshFilmography()` importe séquentiellement chaque titre TMDB manquant, et chaque import (`importTitleByTmdbId`) enchaîne lui-même plusieurs appels TMDB (détails + credits + import de chaque personne du cast/crew). Pour une filmographie avec plusieurs titres manquants, la requête dépassait largement 10s : le `fetch` était abandonné côté client (donc jamais d'invalidation React Query), alors que l'import continuait à écrire en base côté serveur. Le résultat observé au chargement suivant dépendait donc du nombre de titres qui avaient eu le temps d'être commités avant l'abandon — d'où l'aléatoire. C'est ce qui distingue ce module de `TitleCreditsSplit` (page titre) : ce dernier tranche une liste déjà entièrement chargée en une seule requête DB, sans dépendance à un import TMDB asynchrone en arrière-plan.
+- **Correction :**
+  - Câblage effectif du hook `useRefreshFilmography` au montage de `people/[id]/page.tsx` (fire-and-forget, `useEffect` + `useRef` pour ne déclencher qu'une fois)
+  - Ajout d'un `timeoutMs` configurable dans `apiFetch` (`apps/web/src/lib/api/apiClient.ts`), utilisé par `useRefreshFilmography` avec 120s au lieu des 10s par défaut
+  - Parallélisation des imports de titres manquants dans `refreshFilmography()` (`Promise.all` au lieu d'une boucle séquentielle) — le rate limiter TMDB (`@emdb/tmdb-client`) fait déjà la queue nécessaire, donc paralléliser ne dépasse pas le quota et réduit fortement le temps total
+  - Ajout de la limite d'affichage 10 titres max + bouton « Voir plus » par rôle dans `Filmography.tsx` (même pattern que `TitleCreditsSplit`)
+- **Fichiers modifiés :**
+  - `apps/api/src/people/people.service.ts`
+  - `apps/api/src/people/people.controller.ts`
+  - `apps/web/src/hooks/api/useRefreshFilmography.ts` (nouveau)
+  - `apps/web/src/hooks/api/index.ts`
+  - `apps/web/src/lib/api/apiClient.ts`
+  - `apps/web/src/app/(frontend)/people/[id]/page.tsx`
+  - `apps/web/src/components/people/Filmography.tsx`
+- **Tests unitaires à créer :**
+  - Vérifier que le refresh importe les titres manquants depuis TMDB
+  - Vérifier que la filmographie est mise à jour après refresh
+  - Vérifier que le refresh ne crash pas si la personne n'a pas de tmdb_id
+  - Vérifier que `Filmography` affiche 10 titres max par rôle avec bouton « Voir plus » quand il y en a plus de 10, et tous les titres sinon
+- **Vérification manuelle :** Ouvrir la page d'une personne avec une filmographie volumineuse (>10 titres manquants en base) et confirmer que la liste se complète progressivement sans nécessiter de rechargement manuel.
+
+#### Suite (même session) — import trop lent pour les personnes prolifiques + rôles spécifiques
+- **Symptôme :** Même avec la parallélisation, le refresh restait très long (potentiellement des dizaines de minutes) pour une personne prolifique (ex. Tom Hanks), car chaque titre manquant déclenchait un import complet — y compris tout le casting/l'équipe technique de CE titre, donc l'import de dizaines de personnes non demandées par page.
+- **Cause racine :** `importTitleByTmdbId` importe systématiquement les credits complets d'un titre (cast + crew), et pour chaque credit, importe la personne correspondante via `importPersonByTmdbId` (nouvel appel TMDB + Wikidata). Pour `refreshFilmography()`, ce travail est inutile : on connaît déjà, via `getPersonCombinedCredits(person.tmdb_id)`, le personnage/job exact de la personne consultée sur ce titre — pas besoin de réimporter tout le reste du casting pour retrouver cette seule ligne de credit.
+- **Correction :**
+  - Ajout d'une option `importTitleByTmdbId(tmdbId, type, { withCredits: false })` (`packages/tmdb-sync/src/index.ts`) qui importe uniquement les métadonnées du titre (genres, pays), sans toucher aux credits.
+  - `refreshFilmography()` utilise ce mode allégé pour les titres manquants, puis crée directement le credit reliant la personne consultée à chaque titre (existant ou nouvellement importé) via la nouvelle fonction exportée `ensureCreditRecord()`, à partir des données déjà récupérées dans `getPersonCombinedCredits`.
+  - Rôles spécifiques au lieu de tout regrouper sous "Autre" : ajout d'une table de correspondance job TMDB → rôle (`resolveCrewRole()` dans `packages/tmdb-mapper/src/index.ts` — Producteur, Producteur exécutif, Directeur de la photographie, Compositeur, Monteur, Casting, en plus de Réalisateur/Scénariste déjà gérés), reprise de la liste déjà utilisée par `TitleCreditsSplit`. Le job TMDB exact (ex. "Executive Producer") est conservé dans `personnage` pour l'affichage. Ne s'applique qu'aux nouveaux credits créés — pas de backfill des credits déjà en base.
+  - Ajout d'un filtre "Tout / Films / Séries" en haut du module `Filmography.tsx`.
+  - Découverte en marge : `packages/tmdb-sync` et `packages/tmdb-mapper` n'avaient pas `"declaration": true` dans leur tsconfig — un `npm run build` normal ne régénérait donc jamais leurs `.d.ts`, un consommateur (ex. `apps/api`) pouvait compiler contre des types obsolètes sans erreur apparente. Corrigé dans les deux `tsconfig.json`.
+- **Fichiers modifiés (en plus de la liste ci-dessus) :**
+  - `packages/tmdb-sync/src/index.ts` (option `withCredits`, `ensureCreditRecord`, re-export `resolveCrewRole`)
+  - `packages/tmdb-sync/tsconfig.json`
+  - `packages/tmdb-mapper/src/index.ts` (`CREW_JOB_MAP`, `resolveCrewRole`, `CreditInsert.role_libelle`)
+  - `packages/tmdb-mapper/tsconfig.json`
+  - `apps/web/src/components/people/Filmography.tsx` (filtre Tout/Films/Séries)
+- **Vérification manuelle :** Testé sur Christopher Nolan (director/writer/producer/editor/DP) — refresh en ~12s, rôles corrects (Réalisateur, Scénariste, Producteur, Producteur exécutif, Monteur, Directeur de la photographie, Compositeur, Autre), filtre Films/Séries fonctionnel.
+
+### 27bis. Personnes connexes : lien cassé (`/titles/...` au lieu de `/people/...`)
+- **Symptôme :** Cliquer sur une personne dans la section "Personnes connexes" de la page personne menait vers une URL `/titles/...` inexistante au lieu de `/people/...`.
+- **Cause racine :** `people/[id]/page.tsx` utilisait le composant `TitleCard` (prévu pour les titres, génère un lien `/titles/:id`) pour afficher des recommandations de **personnes**, avec un objet bricolé (`type: "film"` forcé) pour satisfaire le typage.
+- **Correction :** Remplacement par le composant `PersonCard` (déjà existant, utilisé pour les résultats de recherche de personnes), qui génère un lien `/people/:id`.
+- **Fichiers modifiés :** `apps/web/src/app/(frontend)/people/[id]/page.tsx`
+- **Vérification manuelle :** Cliqué sur une personne connexe depuis la page de Tom Holland → arrivée correcte sur `/people/:id`.
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -319,18 +367,6 @@
 ---
 
 ## Bugs à corriger — Page People
-
-### 27. Filmographie : pas de mise à jour TMDB au chargement de la page
-- **Symptôme :** La filmographie d'une personne n'affiche que les données déjà présentes en base, sans jamais se mettre à jour depuis TMDB. Les nouveaux films d'un acteur/réalisateur n'apparaissent pas.
-- **Cause racine :** `usePersonFilmography` appelle `GET /people/:id/filmography` qui lit uniquement les credits en base (`people.service.ts:getFilmography()`). Aucun refresh TMDB n'est déclenché au chargement de la page.
-- **Fichiers concernés :** `apps/web/src/app/people/[id]/page.tsx`, `apps/web/src/hooks/api/usePeople.ts`, `apps/api/src/people/people.service.ts`, `apps/api/src/people/people.controller.ts`
-- **Correction proposée :**
-  - Backend : ajouter un endpoint `POST /people/:id/filmography/refresh` qui appelle `getPersonCombinedCredits(tmdb_id)`, importe les titres manquants via `importTitleByTmdbId`, puis re-lit la filmographie
-  - Frontend : créer un hook `useRefreshFilmography()` (mutation) déclenché au mount de la page people (fire-and-forget avec invalidation React Query)
-- **Tests unitaires à créer :**
-  - Vérifier que le refresh importe les titres manquants depuis TMDB
-  - Vérifier que la filmographie est mise à jour après refresh
-  - Vérifier que le refresh ne crash pas si la personne n'a pas de tmdb_id
 
 ### 28. Module filmographie : menu filtre manquant
 - **Symptôme :** Le module filmographie n'a aucun filtre. Impossible de filtrer par date de sortie, pays de production, genre, rating IMDB ou user_rating.
@@ -394,6 +430,12 @@
 - **Description :** Ajouter un filtre par badge rôle dans le module filmographie pour afficher/masquer les crédits par rôle.
 - **Fichier concerné :** `apps/web/src/components/people/Filmography.tsx`
 
+### C. Modules "Distribution & Équipe" et "Filmographie" : liste unique dédupliquée + filtre rôle multi-sélection
+- **Description :** Remplacer l'affichage actuel (plusieurs listes séparées par rôle) par une liste unique de valeurs distinctes — une personne (dans Distribution & Équipe) ou un titre (dans Filmographie) n'apparaît qu'une seule fois même si elle a plusieurs rôles sur ce titre/cette filmographie, avec le ou les rôles affichés en badge sur chaque élément. Ajouter en haut du module un filtre par rôle sous forme de boutons multi-sélectionnables (Tout, Acteur, Réalisateur, Producteur, ...), plutôt que des listes séparées par rôle.
+- **Remplace/fusionne avec :** les items A et B ci-dessus (filtre par badge rôle) — cette modification change aussi la structure d'affichage sous-jacente, pas seulement l'ajout d'un filtre par-dessus les listes existantes.
+- **Fichiers concernés :** `apps/web/src/components/titles/TitleCreditsSplit.tsx`, `apps/web/src/components/people/Filmography.tsx`, `apps/web/src/components/people/PersonBadge.tsx` (badge(s) de rôle par personne), `apps/web/src/lib/types/api.ts`
+- **Note :** `TitleCreditsSplit.tsx` sépare actuellement "Distribution" et "Équipe technique" via une constante `CREW_ROLES` en anglais (`Director`, `Producer`, ...) comparée aux libellés de rôle stockés en base, qui sont en français (`Réalisateur`, `Producteur`, ...) — la comparaison ne matche jamais, donc tout le monde atterrit dans "Distribution" aujourd'hui. Cette modification remplace ce mécanisme cassé plutôt que de le corriger isolément.
+
 ---
 
 ## Bugs à corriger — Header & Navigation
@@ -441,6 +483,34 @@
   - Nettoyer le paramètre `type` de l'URL avant de faire les appels API
   - Ou gérer le paramètre `type` dans la page de détail pour déterminer le type de contenu
   - Vérifier la fonction `titleRecommendationToSearchResult()` qui génère ces URLs
+
+---
+
+## Bugs à corriger — Page Titre
+
+### 36. Page titre : pas de lien direct vers la fiche du réalisateur
+- **Symptôme :** Sur la page titre, impossible de savoir rapidement qui a réalisé le film/la série sans parcourir toute la liste "Distribution & Équipe".
+- **Cause racine :** `TitleHero.tsx` n'affiche que titre/année/note/statut/synopsis, aucune référence au réalisateur. Le nom du réalisateur n'apparaît que noyé dans la liste de credits — qui elle-même ne sépare pas correctement distribution et équipe technique (cf. modification C : `CREW_ROLES` compare des jobs anglais à des libellés de rôle en français, la comparaison ne matche jamais).
+- **Fichiers concernés :** `apps/web/src/components/titles/TitleHero.tsx`, `apps/web/src/app/(frontend)/titles/[id]/page.tsx`, `apps/api/src/titles/titles.service.ts` (ou `credits.service.ts`) pour exposer le réalisateur séparément
+- **Correction proposée :**
+  - Exposer le(s) réalisateur(s) séparément dans la réponse `GET /titles/:id` (ou via un appel dédié)
+  - Afficher "Réalisé par [nom]" dans `TitleHero`, en lien cliquable vers `/people/:id`
+
+### 37. Page titre / people : pas de lien vers la fiche TMDB
+- **Symptôme :** Aucun lien externe vers la fiche TMDB (themoviedb.org) sur les pages titre et personne, alors que `tmdb_id` est disponible et déjà utilisé pour construire les URLs d'images.
+- **Cause racine :** `TitleHero.tsx` et `PersonHero.tsx` n'exploitent `tmdb_id`/`TMDB_IMAGE_BASE_URL` que pour les images, jamais pour un lien externe vers la fiche TMDB elle-même.
+- **Fichiers concernés :** `apps/web/src/components/titles/TitleHero.tsx`, `apps/web/src/components/people/PersonHero.tsx`
+- **Correction proposée :**
+  - Ajouter un lien "Voir sur TMDB" vers `https://www.themoviedb.org/movie/:tmdb_id` (ou `/tv/:tmdb_id` selon le type) sur la page titre, et `https://www.themoviedb.org/person/:tmdb_id` sur la page personne
+  - N'afficher le lien que si `tmdb_id` est défini (titres/personnes sans tmdb_id restent supportés)
+
+### 38. Distribution & Équipe : casting incomplet quand le titre arrive via "titres recommandés"
+- **Symptôme :** En cliquant sur un titre recommandé non local (URL `/titles/tmdb/:tmdbId`), la page titre peut afficher un casting très incomplet — parfois seulement une ou deux personnes déjà présentes en base, jamais la distribution complète.
+- **Cause racine :** `getOrImportByTmdbId()` (`apps/api/src/titles/titles.service.ts:142`) retourne immédiatement le titre existant dès qu'une ligne `titles` avec ce `tmdb_id` existe, sans jamais vérifier si son casting complet (`credits`) a été importé. Depuis la correction du bug 27 (import allégé `withCredits: false` pour le refresh de filmographie), un titre peut désormais exister en base avec seulement ses métadonnées et un seul credit (celui de la personne dont la filmographie a été rafraîchie). Si ce même titre est ensuite ouvert via les recommandations (ou toute navigation `/titles/tmdb/:tmdbId`), `getOrImportByTmdbId` le traite comme "déjà importé" et ne complète jamais le casting.
+- **Fichiers concernés :** `apps/api/src/titles/titles.service.ts` (`getOrImportByTmdbId`), `apps/api/src/people/people.service.ts` (`refreshFilmography`, origine du titre "léger")
+- **Correction proposée :**
+  - Dans `getOrImportByTmdbId`, vérifier aussi si le titre a au moins un credit sans `episode_id` en base
+  - Si absent (titre importé en mode léger uniquement), déclencher un import complet (`withCredits: true`, ou un import différentiel des credits manquants) même si le titre existe déjà
 
 ---
 

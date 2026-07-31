@@ -1,10 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { searchPerson, TmdbSearchResult } from '@emdb/tmdb-client';
+import { searchPerson, getPersonCombinedCredits, TmdbSearchResult } from '@emdb/tmdb-client';
 import {
   importPersonByTmdbId,
+  importTitleByTmdbId,
   refreshPersonData,
   bootstrapPersonRecommendationsFromTmdb,
+  ensureCreditRecord,
+  resolveCrewRole,
 } from '@emdb/tmdb-sync';
 
 /**
@@ -187,6 +190,9 @@ export class PeopleService {
    * Filmographie d'une personne : jointure credits → titles, groupée par rôle,
    * triée par date de sortie.
    *
+   * Lit uniquement les données en base. Pour importer les titres TMDB manquants,
+   * utiliser refreshFilmography().
+   *
    * @param id - UUID de la personne
    * @returns Liste des crédits groupés par rôle
    * @throws NotFoundException si la personne n'existe pas
@@ -201,6 +207,7 @@ export class PeopleService {
       throw new NotFoundException('Personne introuvable.');
     }
 
+    // Lire les crédits en base
     const credits = await this.prisma.credits.findMany({
       where: { person_id: id },
       include: {
@@ -372,5 +379,129 @@ export class PeopleService {
     }
 
     return refreshPersonData(id);
+  }
+
+  /**
+   * Rafraîchit la filmographie d'une personne depuis TMDB.
+   *
+   * 1. Récupère les crédits combinés TMDB de la personne (getPersonCombinedCredits)
+   * 2. Pour chaque titre TMDB non présent en local, déclenche importTitleByTmdbId
+   * 3. Retourne la filmographie mise à jour via getFilmography()
+   *
+   * @param id - UUID de la personne
+   * @returns La filmographie mise à jour (groupée par rôle)
+   * @throws NotFoundException si la personne n'existe pas
+   * @throws BadRequestException si la personne n'a pas de tmdb_id
+   */
+  async refreshFilmography(id: string) {
+    const person = await this.prisma.people.findUnique({
+      where: { id },
+      select: { id: true, tmdb_id: true },
+    });
+
+    if (!person) {
+      throw new NotFoundException('Personne introuvable.');
+    }
+
+    if (!person.tmdb_id) {
+      throw new BadRequestException("La personne n'a pas de tmdb_id, impossible de rafraîchir la filmographie.");
+    }
+
+    // 1. Récupérer les crédits combinés TMDB de cette personne (déjà scopés à
+    // elle seule : chaque entrée porte son propre character/job pour le titre).
+    const tmdbCredits = await getPersonCombinedCredits(person.tmdb_id);
+
+    type CombinedCastCredit = { id: number; media_type: 'movie' | 'tv'; character?: string | null; order?: number | null };
+    type CombinedCrewCredit = { id: number; media_type: 'movie' | 'tv'; job?: string | null };
+
+    const castCredits: CombinedCastCredit[] = (tmdbCredits.cast ?? []).filter((c: CombinedCastCredit) => !!c?.id);
+    const crewCredits: CombinedCrewCredit[] = (tmdbCredits.crew ?? []).filter((c: CombinedCrewCredit) => !!c?.id);
+
+    if (castCredits.length === 0 && crewCredits.length === 0) {
+      return this.getFilmography(id);
+    }
+
+    const mediaTypeByTmdbId = new Map<number, 'film' | 'serie'>();
+    for (const credit of [...castCredits, ...crewCredits]) {
+      mediaTypeByTmdbId.set(credit.id, credit.media_type === 'movie' ? 'film' : 'serie');
+    }
+
+    // 2. Vérifier quels titres existent déjà en local
+    const tmdbTitleIds = Array.from(mediaTypeByTmdbId.keys());
+    const existingTitles = await this.prisma.titles.findMany({
+      where: { tmdb_id: { in: tmdbTitleIds } },
+      select: { id: true, tmdb_id: true },
+    });
+
+    const titleIdByTmdbId = new Map<number, string>(
+      existingTitles
+        .filter((t) => t.tmdb_id !== null)
+        .map((t) => [t.tmdb_id as number, t.id]),
+    );
+
+    // 3. Importer les titres manquants — sans le casting/l'équipe complète
+    // (withCredits: false) : on connaît déjà le rôle exact de CETTE personne
+    // via getPersonCombinedCredits (étape 4), inutile de réimporter en plus
+    // tous les autres acteurs/techniciens de chaque titre pour retrouver cette
+    // seule ligne de credit. C'est ce qui rendait le refresh extrêmement long
+    // pour les personnes prolifiques (des dizaines de titres × casting complet
+    // de chacun). En parallèle : le rate limiter TMDB (@emdb/tmdb-client) fait
+    // déjà la queue nécessaire, donc lancer tous les imports d'un coup ne
+    // dépasse pas le quota, ça raccourcit juste le temps total d'attente.
+    const missingTmdbIds = tmdbTitleIds.filter((tmdbId) => !titleIdByTmdbId.has(tmdbId));
+
+    await Promise.all(
+      missingTmdbIds.map(async (tmdbId) => {
+        const type = mediaTypeByTmdbId.get(tmdbId) ?? 'film';
+        try {
+          const title = await importTitleByTmdbId(tmdbId, type, { withCredits: false });
+          titleIdByTmdbId.set(tmdbId, title.id);
+        } catch (error) {
+          // Silencieux : on continue même si un titre échoue
+          console.warn(`[refreshFilmography] Échec import titre TMDB ${tmdbId}:`, error);
+        }
+      }),
+    );
+
+    // 4. Créer le credit reliant cette personne à chaque titre (qu'il vienne
+    // d'être importé ou qu'il existait déjà sans avoir encore ce credit —
+    // ex. importé via le refresh d'une autre personne).
+    await Promise.all([
+      ...castCredits.map(async (credit) => {
+        const titleId = titleIdByTmdbId.get(credit.id);
+        if (!titleId) return; // import du titre a échoué
+        try {
+          await ensureCreditRecord({
+            titleId,
+            personId: person.id,
+            role: 'acteur',
+            roleLibelle: 'Acteur',
+            personnage: credit.character ?? null,
+            ordre: credit.order ?? null,
+          });
+        } catch (error) {
+          console.warn(`[refreshFilmography] Échec création credit acteur (titre TMDB ${credit.id}):`, error);
+        }
+      }),
+      ...crewCredits.map(async (credit) => {
+        const titleId = titleIdByTmdbId.get(credit.id);
+        if (!titleId) return;
+        const { code, libelle } = resolveCrewRole(credit.job);
+        try {
+          await ensureCreditRecord({
+            titleId,
+            personId: person.id,
+            role: code,
+            roleLibelle: libelle,
+            personnage: credit.job ?? null,
+          });
+        } catch (error) {
+          console.warn(`[refreshFilmography] Échec création credit équipe (titre TMDB ${credit.id}):`, error);
+        }
+      }),
+    ]);
+
+    // 5. Retourner la filmographie mise à jour
+    return this.getFilmography(id);
   }
 }

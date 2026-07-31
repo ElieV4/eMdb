@@ -1,6 +1,7 @@
 "use client";
 
-import { User, Star, List, Bell, BarChart3 } from "lucide-react";
+import { useState } from "react";
+import { User, Star, Bell, BarChart3 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useLists } from "@/hooks/api";
 import { ListCard } from "@/components/lists/ListCard";

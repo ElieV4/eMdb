@@ -6,6 +6,7 @@
 
 "use client";
 
+import { useEffect, useRef } from "react";
 import { notFound } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { PersonHero } from "@/components/people/PersonHero";
@@ -13,11 +14,12 @@ import { Filmography } from "@/components/people/Filmography";
 import { usePerson } from "@/hooks/api/usePeople";
 import { usePersonFilmography } from "@/hooks/api/usePeople";
 import { usePersonRecommendations } from "@/hooks/api/usePersonRecommendations";
+import { useRefreshFilmography } from "@/hooks/api/useRefreshFilmography";
 import {
   FilmographyGrouped,
   PersonRecommendation,
 } from "@/lib/types/api";
-import { TitleCard } from "@/components/titles/TitleCard";
+import { PersonCard } from "@/components/people/PersonCard";
 
 export default function PersonDetailPage({
   params,
@@ -37,6 +39,18 @@ export default function PersonDetailPage({
     isLoading: isRecsLoading,
     isError: isRecsError,
   } = usePersonRecommendations(id);
+
+  // Bug 27 — déclenche le refresh TMDB de la filmographie au chargement de la
+  // page (fire-and-forget) : la liste affichée se met à jour automatiquement
+  // via l'invalidation React Query une fois l'import terminé.
+  const refreshFilmography = useRefreshFilmography(id);
+  const hasTriggeredRefresh = useRef(false);
+  useEffect(() => {
+    if (hasTriggeredRefresh.current || !id) return;
+    hasTriggeredRefresh.current = true;
+    refreshFilmography.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   if (isLoading) {
     return (
@@ -86,25 +100,17 @@ export default function PersonDetailPage({
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {recommendations.map((rec: PersonRecommendation) => (
-                <div key={rec.id} className="shrink-0">
-                  <TitleCard
-                    title={{
-                      id: rec.id,
-                      tmdbId: rec.tmdb_id ?? undefined,
-                      titre: rec.nom,
-                      titreOriginal: undefined,
-                      type: "film",
-                      dateSortie: undefined,
-                      note: undefined,
-                      afficheUrl: rec.photo_url ?? undefined,
-                      genres: undefined,
-                      pays: undefined,
-                      local: true,
-                    }}
-                    compact
-                    showType={false}
-                  />
-                </div>
+                <PersonCard
+                  key={rec.id}
+                  person={{
+                    id: rec.id,
+                    tmdbId: rec.tmdb_id ?? undefined,
+                    nom: rec.nom,
+                    photoUrl: rec.photo_url ?? undefined,
+                    local: true,
+                  }}
+                  compact
+                />
               ))}
             </div>
           )}

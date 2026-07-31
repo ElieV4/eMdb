@@ -16,6 +16,8 @@ export type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   headers?: Record<string, string>;
+  /** Timeout en ms avant abandon de la requête (défaut : 10s). */
+  timeoutMs?: number;
 };
 
 async function buildHeaders(
@@ -41,7 +43,7 @@ export async function apiFetch<T = unknown>(
   const url = `${API_BASE_URL}${path}`;
   const headers = await buildHeaders(options.headers);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 10_000);
 
   try {
     const res = await fetch(url, {

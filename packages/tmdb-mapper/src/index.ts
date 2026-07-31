@@ -145,13 +145,36 @@ export type CountryInsert = {
 
 export type CreditInsert = {
   tmdb_person_id: number;
-  role: 'acteur' | 'realisateur' | 'scenariste' | 'autre';
+  role: string;
+  role_libelle: string;
   personnage?: string | null;
   ordre?: number | null;
   title_id: string;
   episode_id?: string | null;
   source: 'tmdb';
 };
+
+/**
+ * Départements TMDB courants pour l'équipe technique, mappés vers un code/libellé
+ * dédié plutôt que d'être tous regroupés sous "Autre". Basé sur la liste déjà
+ * utilisée par TitleCreditsSplit (apps/web) pour séparer distribution/équipe.
+ */
+const CREW_JOB_MAP: Record<string, { code: string; libelle: string }> = {
+  Director: { code: 'realisateur', libelle: 'Réalisateur' },
+  Writer: { code: 'scenariste', libelle: 'Scénariste' },
+  Screenplay: { code: 'scenariste', libelle: 'Scénariste' },
+  'Director of Photography': { code: 'directeur_photo', libelle: 'Directeur de la photographie' },
+  'Original Music Composer': { code: 'compositeur', libelle: 'Compositeur' },
+  Composer: { code: 'compositeur', libelle: 'Compositeur' },
+  Editor: { code: 'monteur', libelle: 'Monteur' },
+  Casting: { code: 'casting', libelle: 'Casting' },
+  Producer: { code: 'producteur', libelle: 'Producteur' },
+  'Executive Producer': { code: 'producteur_executif', libelle: 'Producteur exécutif' },
+};
+
+export function resolveCrewRole(job?: string | null): { code: string; libelle: string } {
+  return CREW_JOB_MAP[job ?? ''] ?? { code: 'autre', libelle: 'Autre' };
+}
 
 export type PersonInsert = {
   tmdb_id: number;
@@ -254,6 +277,7 @@ export function mapTmdbCredits(
     credits.push({
       tmdb_person_id: castMember.id,
       role: 'acteur',
+      role_libelle: 'Acteur',
       personnage: castMember.character ?? null,
       ordre: castMember.order ?? null,
       title_id: titleId,
@@ -263,17 +287,15 @@ export function mapTmdbCredits(
   }
 
   for (const crewMember of tmdbCredits?.crew || []) {
-    const role =
-      crewMember.job === 'Director'
-        ? 'realisateur'
-        : crewMember.job === 'Writer' || crewMember.job === 'Screenplay'
-          ? 'scenariste'
-          : 'autre';
+    const mapped = resolveCrewRole(crewMember.job);
 
     credits.push({
       tmdb_person_id: crewMember.id,
-      role,
-      personnage: null,
+      role: mapped.code,
+      role_libelle: mapped.libelle,
+      // Conserve l'intitulé TMDB exact (ex: "Executive Producer") pour l'affichage,
+      // même quand plusieurs jobs sont regroupés sous le même rôle/libellé.
+      personnage: crewMember.job ?? null,
       ordre: null,
       title_id: titleId,
       episode_id: episodeId ?? null,

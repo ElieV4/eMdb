@@ -41,7 +41,7 @@ export default function SearchPage({ searchParams }: SearchPageProps) {
 
   // État local
   const [query, setQuery] = useState(urlQuery);
-  const [activeTab, setActiveTab] = useState<SearchType | "tout">(
+  const [activeTab] = useState<SearchType | "tout">(
     urlTab || "tout",
   );
   const [page, setPage] = useState<number>(parseInt(urlPage) || 1);
@@ -70,13 +70,6 @@ export default function SearchPage({ searchParams }: SearchPageProps) {
     setQuery(value);
     setPage(1);
     updateUrl(value, undefined, 1);
-  };
-
-  // Gérer le changement de tab
-  const handleTabChange = (tab: SearchType | "tout") => {
-    setActiveTab(tab);
-    setPage(1);
-    updateUrl(query, tab, 1);
   };
 
   // Gérer le changement de page

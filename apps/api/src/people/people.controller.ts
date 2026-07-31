@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Query, UseGuards, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Post, Query, UseGuards, NotFoundException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PeopleService } from './people.service';
 import { SearchPeopleDto } from './dto/search-people.dto';
@@ -87,5 +87,17 @@ export class PeopleController {
   @UseGuards(JwtAuthGuard)
   async refresh(@Param('id') id: string) {
     return this.peopleService.refresh(id);
+  }
+
+  /**
+   * POST /people/:id/filmography/refresh
+   * Rafraîchit la filmographie d'une personne depuis TMDB.
+   * Importe les titres TMDB manquants, puis retourne la filmographie mise à jour.
+   * Nécessite une authentification JWT.
+   */
+  @Post(':id/filmography/refresh')
+  @UseGuards(JwtAuthGuard)
+  async refreshFilmography(@Param('id') id: string) {
+    return this.peopleService.refreshFilmography(id);
   }
 }

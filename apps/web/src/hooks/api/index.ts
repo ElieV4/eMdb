@@ -82,3 +82,6 @@ export { useSharedLists } from "./useSharedLists";
 // Hooks utilitaires pour les icones d'affiche
 export { useWatchedTitles } from "./useWatchedTitles";
 export { useFollowedTitleIds } from "./useFollowedTitleIds";
+
+// Bug 27 — Rafraîchissement filmographie TMDB
+export { useRefreshFilmography } from "./useRefreshFilmography";
