@@ -8,21 +8,13 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  PlayCircle,
-  Star,
-  List,
-  Calendar,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { PlayCircle, Calendar, TrendingUp, Users } from "lucide-react";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { CalendarEpisodes } from "@/components/watches/CalendarEpisodes";
 import { useAuthStore } from "@/store/authStore";
 import {
   useRecentWatches,
-  useFollowedSeries,
   usePopularTitles,
   useRecommendations,
 } from "@/hooks/api/useDashboard";
@@ -154,43 +146,13 @@ function ContinueWatchingCard({ watch }: { watch: any }) {
   );
 }
 
-// Composant de stat card pour le dashboard
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  href,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string | number;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-4 p-4 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
-    >
-      <div className="rounded-full p-3 bg-primary/10 group-hover:bg-primary/20 transition-colors">
-        <Icon className="h-6 w-6 text-primary" />
-      </div>
-      <div>
-        <p className="text-2xl font-bold">{value}</p>
-        <p className="text-sm text-muted-foreground">{label}</p>
-      </div>
-    </Link>
-  );
-}
-
 export default function HomePage() {
-  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const searchParams = useSearchParams();
   const filters = parseTitleFilters(searchParams);
 
   // Hooks pour les données du dashboard
   const { data: recentWatches } = useRecentWatches(4, isAuthenticated);
-
-  const { data: followedSeries } = useFollowedSeries(4, isAuthenticated);
 
   const { data: popularTitles, isLoading: isLoadingPopular } =
     usePopularTitles(8);
@@ -232,19 +194,16 @@ export default function HomePage() {
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
-      {/* En-tête */}
-      <div className="mb-12">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Bienvenue {isAuthenticated ? `, ${user?.pseudo}` : "sur eMDB"}
-        </h1>
-        <p className="mt-2 text-lg text-muted-foreground">
-          {isAuthenticated
-            ? "Suivez vos films et séries préférés, découvrez des recommandations et explorez."
-            : "Découvrez, suivez et partagez vos films et séries préférés."}
-        </p>
+      {/* En-tête (invités uniquement) */}
+      {!isAuthenticated && (
+        <div className="mb-12">
+          <h1 className="text-3xl font-bold tracking-tight">
+            Bienvenue sur eMDB
+          </h1>
+          <p className="mt-2 text-lg text-muted-foreground">
+            Découvrez, suivez et partagez vos films et séries préférés.
+          </p>
 
-        {/* CTA pour les invités */}
-        {!isAuthenticated && (
           <div className="mt-6 flex gap-4">
             <Link
               href="/register"
@@ -259,35 +218,12 @@ export default function HomePage() {
               Se connecter
             </Link>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Dashboard pour utilisateurs connectés */}
       {isAuthenticated ? (
         <div className="space-y-10">
-          {/* Statistiques rapides */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard
-              icon={PlayCircle}
-              label="Visionnages"
-              value={recentWatches?.length || 0}
-              href="/history"
-            />
-            <StatCard icon={Star} label="Notes" value={0} href="/ratings" />
-            <StatCard
-              icon={List}
-              label="Listes"
-              value={userLists?.length || 0}
-              href="/profile"
-            />
-            <StatCard
-              icon={Calendar}
-              label="Séries suivies"
-              value={followedSeries?.length || 0}
-              href="/profile"
-            />
-          </div>
-
           {/* Historique */}
           {filteredRecentWatches.length > 0 && (
             <DashboardSection

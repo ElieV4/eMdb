@@ -215,7 +215,7 @@ describe('WatchesService', () => {
       expect(result.limit).toBe(20);
     });
 
-    it('filtre par type', async () => {
+    it('filtre par type film', async () => {
       prismaServiceMock.user_watches.findMany.mockResolvedValue([]);
       prismaServiceMock.user_watches.count.mockResolvedValue(0);
 
@@ -225,6 +225,27 @@ describe('WatchesService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             titles: { type: 'film' },
+          }),
+        }),
+      );
+    });
+
+    it('filtre par type série : inclut aussi les visionnages par épisode (bug #44)', async () => {
+      // Un visionnage d'épisode a title_id = null (cf. createWatch) : filtrer
+      // uniquement sur `titles.type` ignorait tous les épisodes, qui sont
+      // pourtant l'essentiel des visionnages de séries.
+      prismaServiceMock.user_watches.findMany.mockResolvedValue([]);
+      prismaServiceMock.user_watches.count.mockResolvedValue(0);
+
+      await service.listWatches(userId, { type: 'serie' });
+
+      expect(prismaServiceMock.user_watches.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [
+              { titles: { type: 'serie' } },
+              { episodes: { seasons: { titles: { type: 'serie' } } } },
+            ],
           }),
         }),
       );

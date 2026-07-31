@@ -264,8 +264,21 @@ export class WatchesService {
     }
 
     if (filters.type) {
-      // Filtrer par type nécessite une jointure avec titles
-      where.titles = { type: filters.type };
+      // Un watch porte soit sur un titre directement (title_id, films et
+      // séries "vues" sans épisode précis), soit sur un épisode (episode_id,
+      // title_id alors null) — cf. createWatch(). Filtrer uniquement sur
+      // `titles.type` (relation directe) ignore donc tous les visionnages
+      // d'épisodes, qui sont pourtant l'essentiel des visionnages de séries
+      // (bug #44) : il faut aussi suivre episode → season → title.
+      if (filters.type === 'serie') {
+        where.OR = [
+          { titles: { type: 'serie' } },
+          { episodes: { seasons: { titles: { type: 'serie' } } } },
+        ];
+      } else {
+        // Un épisode appartient toujours à une série, jamais à un film.
+        where.titles = { type: 'film' };
+      }
     }
 
     const [data, total] = await Promise.all([

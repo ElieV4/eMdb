@@ -501,6 +501,14 @@
 - **Fichiers modifiés :** `apps/api/src/lists/lists.service.ts`, `apps/api/src/lists/lists.service.spec.ts`, `apps/web/src/lib/types/api.ts`, `apps/web/src/lib/titleFilters.ts`, `apps/web/src/components/lists/ListCard.tsx`, `apps/web/src/components/layout/Header.tsx`, `apps/web/src/app/(frontend)/lists/[id]/page.tsx` (nouveau), `apps/web/src/app/(frontend)/lists/page.tsx`, `apps/web/src/app/(frontend)/watchlist/page.tsx`, `apps/web/src/app/(frontend)/page.tsx`, `apps/web/src/app/(frontend)/profile/page.tsx`, `apps/web/src/app/(frontend)/history/page.tsx`
 - **Vérification manuelle :** compte de test avec 1 film + 1 série en watchlist — `/watchlist`, `/lists` (compteur "2 titres"), `/lists/:id` et la section Watchlist de l'accueil affichent désormais les vrais titres ; filtre "Film" sur `/watchlist` ne garde que le film ; page titre (`/titles/:id`) ne montre plus les filtres du header.
 
+### 44. Historique : le filtre "Série" ne renvoyait aucune donnée
+- **Symptôme :** Signalé par l'utilisateur — sur `/history`, filtrer par "Série" ne renvoyait aucun visionnage, même quand des épisodes ont été marqués comme vus.
+- **Cause racine :** `WatchesService.listWatches()` (`apps/api/src/watches/watches.service.ts`) filtrait par `where.titles = { type: filters.type }` — condition portant uniquement sur la relation directe `title_id → titles`. Or `createWatch()` impose que `title_id` et `episode_id` soient mutuellement exclusifs : marquer un **épisode** comme vu (le cas normal pour une série) enregistre `title_id = null` et seulement `episode_id`. Le filtre ne matchait donc jamais ces lignes (relation nulle), alors que l'essentiel des visionnages de séries passent par des épisodes.
+- **Correction :** filtre étendu — pour `type: 'serie'`, `where.OR = [{ titles: { type: 'serie' } }, { episodes: { seasons: { titles: { type: 'serie' } } } }]` (couvre les deux façons d'enregistrer un visionnage de série) ; pour `type: 'film'`, un épisode n'appartenant jamais à un film, `where.titles = { type: 'film' }` suffit.
+- **Fichiers modifiés :** `apps/api/src/watches/watches.service.ts` (`listWatches`), `apps/api/src/watches/watches.service.spec.ts` (nouveau test)
+- **Limite connue (non corrigée) :** le libellé affiché sur `/history` pour un visionnage d'épisode reste générique ("Série — Épisode N") plutôt que le nom de la série — `listWatches()` ne remonte pas le titre de la série parente pour la branche épisode (`episodes.seasons` ne sélectionne que `numero`). Amélioration possible mais hors scope de ce fix (le filtre, lui, fonctionne).
+- **Vérification manuelle :** watch créé sur un épisode (`title_id` bien `null`) — apparaît désormais dans `/history` en filtrant "Série".
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -549,14 +557,15 @@
   - Vérifier qu'ajouter un film à la watchlist fait apparaître le bookmark sur son affiche
   - Vérifier qu'ajouter une série à la watchlist fait apparaître le bookmark sans dupliquer une notification/calendrier si elle n'est pas explicitement suivie (selon l'option retenue)
 
-### E. Retirer le module "Listes" de la page profil
+### E. Retirer le module "Listes" de la page profil — ✅ fait
 - **Description demandée :** Supprimer la section "Gestion des listes" (grille de listes + bouton "Créer une liste") de `app/(frontend)/profile/page.tsx` — les listes ont désormais leur propre page dédiée (`/lists`, cf. bug #43), ce module est redondant sur le profil.
-- **Fichier concerné :** `apps/web/src/app/(frontend)/profile/page.tsx`
-- **Note :** la section "Favoris" du profil (titres favoris affichés en grille) est distincte du module "Listes" et n'est pas concernée par cette demande — à confirmer si elle doit rester.
+- **Fait :** section retirée. La section "Favoris" (titres favoris en grille) est conservée — distincte du module "Listes", non concernée par la demande. `useLists()` reste appelé (nécessaire pour repérer la liste favoris), mais `ListCard`/`ListDialog` et les imports associés (Button, Skeleton, Alert, Plus) ont été retirés, plus utilisés.
+- **Fichier modifié :** `apps/web/src/app/(frontend)/profile/page.tsx`
 
-### F. Simplifier l'en-tête de la page d'accueil
+### F. Simplifier l'en-tête de la page d'accueil — ✅ fait
 - **Description demandée :** Retirer le bloc "Bienvenue, {pseudo}" et les 4 cases de statistiques (Visionnages/Notes/Listes/Séries suivies) de la page d'accueil.
-- **Fichier concerné :** `apps/web/src/app/(frontend)/page.tsx`
+- **Fait :** bloc "Bienvenue, {pseudo}" et grille de 4 stats retirés pour les utilisateurs connectés — le dashboard démarre directement sur la section Historique. L'en-tête "Bienvenue sur eMDB" + CTA (Créer un compte/Se connecter) pour les visiteurs non connectés est conservé (non concerné par la demande). Nettoyage associé : composant `StatCard` (devenu mort) et hook `useFollowedSeries()` (plus consommé) retirés.
+- **Fichier modifié :** `apps/web/src/app/(frontend)/page.tsx`
 
 ### G. Nouvelle page "Découvrir" (tendances, populaires, attendus, sorties)
 - **Description demandée :** Créer une page dédiée à la découverte de titres, avec 4 modules : Tendances, Populaires, Attendus, Sorties.
@@ -636,13 +645,6 @@
   - Aligner `listUserRatings()` sur le même format que `listWatches()` : renommer `data` → `items`, ajouter `totalPages`
   - Aligner `formatRating()` sur le type frontend `UserRating` (`note`, `createdAt`) ou aligner le type frontend sur le format backend (`note_perso`, `created_at`) — choisir un seul sens de vérité plutôt que deux formats parallèles
   - Vérifier tous les consommateurs de `useUserRatings()` (page profil, historique de notes) une fois corrigé
-
-### 44. Historique : le filtre "Série" ne renvoie aucune donnée
-- **Symptôme :** Signalé par l'utilisateur — sur `/history`, filtrer par "Série" ne renvoie aucun visionnage, même quand des épisodes ont été marqués comme vus.
-- **Cause racine (identifiée, non corrigée) :** `WatchesService.listWatches()` (`apps/api/src/watches/watches.service.ts:266-268`) filtre par `where.titles = { type: filters.type }` — cette condition porte sur la relation `title_id → titles`. Or `createWatch()` (même fichier, ligne ~42-53) impose que `title_id` et `episode_id` soient mutuellement exclusifs : marquer un **épisode** comme vu (le cas normal pour une série) enregistre `title_id = null` et seulement `episode_id`. Le filtre `titles: {type: 'serie'}` ne matche donc jamais ces lignes (relation nulle), même si l'épisode appartient bien à une série — d'où "aucune donnée" dès qu'on filtre par Série alors que l'essentiel des visionnages de séries passent par des épisodes.
-- **Fichiers concernés :** `apps/api/src/watches/watches.service.ts` (`listWatches`, filtre `type`)
-- **Correction à envisager :** étendre le filtre pour couvrir aussi les watches liés à un épisode dont la série parente correspond au type demandé, ex. `OR: [{ titles: { type: filters.type } }, { episodes: { seasons: { titles: { type: filters.type } } } }]` (filtre `type: 'serie'` uniquement pertinent pour la branche épisode, `type: 'film'` ne peut matcher que la branche titre direct).
-- **Statut :** non corrigé.
 
 ### 45. Icônes "vu" et "bookmark" non fonctionnelles sur les affiches
 - **Symptôme :** Signalé par l'utilisateur — les icônes "vu" (œil rouge, bug #29) et "bookmark" (bug #30) sur les affiches de titres (`TitleCard`/`TitlePoster`) ne fonctionnent pas. Ces bugs avaient été marqués résolus précédemment (cf. entrées #29/#30 dans "Bugs corrigés") — à reproduire pour déterminer s'il s'agit d'une régression ou d'un cas non couvert par la correction initiale (ex. affiches dans un module particulier, comme les nouvelles pages `/watchlist`, `/lists/:id`, sections de l'accueil introduites par le bug #43).

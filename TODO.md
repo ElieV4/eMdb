@@ -1,65 +1,47 @@
-# Bug 43 — Filtres header sur accueil/watchlist/listes/historique + données de listes cassées
+# Suite backlog — bug 44, modifications E et F
 
-Statut : **terminé** (voir `docs/bugs.md` #43).
-(Le travail précédent sur les bugs #27-#32, #40, #41, #42, #33 reste terminé, voir `docs/bugs.md`.)
+Statut : **terminé** (voir `docs/bugs.md`).
+(Le travail précédent sur les bugs #27-#32, #33, #40-#43 reste terminé.)
 
-## Demande initiale
+## Bug 44 — Historique : filtre "Série" ne renvoyait aucune donnée
 
-L'utilisateur voulait que les filtres du header (type + genre/pays/année/note)
-s'appliquent sur accueil / watchlist / listes / historique.
+Cause : `WatchesService.listWatches()` filtrait uniquement sur la relation
+directe `title_id → titles`, or un visionnage d'épisode (cas normal pour une
+série) a `title_id = null`. Filtre étendu avec un `OR` couvrant aussi
+`episodes → seasons → titles`.
 
-## Cause racine découverte en creusant
+- [x] Corrigé dans `apps/api/src/watches/watches.service.ts` (`listWatches`)
+- [x] Nouveau test dans `watches.service.spec.ts` (28 tests, tous verts)
+- [x] Vérifié en direct : watch créé sur un épisode → apparaît bien en
+      filtrant "Série" sur `/history`
+- [x] Limite connue documentée (non corrigée) : le libellé reste générique
+      ("Série — Épisode N"), le nom de la série n'est pas remonté par
+      `listWatches()` pour la branche épisode
 
-Avant même de parler de filtres, ces pages n'affichaient jamais leurs titres
-correctement :
-- `GET /lists` ne renvoyait jamais les items d'une liste (seulement `_count`)
-  → watchlist de l'accueil, page `/watchlist`, favoris du profil toujours vides.
-- `ListCard.tsx` affichait `list.items?.length` (toujours 0) au lieu de
-  `_count.list_items` → "0 titres" partout sur `/lists`.
-- La page `/lists/:id` n'existait pas du tout.
-- Le typage frontend `ListDetail.items` ne correspondait pas à la réponse
-  réelle du backend.
+## Modification E — Retirer le module "Listes" de la page profil
 
-## Steps
+- [x] Section "Gestion des listes" retirée de `profile/page.tsx`
+- [x] Section "Favoris" conservée (distincte, non concernée)
+- [x] Imports/state devenus inutiles nettoyés (Button, Skeleton, Alert,
+      Plus, ListCard, ListDialog, dialogOpen)
 
-- [x] 1. Confirmé avec l'utilisateur (question posée) : scope élargi accepté
-      pour corriger la fondation de données avant de brancher les filtres.
-- [x] 2. Backend : `getUserLists()` inclut un tableau `items` allégé par liste
-      (type/année/note/genreIds/countryIds) pour le filtrage sans N+1.
-- [x] 3. Backend : `getListDetail()` renvoie les items au format frontend
-      `Title` (camelCase, avec genres/pays/note/date de sortie).
-- [x] 4. Nouvelle page `/lists/[id]` (détail liste, avec filtres).
-- [x] 5. `ListCard.tsx` : compteur `_count.list_items`, carte cliquable vers
-      `/lists/:id`.
-- [x] 6. `/watchlist`, accueil (section Watchlist), profil (section Favoris) :
-      basculés sur `useList(listId)` (détail réel) au lieu de `useLists()`.
-- [x] 7. `lib/titleFilters.ts` : ajout de `titleMatchesFilters`/
-      `toFilterableTitle`/`FilterableTitle`.
-- [x] 8. Filtres branchés : accueil (Watchlist + Historique), `/watchlist`,
-      `/lists` (n'affiche que les listes avec un titre correspondant),
-      `/lists/:id`, `/history` (filtre type uniquement, transmis au backend).
-- [x] 9. `Header.tsx` : menu de filtres restreint aux pages où il a un effet
-      (`/`, `/search`, `/calendar`, `/watchlist`, `/lists`, `/history`) ;
-      bouton "Filtres" (genre/pays/année/note) masqué sur `/history` (données
-      non disponibles sur les visionnages).
-- [x] 10. `lists.service.spec.ts` mis à jour pour la nouvelle forme de
-       réponse — 36 tests, tous verts.
-- [x] 11. `npx tsc --noEmit` (frontend) : aucune erreur. Backend : compile
-       proprement (`Nest application successfully started`).
-- [x] 12. Vérifié dans le navigateur (compte de test, 1 film + 1 série en
-       watchlist) : `/watchlist`, `/lists` (compteur correct), `/lists/:id`,
-       accueil affichent les vrais titres ; filtre "Film" fonctionne ; les
-       filtres sont bien masqués sur `/titles/:id`.
+## Modification F — Simplifier l'en-tête de l'accueil
 
-## Backlog ajouté (documenté dans docs/bugs.md, pas implémenté)
+- [x] Bloc "Bienvenue, {pseudo}" retiré pour les utilisateurs connectés
+- [x] Grille de 4 stats (Visionnages/Notes/Listes/Séries suivies) retirée
+- [x] En-tête invité ("Bienvenue sur eMDB" + CTA) conservé, non concerné
+- [x] Nettoyage : composant `StatCard` et hook `useFollowedSeries()` devenus
+      morts, retirés
 
-Sur demande de l'utilisateur, ajouté dans `docs/bugs.md` :
-- Bug #44 : filtre "Série" sur `/history` ne renvoie rien (cause identifiée :
-  les watches d'épisodes ont `title_id = null`, non couverts par le filtre).
-- Bug #45 : icônes vu/bookmark non fonctionnelles sur les affiches (à
-  reproduire — possible régression des bugs #29/#30).
-- Modification E : retirer le module Listes de la page profil.
-- Modification F : simplifier l'en-tête de l'accueil (retirer bienvenue + stats).
-- Modification G : nouvelle page "Découvrir" (tendances/populaires/attendus/sorties).
-- Modification H : menu contextuel "⋮" sur les affiches (watchlist/vu avec date).
-- Modification I : tooltip au survol des icônes vu/bookmark.
+## Vérifications finales
+
+- [x] `npx tsc --noEmit` (frontend) : aucune erreur
+- [x] Vérifié dans le navigateur : accueil ne montre plus "Bienvenue,
+      DebugTester4" ni les 4 cases ; profil ne montre plus "Mes Listes"
+
+## Reste du backlog (documenté, pas implémenté)
+
+- Bug #45 : icônes vu/bookmark non fonctionnelles — à investiguer
+- Modification G : page "Découvrir" (tendances/populaires/attendus/sorties)
+- Modification H : menu contextuel "⋮" sur les affiches
+- Modification I : tooltip au survol des icônes vu/bookmark (dépend de #45)
