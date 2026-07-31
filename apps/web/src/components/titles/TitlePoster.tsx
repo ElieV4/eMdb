@@ -69,8 +69,10 @@ export function TitlePoster({
         blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQ1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMwMzMzMzMiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMTUwIiBjeT0iMjI1IiByPSI4MCIvPjwvZz48L2c+PC9zdmc+"
       />
 
-      {/* Badge de type (film/serie) */}
-      <div className="absolute top-2 right-2 z-10">
+      {/* Badge de type (film/serie) — en bas à droite pour laisser la place,
+          en haut à droite, au menu actions rapides ("⋮", rendu par TitleCard
+          en dehors de ce composant). */}
+      <div className="absolute bottom-2 right-2 z-10">
         <span
           className={cn(
             "px-2 py-1 text-xs font-medium rounded-full",

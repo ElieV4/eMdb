@@ -15,6 +15,7 @@ export function useDeleteWatch() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["watches"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["watched-titles-set"] });
     },
   });
 }

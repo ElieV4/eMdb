@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { Star } from "lucide-react";
 import { TitlePoster } from "./TitlePoster";
+import { TitleQuickActionsMenu } from "./TitleQuickActionsMenu";
 import { TitleSearchResult } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 
@@ -48,74 +49,92 @@ export function TitleCard({
     ? `/titles/${id}`
     : `/titles/tmdb/${title.tmdbId}?type=${type}`;
 
+  const posterWidth = compact ? 150 : 200;
+
   return (
-    <Link
-      href={href}
-      className={cn(
-        "group block overflow-hidden rounded-lg transition-all duration-200",
-        "hover:shadow-md hover:-translate-y-0.5",
-        className,
-      )}
+    // Largeur alignée sur celle de l'affiche : sans ça, le wrapper (bloc)
+    // s'étire à la largeur de la cellule de grille, et le bouton "⋮"
+    // positionné en absolu par rapport à lui atterrit hors de l'affiche.
+    <div
+      className={cn("group relative", className)}
+      style={{ width: `${posterWidth}px` }}
     >
-      <TitlePoster
-        src={afficheUrl}
-        alt={titre}
-        title={titre}
-        type={type}
-        width={compact ? 150 : 200}
-        height={compact ? 225 : 300}
-        priority={false}
-        watched={watched}
+      {/* Le menu actions rapides est un bouton — il ne peut pas être imbriqué
+          dans le <Link> ci-dessous (HTML invalide, cf. bug #45), donc il est
+          rendu en frère, positionné par-dessus. */}
+      <TitleQuickActionsMenu
+        titleId={id}
         inWatchlist={inWatchlist}
-        inFavorites={inFavorites}
+        watched={watched}
+        className="absolute top-2 right-2 z-30"
       />
+      <Link
+        href={href}
+        className={cn(
+          "block overflow-hidden rounded-lg transition-all duration-200",
+          "hover:shadow-md hover:-translate-y-0.5",
+        )}
+      >
+        <TitlePoster
+          src={afficheUrl}
+          alt={titre}
+          title={titre}
+          type={type}
+          width={compact ? 150 : 200}
+          height={compact ? 225 : 300}
+          priority={false}
+          watched={watched}
+          inWatchlist={inWatchlist}
+          inFavorites={inFavorites}
+        />
 
-      <div className="p-3 bg-background">
-        <div className="space-y-1">
-          {/* Titre */}
-          <h3
-            className={cn(
-              "font-semibold line-clamp-1 group-hover:text-primary",
-              compact ? "text-sm" : "text-base",
+        <div className="p-3 bg-background">
+          <div className="space-y-1">
+            {/* Titre */}
+            <h3
+              className={cn(
+                "font-semibold line-clamp-1 group-hover:text-primary",
+                compact ? "text-sm" : "text-base",
+              )}
+            >
+              {displayTitle}
+            </h3>
+
+            {/* Titre original si différent */}
+            {titreOriginal && titreOriginal !== titre && !compact && (
+              <p className="text-xs text-muted-foreground line-clamp-1">
+                {titre}
+              </p>
             )}
-          >
-            {displayTitle}
-          </h3>
 
-          {/* Titre original si différent */}
-          {titreOriginal && titreOriginal !== titre && !compact && (
-            <p className="text-xs text-muted-foreground line-clamp-1">
-              {titre}
-            </p>
-          )}
+            {/* Métadonnées (année, note) */}
+            <div className="flex items-center gap-2 text-sm">
+              {year && <span className="text-muted-foreground">{year}</span>}
 
-          {/* Métadonnées (année, note) */}
-          <div className="flex items-center gap-2 text-sm">
-            {year && <span className="text-muted-foreground">{year}</span>}
+              {note && (
+                <span className="flex items-center gap-0.5 text-amber-400">
+                  <Star className="h-3.5 w-3.5 fill-current" />
+                  <span>{Number(note).toFixed(1)}</span>
+                </span>
+              )}
 
-            {note && (
-              <span className="flex items-center gap-0.5 text-amber-400">
-                <Star className="h-3.5 w-3.5 fill-current" />
-                <span>{Number(note).toFixed(1)}</span>
-              </span>
-            )}
-
-            {showType && !compact && (
-              <span
-                className={cn(
-                  "px-1.5 py-0.5 text-xs font-medium rounded-full",
-                  type === "film"
-                    ? "bg-primary/10 text-primary-foreground"
-                    : "bg-secondary/10 text-secondary-foreground",
-                )}
-              >
-                {type === "film" ? "Film" : "Série"}
-              </span>
-            )}
+              {showType && !compact && (
+                <span
+                  className={cn(
+                    "px-1.5 py-0.5 text-xs font-medium rounded-full",
+                    type === "film"
+                      ? "bg-primary/10 text-primary-foreground"
+                      : "bg-secondary/10 text-secondary-foreground",
+                  )}
+                >
+                  {type === "film" ? "Film" : "Série"}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }
 
@@ -144,28 +163,33 @@ export function TitleCardHorizontal({
     : `/titles/tmdb/${title.tmdbId}?type=${type}`;
 
   return (
-    <Link
-      href={href}
-      className={cn(
-        "group flex items-center gap-4 p-3 rounded-lg transition-all duration-200",
-        "hover:bg-muted/50",
-        className,
-      )}
-    >
-      <TitlePoster
-        src={afficheUrl}
-        alt={titre}
-        title={titre}
-        type={type}
-        width={80}
-        height={120}
-        className="shrink-0"
-        watched={watched}
+    <div className={cn("group relative", className)}>
+      {/* Positionné sur le coin de l'affiche (80px de large) — bouton, donc
+          rendu hors du <Link> ci-dessous, cf. TitleCard. */}
+      <TitleQuickActionsMenu
+        titleId={id}
         inWatchlist={inWatchlist}
-        inFavorites={inFavorites}
+        watched={watched}
+        className="absolute top-1 left-[52px] z-30"
       />
+      <Link
+        href={href}
+        className="flex items-center gap-4 p-3 rounded-lg transition-all duration-200 hover:bg-muted/50"
+      >
+        <TitlePoster
+          src={afficheUrl}
+          alt={titre}
+          title={titre}
+          type={type}
+          width={80}
+          height={120}
+          className="shrink-0"
+          watched={watched}
+          inWatchlist={inWatchlist}
+          inFavorites={inFavorites}
+        />
 
-      <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0">
         <h3 className="font-semibold text-sm line-clamp-1 group-hover:text-primary">
           {titre}
         </h3>
@@ -193,7 +217,8 @@ export function TitleCardHorizontal({
             {type === "film" ? "Film" : "Série"}
           </span>
         </div>
-      </div>
-    </Link>
+        </div>
+      </Link>
+    </div>
   );
 }

@@ -15,15 +15,22 @@ export function useListMembership() {
   const { isAuthenticated } = useAuthStore();
   const { data: lists, isLoading } = useLists(isAuthenticated);
 
+  const watchlist = lists?.find((list) => list.type === "watchlist");
+  const favoris = lists?.find((list) => list.type === "favoris");
+
   const watchlistIds = useMemo(() => {
-    const watchlist = lists?.find((list) => list.type === "watchlist");
     return new Set((watchlist?.items ?? []).map((item) => item.titleId));
-  }, [lists]);
+  }, [watchlist]);
 
   const favoriteIds = useMemo(() => {
-    const favoris = lists?.find((list) => list.type === "favoris");
     return new Set((favoris?.items ?? []).map((item) => item.titleId));
-  }, [lists]);
+  }, [favoris]);
 
-  return { watchlistIds, favoriteIds, isLoading };
+  return {
+    watchlistIds,
+    favoriteIds,
+    watchlistId: watchlist?.id,
+    favorisId: favoris?.id,
+    isLoading,
+  };
 }

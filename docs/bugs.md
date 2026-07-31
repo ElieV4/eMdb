@@ -576,16 +576,30 @@
 - **À trancher avant implémentation :** la source de chaque module — TMDB expose des endpoints tout faits pour une partie (`trending`, `popular`, `upcoming`/`now_playing`), mais pas forcément un équivalent direct pour "attendus" (le plus proche : `upcoming` trié par nombre de votes/popularité anticipée, ou une note communautaire de type "most anticipated" qui n'existe pas nativement sur TMDB) — si la donnée n'est pas disponible telle quelle, réfléchir à un algo de substitution par module (ex. "Attendus" = titres non sortis triés par popularité TMDB décroissante).
 - **Fichiers concernés (pressentis) :** nouvelle route `apps/web/src/app/(frontend)/discover/page.tsx`, nouveaux hooks `apps/web/src/hooks/api/useDiscover*.ts`, éventuel nouvel endpoint backend si TMDB ne couvre pas tous les modules directement.
 
-### H. Menu contextuel (trois points) sur les affiches de titres
+### H. Menu contextuel (trois points) sur les affiches de titres — ✅ fait
 - **Description demandée :** Sur les affiches de titres (`TitleCard`/`TitlePoster`), quel que soit le module où elles apparaissent, ajouter un bouton "⋮" (trois points) en haut à droite ouvrant un dropdown dont le contenu dépend de l'état du titre pour l'utilisateur connecté :
   - Ajouter à la watchlist / Retirer de la watchlist (selon présence actuelle)
   - Marquer comme vu, avec un sous-menu/dropdown de sélection de date — ou Retirer de l'historique si déjà vu
-- **Fichiers concernés (pressentis) :** `apps/web/src/components/titles/TitleCard.tsx`, `apps/web/src/components/titles/TitlePoster.tsx`, réutilisation des hooks existants (`useAddItem`/`useRemoveItem`, `useCreateWatch`/`useDeleteWatch`) déjà utilisés dans `TitleActions.tsx` sur la page titre — à factoriser plutôt que dupliquer la logique.
+- **Fait :** nouveau composant `apps/web/src/components/titles/TitleQuickActionsMenu.tsx`, réutilisant `useAddItem`/`useRemoveItem`, `useCreateWatch`/`useDeleteAllWatches` et `useListMembership` (bug #45). Rendu en haut à droite de l'affiche.
+  - **Contrainte structurelle :** le bouton ne peut pas être imbriqué dans le `<Link>` de la carte (même classe de bug que #45 — `<button>` dans `<a>` est du HTML invalide). `TitleCard`/`TitleCardHorizontal` ont été restructurés : le menu est rendu en élément frère du `<Link>`, positionné par-dessus en absolu.
+  - `TitlePoster` : le badge de type (Film/Série) déplacé de haut-droite vers bas-droite pour laisser la place au bouton "⋮" (rendu par `TitleCard`, pas par `TitlePoster` lui-même).
+  - Effet de bord corrigé au passage : `useCreateWatch`/`useDeleteWatch`/`useDeleteAllWatches` n'invalidaient pas le cache `["watched-titles-set"]` consommé par l'icone "vu" — l'icone ne se mettait donc à jour qu'après un rechargement complet de page, y compris via l'ancien `WatchButton`. Corrigé pour les trois hooks.
+- **Fichiers modifiés :** `apps/web/src/components/titles/TitleQuickActionsMenu.tsx` (nouveau), `apps/web/src/components/titles/TitleCard.tsx`, `apps/web/src/components/titles/TitlePoster.tsx`, `apps/web/src/hooks/api/useListMembership.ts` (expose `watchlistId`/`favorisId`), `apps/web/src/hooks/api/useCreateWatch.ts`, `apps/web/src/hooks/api/useDeleteWatch.ts`, `apps/web/src/hooks/api/useDeleteAllWatches.ts`, `apps/web/src/__tests__/unit/components/titles/TitleCard.test.tsx` (ajout d'un `QueryClientProvider`, désormais nécessaire).
+- **Vérification manuelle :** sur `/search` et `/watchlist`, le bouton "⋮" ouvre le menu sans déclencher la navigation de la carte ; contenu contextuel correct (ex. "Retirer de la watchlist" + "Retirer de l'historique" pour un titre déjà présent/vu) ; retirer de la watchlist et marquer/retirer "vu" fonctionnent et se reflètent immédiatement sur l'affiche, sans rechargement.
 
 ### I. Tooltip au survol des icônes "vu"/"watchlist"/"favori" sur les affiches — ✅ fait
 - **Description demandée :** Ajouter une bulle d'aide (tooltip) expliquant ce que représente l'icône au survol.
 - **Fait :** nouveau composant `apps/web/src/components/ui/tooltip.tsx` (wrapper autour de `@base-ui/react/tooltip`, même convention que `dropdown-menu.tsx`), utilisé par les 3 icones de `TitlePoster.tsx` ("Dans les favoris" / "Dans la watchlist" / "Déjà vu"). Implémenté en même temps que le bug #45.
 - **Fichiers modifiés :** `apps/web/src/components/ui/tooltip.tsx` (nouveau), `apps/web/src/components/titles/TitlePoster.tsx`
+
+### J. Refonte Historique & Calendrier — même traitement pour les deux
+- **Description demandée :** Historique (`/history`) et Calendrier (`/calendar`) doivent adopter le même comportement, à deux niveaux :
+  1. **Module intra-accueil** (les deux sections sur la page d'accueil) : titres affichés les uns derrière les autres (liste, pas grille), avec un badge en bas à droite de chaque élément donnant la date relative de sortie (calendrier) ou de visionnage (historique) du titre ou de l'épisode :
+     - Formats attendus : "dans 3h", "il y a 3h", "hier", "demain", "mercredi prochain", "jeudi dernier", ...
+     - Au-delà d'une semaine (passé ou futur) : date au format `jj/mm/aaaa`.
+  2. **Page dédiée** (`/history` et `/calendar`) : reprendre le format du widget Outlook sur Android — un filtre de période en haut de page (Jour / Semaine / Mois / Trimestre / Semestre / Année), et les titres groupés par période, chaque groupe affiché l'un en dessous de l'autre.
+- **Fichiers concernés (pressentis) :** `apps/web/src/app/(frontend)/history/page.tsx`, `apps/web/src/app/(frontend)/calendar/page.tsx`, `apps/web/src/app/(frontend)/page.tsx` (sections Historique/Calendrier de l'accueil), `apps/web/src/components/watches/CalendarEpisodes.tsx`, nouvelle fonction utilitaire de formatage de date relative (à mutualiser entre les deux modules plutôt que dupliquée), nouveau composant de filtre de période.
+- **Statut :** non implémenté.
 
 ---
 

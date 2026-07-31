@@ -21,6 +21,9 @@ export function useCreateWatch() {
       queryClient.invalidateQueries({ queryKey: ["calendar"] });
       queryClient.invalidateQueries({ queryKey: ["serie-progress"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      // Set consommé par l'icone "vu" sur les affiches (bug lié au #45) —
+      // sans ça, l'icone ne se met à jour qu'après un rechargement complet.
+      queryClient.invalidateQueries({ queryKey: ["watched-titles-set"] });
     },
   });
 }
