@@ -7,6 +7,7 @@ const prismaServiceMock = {
   user_lists: {
     create: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     findMany: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
@@ -59,6 +60,8 @@ describe('ListsService', () => {
     type: overrides.type ?? 'watchlist',
     description: overrides.description ?? null,
     created_at: overrides.created_at ?? new Date('2026-07-23'),
+    _count: overrides._count ?? { list_items: 0 },
+    list_items: overrides.list_items ?? [],
   });
 
   const buildListItem = (overrides: any = {}) => ({
@@ -73,6 +76,12 @@ describe('ListsService', () => {
       titre_vf: 'Film Test',
       affiche_url: '/poster.jpg',
       type: 'film',
+      date_sortie: new Date('2020-01-01'),
+      note_imdb: 7.5,
+      title_genres: [{ genre_id: 'genre-1', genres: { id: 'genre-1', nom: 'Action' } }],
+      title_countries: [
+        { country_id: 'country-1', countries: { id: 'country-1', nom: 'France' } },
+      ],
     },
   });
 
@@ -92,7 +101,8 @@ describe('ListsService', () => {
   // createList
   // ======================================================================
   describe('createList', () => {
-    it('crée une liste de type watchlist', async () => {
+    it("crée une liste de type watchlist si l'utilisateur n'en a pas déjà une", async () => {
+      prismaServiceMock.user_lists.findFirst.mockResolvedValue(null);
       const expected = buildList({ type: 'watchlist' });
       prismaServiceMock.user_lists.create.mockResolvedValue(expected);
 
@@ -110,6 +120,23 @@ describe('ListsService', () => {
           description: null,
         },
       });
+    });
+
+    it("retourne la watchlist existante sans en créer une deuxième (bug #42)", async () => {
+      const existing = buildList({ type: 'watchlist', nom: 'Ma Watchlist' });
+      prismaServiceMock.user_lists.findFirst.mockResolvedValue(existing);
+
+      const result = await service.createList(userId, {
+        nom: 'Ma Watchlist',
+        type: 'watchlist',
+      });
+
+      expect(result).toEqual(existing);
+      expect(prismaServiceMock.user_lists.findFirst).toHaveBeenCalledWith({
+        where: { user_id: userId, type: 'watchlist' },
+        orderBy: { created_at: 'asc' },
+      });
+      expect(prismaServiceMock.user_lists.create).not.toHaveBeenCalled();
     });
 
     it('crée une liste de type custom avec description', async () => {
@@ -140,6 +167,7 @@ describe('ListsService', () => {
     it('crée une liste (le type est validé par class-validator dans le DTO)', async () => {
       // La validation du type enum est faite par class-validator au niveau du DTO.
       // Le service reçoit le type déjà validé et le passe à Prisma.
+      prismaServiceMock.user_lists.findFirst.mockResolvedValue(null);
       const expected = buildList({ type: 'watchlist', nom: 'Test' });
       prismaServiceMock.user_lists.create.mockResolvedValue(expected);
 
@@ -157,19 +185,49 @@ describe('ListsService', () => {
   // getUserLists
   // ======================================================================
   describe('getUserLists', () => {
-    it("retourne les listes de l'utilisateur", async () => {
+    it("retourne les listes de l'utilisateur avec des items allégés pour le filtrage", async () => {
       const lists = [
-        buildList({ id: 'list-1', nom: 'Liste 1' }),
+        buildList({
+          id: 'list-1',
+          nom: 'Liste 1',
+          list_items: [buildListItem()],
+        }),
         buildList({ id: 'list-2', nom: 'Liste 2' }),
       ];
       prismaServiceMock.user_lists.findMany.mockResolvedValue(lists);
 
       const result = await service.getUserLists(userId);
 
-      expect(result).toEqual(lists);
+      expect(result[0].id).toBe('list-1');
+      expect(result[0].items).toEqual([
+        {
+          type: 'film',
+          year: 2020,
+          note: 7.5,
+          genreIds: ['genre-1'],
+          countryIds: ['country-1'],
+        },
+      ]);
+      expect(result[1].items).toEqual([]);
+      expect((result[0] as any).list_items).toBeUndefined();
       expect(prismaServiceMock.user_lists.findMany).toHaveBeenCalledWith({
         where: { user_id: userId },
-        include: { _count: { select: { list_items: true } } },
+        include: {
+          _count: { select: { list_items: true } },
+          list_items: {
+            select: {
+              titles: {
+                select: {
+                  type: true,
+                  date_sortie: true,
+                  note_imdb: true,
+                  title_genres: { select: { genre_id: true } },
+                  title_countries: { select: { country_id: true } },
+                },
+              },
+            },
+          },
+        },
         orderBy: { created_at: 'desc' },
       });
     });
@@ -187,7 +245,7 @@ describe('ListsService', () => {
   // getListDetail
   // ======================================================================
   describe('getListDetail', () => {
-    it('retourne la liste avec ses items si propriétaire', async () => {
+    it('retourne la liste avec ses items au format frontend (Title) si propriétaire', async () => {
       prismaServiceMock.user_lists.findUnique.mockResolvedValue(buildList({ user_id: userId }));
       prismaServiceMock.list_items.findMany.mockResolvedValue([
         buildListItem({ position: 0 }),
@@ -198,8 +256,19 @@ describe('ListsService', () => {
 
       expect(result.id).toBe(listId);
       expect(result.items).toHaveLength(2);
-      expect(result.items[0].title_id).toBe(titleId);
-      expect(result.items[0].position).toBe(0);
+      expect(result.items[0]).toMatchObject({
+        id: titleId,
+        tmdbId: 123,
+        titre: 'Test Movie',
+        titreOriginal: 'Film Test',
+        type: 'film',
+        note: 7.5,
+        afficheUrl: '/poster.jpg',
+        genres: [{ id: 'genre-1', nom: 'Action' }],
+        pays: [{ id: 'country-1', nom: 'France' }],
+        position: 0,
+      });
+      expect(result.items[0].dateSortie).toBeDefined();
     });
 
     it('retourne la liste si partagée en lecture', async () => {

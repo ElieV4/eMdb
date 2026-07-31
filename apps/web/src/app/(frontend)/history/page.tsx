@@ -7,6 +7,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useWatches } from "@/hooks/api/useWatches";
 import { useDeleteWatch } from "@/hooks/api/useDeleteWatch";
@@ -15,10 +16,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
+import { parseTitleFilters } from "@/lib/titleFilters";
 
 export default function HistoryPage() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
-  const { data, isLoading, error } = useWatches({ limit: 20 });
+  const searchParams = useSearchParams();
+  // Seul le filtre type (film/série) s'applique ici : les visionnages ne
+  // portent pas les genres/pays/note du titre (donnée non disponible sans
+  // changement backend plus large).
+  const filters = parseTitleFilters(searchParams);
+  const { data, isLoading, error } = useWatches({
+    limit: 20,
+    type: filters.type !== "tout" ? filters.type : undefined,
+  });
   const deleteWatch = useDeleteWatch();
 
   if (isAuthLoading) {
@@ -65,7 +75,9 @@ export default function HistoryPage() {
           </Alert>
         ) : !data || data.items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Vous n&apos;avez encore rien marqué comme vu.
+            {filters.type !== "tout"
+              ? "Aucun visionnage ne correspond au filtre actif."
+              : "Vous n'avez encore rien marqué comme vu."}
           </p>
         ) : (
           <div className="space-y-3">

@@ -472,6 +472,35 @@
 - **Non corrigé (hors scope) :** la cause exacte du double déclenchement de `onSuccess` dans `useRegister()` (probable artefact React Strict Mode / dev only) n'a pas été éliminée à la source — seul son effet (duplication en base) est neutralisé par l'idempotence backend. Un `POST /lists` redondant continue donc de partir à l'inscription, sans conséquence utilisateur.
 - **Vérification manuelle :** compte de test recréé après correction — une seule "Ma Watchlist" et un seul "Mes Favoris" après inscription ; formulaire "Créer une liste" ne propose plus que Nom/Description.
 
+### 33. Filtres de type du header (Tout/Film/Série/Personne) inopérants sur la page recherche
+- **Symptôme :** Les boutons de filtre dans le header (Tout, Film, Série, Personne) ne changent pas les résultats de la page recherche.
+- **Cause racine :** `Header.tsx` écrit correctement le filtre `type` dans les paramètres d'URL (bug #28), mais `search/page.tsx` lisait `searchParams` comme une **prop** figée au montage (`useState(urlTab || "tout")`, sans setter jamais appelé) plutôt que via le hook réactif `useSearchParams()`. Une navigation vers la même route avec un `type` différent (déclenchée par le header, sans démonter la page) mettait bien à jour la prop `searchParams`, mais `activeTab` restait gelé à sa valeur initiale — les requêtes `useTitles()`/`usePeople()` ne recevaient donc jamais le nouveau filtre.
+- **Correction :** `search/page.tsx` dérive désormais `activeTab` et `page` directement de `useSearchParams()` à chaque rendu (plus d'état local figé) ; `query` reste un état local contrôlé pour la saisie, resynchronisé via un `useEffect` si l'URL change ailleurs (navigation, retour arrière). Corrigé au passage dans `Header.tsx` : l'onglet "Personne" (valide uniquement sur `/search`) ne s'affichait jamais comme actif — `parseTitleFilters()` normalise `type=personne` en `"tout"` (il ne fait partie que du `TitleTypeFilter` partagé film/série), donc le surlignage des tabs utilise maintenant la valeur brute du paramètre d'URL plutôt que ce filtre normalisé.
+- **Fichiers modifiés :** `apps/web/src/app/(frontend)/search/page.tsx`, `apps/web/src/components/layout/Header.tsx`
+- **Vérification manuelle :** sur `/search?query=matrix`, cliquer "Série" (sans rechargement de page) déclenche bien `GET /titles/search?...&type=serie` et affiche des séries ; cliquer "Personne" affiche des personnes et surligne correctement l'onglet.
+
+### 43. Filtres du header inopérants sur accueil/watchlist/listes/historique — et `GET /lists` ne renvoyait jamais les titres d'une liste
+- **Symptôme :** Demande de l'utilisateur — les filtres du header (type + genre/pays/année/note) devaient pouvoir s'appliquer sur l'accueil, la watchlist, les listes et l'historique. En creusant : ces pages n'affichaient de toute façon jamais leurs titres correctement (watchlist et favoris systématiquement vides, page `/lists/:id` inexistante), donc il n'y avait rien à filtrer.
+- **Cause racine (plusieurs bugs cumulés) :**
+  1. `ListsService.getUserLists()` (`GET /lists`) n'a jamais renvoyé les items d'une liste (seulement `_count`), alors que le frontend (`app/(frontend)/page.tsx`, `app/(frontend)/watchlist/page.tsx`, `app/(frontend)/profile/page.tsx`) lisait `list.items` en s'appuyant sur son typage — toujours `undefined`. La watchlist de l'accueil, la page `/watchlist` et les favoris du profil étaient donc **systématiquement vides**, quel que soit le contenu réel.
+  2. `ListCard.tsx` affichait `list.items?.length` (toujours 0) au lieu de `_count.list_items` — toutes les listes affichaient "0 titres" sur `/lists`, même non vides.
+  3. La page `/lists/:id` (détail d'une liste) n'existait pas du tout, malgré un test (`ListCard.test.tsx`) qui attendait déjà un lien vers cette route.
+  4. `ListDetail.items` (typage frontend) ne correspondait pas à la réponse réelle de `GET /lists/:id` (`{title_id, position, added_at, title: {...}}` en snake_case vs `Title[]` attendu), et le select Prisma ne remontait ni genres, ni pays, ni note, ni date de sortie — indispensables pour filtrer.
+- **Correction :**
+  - Backend (`apps/api/src/lists/lists.service.ts`) :
+    - `getUserLists()` inclut désormais, par liste, un tableau `items` allégé (`type`, `year`, `note`, `genreIds`, `countryIds`) suffisant pour déterminer si une liste contient un titre correspondant aux filtres actifs, sans avoir à charger le détail de chaque liste.
+    - `getListDetail()` renvoie désormais les items au format frontend `Title` (camelCase, avec genres/pays/note/date de sortie), prêts pour `TitleCard` et le filtrage.
+  - Frontend :
+    - Nouvelle page `app/(frontend)/lists/[id]/page.tsx` (détail d'une liste), avec filtres appliqués.
+    - `ListCard.tsx` : compteur basé sur `_count.list_items`, carte cliquable vers `/lists/:id`.
+    - `app/(frontend)/watchlist/page.tsx` et la section "Watchlist" de l'accueil : récupèrent désormais le détail réel de la liste watchlist (`useList(watchlistId)`) au lieu de `useLists()`. Section "Favoris" du profil : idem.
+    - `lib/titleFilters.ts` : ajout de `titleMatchesFilters()`/`toFilterableTitle()`/`FilterableTitle`, réutilisés par toutes les pages listées ci-dessous.
+    - Filtres branchés : accueil (sections Watchlist et Historique — Recommandés reste non filtrable, section non implémentée côté backend, cf. `useRecommendations()` toujours stub vide), `/watchlist`, `/lists` (n'affiche que les listes contenant un titre correspondant), `/lists/:id`, `/history` (filtre `type` uniquement, transmis au backend via `GET /watches?type=...` — les autres filtres ne s'appliquent pas, cf. bug lié ci-dessous).
+    - `Header.tsx` : le menu de filtres (tabs + bouton "Filtres") ne s'affiche plus que sur les pages où il a un effet (`/`, `/search`, `/calendar`, `/watchlist`, `/lists`(+ `/lists/:id`), `/history`) — masqué ailleurs (pages titre/personne/épisode/profil). Sur `/history`, seuls les tabs type s'affichent (pas le bouton "Filtres" : genre/pays/année/note non disponibles sur les visionnages, cf. bug lié).
+  - Tests : `lists.service.spec.ts` mis à jour pour la nouvelle forme de réponse (36 tests, tous verts).
+- **Fichiers modifiés :** `apps/api/src/lists/lists.service.ts`, `apps/api/src/lists/lists.service.spec.ts`, `apps/web/src/lib/types/api.ts`, `apps/web/src/lib/titleFilters.ts`, `apps/web/src/components/lists/ListCard.tsx`, `apps/web/src/components/layout/Header.tsx`, `apps/web/src/app/(frontend)/lists/[id]/page.tsx` (nouveau), `apps/web/src/app/(frontend)/lists/page.tsx`, `apps/web/src/app/(frontend)/watchlist/page.tsx`, `apps/web/src/app/(frontend)/page.tsx`, `apps/web/src/app/(frontend)/profile/page.tsx`, `apps/web/src/app/(frontend)/history/page.tsx`
+- **Vérification manuelle :** compte de test avec 1 film + 1 série en watchlist — `/watchlist`, `/lists` (compteur "2 titres"), `/lists/:id` et la section Watchlist de l'accueil affichent désormais les vrais titres ; filtre "Film" sur `/watchlist` ne garde que le film ; page titre (`/titles/:id`) ne montre plus les filtres du header.
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -520,15 +549,35 @@
   - Vérifier qu'ajouter un film à la watchlist fait apparaître le bookmark sur son affiche
   - Vérifier qu'ajouter une série à la watchlist fait apparaître le bookmark sans dupliquer une notification/calendrier si elle n'est pas explicitement suivie (selon l'option retenue)
 
+### E. Retirer le module "Listes" de la page profil
+- **Description demandée :** Supprimer la section "Gestion des listes" (grille de listes + bouton "Créer une liste") de `app/(frontend)/profile/page.tsx` — les listes ont désormais leur propre page dédiée (`/lists`, cf. bug #43), ce module est redondant sur le profil.
+- **Fichier concerné :** `apps/web/src/app/(frontend)/profile/page.tsx`
+- **Note :** la section "Favoris" du profil (titres favoris affichés en grille) est distincte du module "Listes" et n'est pas concernée par cette demande — à confirmer si elle doit rester.
+
+### F. Simplifier l'en-tête de la page d'accueil
+- **Description demandée :** Retirer le bloc "Bienvenue, {pseudo}" et les 4 cases de statistiques (Visionnages/Notes/Listes/Séries suivies) de la page d'accueil.
+- **Fichier concerné :** `apps/web/src/app/(frontend)/page.tsx`
+
+### G. Nouvelle page "Découvrir" (tendances, populaires, attendus, sorties)
+- **Description demandée :** Créer une page dédiée à la découverte de titres, avec 4 modules : Tendances, Populaires, Attendus, Sorties.
+- **À trancher avant implémentation :** la source de chaque module — TMDB expose des endpoints tout faits pour une partie (`trending`, `popular`, `upcoming`/`now_playing`), mais pas forcément un équivalent direct pour "attendus" (le plus proche : `upcoming` trié par nombre de votes/popularité anticipée, ou une note communautaire de type "most anticipated" qui n'existe pas nativement sur TMDB) — si la donnée n'est pas disponible telle quelle, réfléchir à un algo de substitution par module (ex. "Attendus" = titres non sortis triés par popularité TMDB décroissante).
+- **Fichiers concernés (pressentis) :** nouvelle route `apps/web/src/app/(frontend)/discover/page.tsx`, nouveaux hooks `apps/web/src/hooks/api/useDiscover*.ts`, éventuel nouvel endpoint backend si TMDB ne couvre pas tous les modules directement.
+
+### H. Menu contextuel (trois points) sur les affiches de titres
+- **Description demandée :** Sur les affiches de titres (`TitleCard`/`TitlePoster`), quel que soit le module où elles apparaissent, ajouter un bouton "⋮" (trois points) en haut à droite ouvrant un dropdown dont le contenu dépend de l'état du titre pour l'utilisateur connecté :
+  - Ajouter à la watchlist / Retirer de la watchlist (selon présence actuelle)
+  - Marquer comme vu, avec un sous-menu/dropdown de sélection de date — ou Retirer de l'historique si déjà vu
+- **Fichiers concernés (pressentis) :** `apps/web/src/components/titles/TitleCard.tsx`, `apps/web/src/components/titles/TitlePoster.tsx`, réutilisation des hooks existants (`useAddItem`/`useRemoveItem`, `useCreateWatch`/`useDeleteWatch`) déjà utilisés dans `TitleActions.tsx` sur la page titre — à factoriser plutôt que dupliquer la logique.
+
+### I. Tooltip au survol des icônes "vu" et "bookmark" sur les affiches
+- **Description demandée :** Ajouter une bulle d'aide (tooltip) expliquant ce que représente l'icône au survol des icônes "vu" (œil rouge, bug #29) et "bookmark" (bug #30) sur les affiches.
+- **Fichiers concernés :** `apps/web/src/components/titles/TitlePoster.tsx` (ou équivalent portant ces icônes)
+- **Dépend de :** bug #44 ci-dessous (icônes non fonctionnelles) — à vérifier/corriger avant ou en même temps que l'ajout du tooltip.
+
 ---
 
 ## Bugs à corriger — Header & Navigation
 
-### 33. Filtres de type du header (Tout/Film/Série/Personne) inopérants sur la page recherche
-- **Symptôme :** Les boutons de filtre dans le header (Tout, Film, Série, Personne) ne changent pas les résultats de la page recherche.
-- **Cause racine :** Le `activeFilter` est un état local du `Header.tsx` qui n'est pas synchronisé avec la page recherche. La page recherche a ses propres tabs supprimés, mais le header ne communique pas le filtre actif à la page.
-- **Fichiers concernés :** `apps/web/src/components/layout/Header.tsx`, `apps/web/src/app/(frontend)/search/page.tsx`
-- **Statut :** **partiellement résolu** (bug #28) — `Header.tsx` écrit désormais le filtre `type` dans les paramètres d'URL de la page courante (`apps/web/src/lib/titleFilters.ts`) au lieu d'un state local ; consommé par le module filmographie (`Filmography.tsx`). **Reste à faire :** la page `/search` elle-même ne lit pas encore ce paramètre pour filtrer ses propres résultats — brancher `useSearchParams()` + `parseTitleFilters()` côté `search/page.tsx`.
 
 ### 34. Menu filtre du header à refondre
 - **Symptôme :** Le menu "Filtres" dans le header est un simple dropdown de texte inutile. Il doit contenir des contrôles fonctionnels : dropdown pour genres/région/statut, curseur pour durée et date de sortie, toggle pour vu et watchlist.
@@ -587,6 +636,18 @@
   - Aligner `listUserRatings()` sur le même format que `listWatches()` : renommer `data` → `items`, ajouter `totalPages`
   - Aligner `formatRating()` sur le type frontend `UserRating` (`note`, `createdAt`) ou aligner le type frontend sur le format backend (`note_perso`, `created_at`) — choisir un seul sens de vérité plutôt que deux formats parallèles
   - Vérifier tous les consommateurs de `useUserRatings()` (page profil, historique de notes) une fois corrigé
+
+### 44. Historique : le filtre "Série" ne renvoie aucune donnée
+- **Symptôme :** Signalé par l'utilisateur — sur `/history`, filtrer par "Série" ne renvoie aucun visionnage, même quand des épisodes ont été marqués comme vus.
+- **Cause racine (identifiée, non corrigée) :** `WatchesService.listWatches()` (`apps/api/src/watches/watches.service.ts:266-268`) filtre par `where.titles = { type: filters.type }` — cette condition porte sur la relation `title_id → titles`. Or `createWatch()` (même fichier, ligne ~42-53) impose que `title_id` et `episode_id` soient mutuellement exclusifs : marquer un **épisode** comme vu (le cas normal pour une série) enregistre `title_id = null` et seulement `episode_id`. Le filtre `titles: {type: 'serie'}` ne matche donc jamais ces lignes (relation nulle), même si l'épisode appartient bien à une série — d'où "aucune donnée" dès qu'on filtre par Série alors que l'essentiel des visionnages de séries passent par des épisodes.
+- **Fichiers concernés :** `apps/api/src/watches/watches.service.ts` (`listWatches`, filtre `type`)
+- **Correction à envisager :** étendre le filtre pour couvrir aussi les watches liés à un épisode dont la série parente correspond au type demandé, ex. `OR: [{ titles: { type: filters.type } }, { episodes: { seasons: { titles: { type: filters.type } } } }]` (filtre `type: 'serie'` uniquement pertinent pour la branche épisode, `type: 'film'` ne peut matcher que la branche titre direct).
+- **Statut :** non corrigé.
+
+### 45. Icônes "vu" et "bookmark" non fonctionnelles sur les affiches
+- **Symptôme :** Signalé par l'utilisateur — les icônes "vu" (œil rouge, bug #29) et "bookmark" (bug #30) sur les affiches de titres (`TitleCard`/`TitlePoster`) ne fonctionnent pas. Ces bugs avaient été marqués résolus précédemment (cf. entrées #29/#30 dans "Bugs corrigés") — à reproduire pour déterminer s'il s'agit d'une régression ou d'un cas non couvert par la correction initiale (ex. affiches dans un module particulier, comme les nouvelles pages `/watchlist`, `/lists/:id`, sections de l'accueil introduites par le bug #43).
+- **Fichiers concernés (pressentis) :** `apps/web/src/components/titles/TitlePoster.tsx`, `apps/web/src/components/titles/TitleCard.tsx`, `apps/web/src/hooks/api/useWatchedTitles.ts`, `apps/web/src/hooks/api/useFollowedTitleIds.ts`
+- **Statut :** non investigué — symptôme signalé, cause à identifier.
 
 ---
 

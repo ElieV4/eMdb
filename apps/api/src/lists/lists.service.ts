@@ -151,19 +151,48 @@ export class ListsService {
    * GET /lists
    * Liste des listes de l'utilisateur connecté.
    *
+   * Inclut, pour chaque liste, un tableau `items` allégé (type/année/note/genres/pays,
+   * pas les champs d'affichage) permettant de filtrer côté frontend quelles listes
+   * contiennent au moins un titre correspondant aux filtres actifs du header —
+   * sans avoir à récupérer le détail complet de chaque liste (bug filtres header).
+   *
    * @param userId - UUID de l'utilisateur connecté
    * @returns Tableau des listes
    */
   async getUserLists(userId: string) {
-    return this.prisma.user_lists.findMany({
+    const lists = await this.prisma.user_lists.findMany({
       where: { user_id: userId },
       include: {
         _count: {
           select: { list_items: true },
         },
+        list_items: {
+          select: {
+            titles: {
+              select: {
+                type: true,
+                date_sortie: true,
+                note_imdb: true,
+                title_genres: { select: { genre_id: true } },
+                title_countries: { select: { country_id: true } },
+              },
+            },
+          },
+        },
       },
       orderBy: { created_at: 'desc' },
     });
+
+    return lists.map(({ list_items, ...list }) => ({
+      ...list,
+      items: list_items.map((item) => ({
+        type: item.titles.type,
+        year: item.titles.date_sortie ? item.titles.date_sortie.getFullYear() : null,
+        note: item.titles.note_imdb ? Number(item.titles.note_imdb) : null,
+        genreIds: item.titles.title_genres.map((g) => g.genre_id),
+        countryIds: item.titles.title_countries.map((c) => c.country_id),
+      })),
+    }));
   }
 
   /**
@@ -218,6 +247,10 @@ export class ListsService {
             titre_vf: true,
             affiche_url: true,
             type: true,
+            date_sortie: true,
+            note_imdb: true,
+            title_genres: { include: { genres: { select: { id: true, nom: true } } } },
+            title_countries: { include: { countries: { select: { id: true, nom: true } } } },
           },
         },
       },
@@ -229,11 +262,28 @@ export class ListsService {
       type: list.type,
       description: list.description,
       created_at: list.created_at,
+      // Items au format frontend `Title` (camelCase, prêts pour TitleCard et le
+      // filtrage par type/genre/pays/année/note) plutôt que la forme brute
+      // Prisma — le typage frontend `ListDetail.items: Title[]` ne correspondait
+      // jamais à la réponse réelle jusqu'ici.
       items: items.map((item) => ({
-        title_id: item.title_id,
+        id: item.titles.id,
+        tmdbId: item.titles.tmdb_id ?? undefined,
+        titre: item.titles.titre_vo,
+        titreOriginal:
+          item.titles.titre_vf && item.titles.titre_vf !== item.titles.titre_vo
+            ? item.titles.titre_vf
+            : undefined,
+        type: item.titles.type,
+        dateSortie: item.titles.date_sortie
+          ? item.titles.date_sortie.toISOString()
+          : undefined,
+        note: item.titles.note_imdb ? Number(item.titles.note_imdb) : undefined,
+        afficheUrl: item.titles.affiche_url ?? undefined,
+        genres: item.titles.title_genres.map((tg) => tg.genres),
+        pays: item.titles.title_countries.map((tc) => tc.countries),
+        addedAt: item.added_at,
         position: item.position,
-        added_at: item.added_at,
-        title: item.titles,
       })),
     };
   }

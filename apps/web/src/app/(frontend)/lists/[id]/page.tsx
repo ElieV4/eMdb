@@ -1,18 +1,18 @@
 /**
- * Page watchlist : films et séries à voir.
- * Route : /watchlist
- * Backend : GET /lists (repère la liste de type "watchlist", créée
- * automatiquement à l'inscription) puis GET /lists/:id pour ses titres —
- * GET /lists seul ne renvoie pas les titres au format affichable.
+ * Page détail d'une liste : titres qu'elle contient.
+ * Route : /lists/:id
+ * Backend : GET /lists/:id
  *
- * Applique les filtres du header (type/genre/pays/année/note).
+ * Applique les filtres du header (type/genre/pays/année/note, bug filtres
+ * header sur accueil/watchlist/listes/historique) aux titres affichés.
  */
 
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
-import { useLists } from "@/hooks/api/useLists";
 import { useList } from "@/hooks/api/useList";
 import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
 import { TitleCard } from "@/components/titles/TitleCard";
@@ -44,21 +44,21 @@ function titleToSearchResult(title: Title): TitleSearchResult {
   };
 }
 
-export default function WatchlistPage() {
+const typeLabels: Record<string, string> = {
+  watchlist: "Watchlist",
+  favoris: "Favoris",
+  custom: "Personnalisée",
+};
+
+export default function ListDetailPage() {
+  const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
-  const { data: lists, isLoading: isListsLoading } = useLists(isAuthenticated);
-  const watchlistId = lists?.find((list) => list.type === "watchlist")?.id;
-  const {
-    data: watchlist,
-    isLoading: isDetailLoading,
-    error,
-  } = useList(watchlistId ?? "");
+  const { data: list, isLoading, error } = useList(params.id);
   const { data: watchedTitles } = useWatchedTitles();
   const { data: followedTitleIds } = useFollowedTitleIds();
 
   const filters = parseTitleFilters(searchParams);
-  const isLoading = isListsLoading || (!!watchlistId && isDetailLoading);
 
   if (isAuthLoading) {
     return (
@@ -71,15 +71,15 @@ export default function WatchlistPage() {
   if (!isAuthenticated) {
     return (
       <div className="container mx-auto max-w-7xl px-4 py-8">
-        <h1 className="text-2xl font-bold">Watchlist</h1>
+        <h1 className="text-2xl font-bold">Liste</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Connectez-vous pour voir votre watchlist.
+          Connectez-vous pour voir cette liste.
         </p>
       </div>
     );
   }
 
-  const items = watchlist?.items ?? [];
+  const items = list?.items ?? [];
   const filteredItems = items.filter((item) =>
     titleMatchesFilters(toFilterableTitle(item), filters),
   );
@@ -88,10 +88,31 @@ export default function WatchlistPage() {
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Watchlist</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Films et séries à voir
-          </p>
+          <Link
+            href="/lists"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Mes listes
+          </Link>
+
+          {isLoading ? (
+            <Skeleton className="h-8 w-64" />
+          ) : list ? (
+            <>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold">{list.nom}</h1>
+                <span className="text-xs rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">
+                  {typeLabels[list.type] ?? list.type}
+                </span>
+              </div>
+              {list.description && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {list.description}
+                </p>
+              )}
+            </>
+          ) : null}
         </div>
 
         {isLoading ? (
@@ -104,17 +125,16 @@ export default function WatchlistPage() {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Erreur lors du chargement de la watchlist.
+              Erreur lors du chargement de la liste.
             </AlertDescription>
           </Alert>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Votre watchlist est vide. Ajoutez des titres à voir depuis leur
-            fiche.
+            Cette liste est vide. Ajoutez des titres depuis leur fiche.
           </p>
         ) : filteredItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Aucun titre de votre watchlist ne correspond aux filtres actifs.
+            Aucun titre de cette liste ne correspond aux filtres actifs.
           </p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">

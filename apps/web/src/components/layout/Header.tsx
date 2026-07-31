@@ -65,6 +65,18 @@ const FILTER_TABS: FilterTab[] = [
   { id: "personne", label: "Personne", icon: <Users className="h-3.5 w-3.5" /> },
 ];
 
+// Pages où les filtres de type/genre/pays/année/note ont un effet réel sur le
+// contenu affiché (bug #33/#34). "/" est un préfixe exact, les autres
+// couvrent aussi leurs sous-routes (ex. /lists/:id).
+const FILTER_VISIBLE_PATHS = [
+  "/",
+  "/search",
+  "/calendar",
+  "/watchlist",
+  "/lists",
+  "/history",
+];
+
 export function Header() {
   const { isAuthenticated, user } = useAuth();
   const logout = useLogout();
@@ -78,6 +90,10 @@ export function Header() {
   const { data: countries } = useTitleCountries();
 
   const filters = parseTitleFilters(searchParams);
+  // Valeur brute du paramètre `type`, y compris "personne" (spécifique à la
+  // page recherche) qu'un `TitleTypeFilter` normalisé par parseTitleFilters
+  // ne peut pas représenter — utilisée uniquement pour l'état actif des tabs.
+  const rawTypeTab = searchParams.get("type") || "tout";
 
   const [yearRange, setYearRange] = useState<[number, number]>([
     filters.yearMin ?? YEAR_RANGE_MIN,
@@ -107,6 +123,16 @@ export function Header() {
 
   // Détecter si on est sur la page search pour afficher l'onglet "Personne"
   const isSearchPage = pathname === "/search";
+
+  // Pages où les filtres de type ont un effet réel (bug #33/#34 : le menu
+  // s'affichait partout, y compris sur des pages où il ne filtrait rien).
+  const isHistoryPage = pathname === "/history";
+  const showTypeTabs = FILTER_VISIBLE_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(path + "/"),
+  );
+  // Le menu "Filtres" (genre/pays/année/note) ne s'applique pas à
+  // l'historique : les visionnages n'embarquent pas ces données du titre.
+  const showFilterSidebarButton = showTypeTabs && !isHistoryPage;
 
   // Filtrer les tabs selon la page
   const visibleTabs = isSearchPage
@@ -178,38 +204,41 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2">
-        {/* Filtres centraux - visible sur desktop uniquement */}
+        {/* Filtres centraux - visible sur desktop uniquement, pages pertinentes seulement */}
         <div className="hidden lg:flex items-center gap-1">
-          {visibleTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setTypeFilter(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                filters.type === tab.id || (filters.type === "tout" && tab.id === "tout")
-                  ? "bg-primary/20 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-            >
-              {tab.icon}
-              <span>{tab.label}</span>
-            </button>
-          ))}
+          {showTypeTabs &&
+            visibleTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setTypeFilter(tab.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                  rawTypeTab === tab.id
+                    ? "bg-primary/20 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            ))}
         </div>
 
         {/* Actions droite */}
         <div className="flex items-center gap-2">
           {/* Bouton "Filtres" — déploie la sidebar droite */}
-          <button
-            onClick={() => setFilterSidebarOpen((v) => !v)}
-            className={`hidden lg:flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              filterSidebarOpen || hasActiveTitleFilters(filters)
-                ? "bg-primary/20 text-primary"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent"
-            }`}
-          >
-            <Filter className="h-3.5 w-3.5" />
-            <span>Filtres</span>
-          </button>
+          {showFilterSidebarButton && (
+            <button
+              onClick={() => setFilterSidebarOpen((v) => !v)}
+              className={`hidden lg:flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                filterSidebarOpen || hasActiveTitleFilters(filters)
+                  ? "bg-primary/20 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
+            >
+              <Filter className="h-3.5 w-3.5" />
+              <span>Filtres</span>
+            </button>
+          )}
 
           {/* Utilisateur connecté */}
           {isAuthenticated ? (
@@ -251,27 +280,30 @@ export function Header() {
         </div>
       </div>
 
-      <FilterSidebar
-        open={filterSidebarOpen}
-        onClose={() => setFilterSidebarOpen(false)}
-        filters={filters}
-        genres={genres}
-        countries={countries}
-        yearRange={yearRange}
-        onYearRangeChange={setYearRange}
-        onYearRangeCommit={commitYearRange}
-        noteRange={noteRange}
-        onNoteRangeChange={setNoteRange}
-        onNoteRangeCommit={commitNoteRange}
-        onToggleGenre={toggleGenre}
-        onToggleCountry={toggleCountry}
-        onReset={resetFilters}
-      />
+      {showFilterSidebarButton && (
+        <FilterSidebar
+          open={filterSidebarOpen}
+          onClose={() => setFilterSidebarOpen(false)}
+          filters={filters}
+          genres={genres}
+          countries={countries}
+          yearRange={yearRange}
+          onYearRangeChange={setYearRange}
+          onYearRangeCommit={commitYearRange}
+          noteRange={noteRange}
+          onNoteRangeChange={setNoteRange}
+          onNoteRangeCommit={commitNoteRange}
+          onToggleGenre={toggleGenre}
+          onToggleCountry={toggleCountry}
+          onReset={resetFilters}
+        />
+      )}
 
       {/* Menu navigation mobile */}
       {menuOpen && (
         <nav className="border-t px-4 py-2 lg:hidden bg-background/95 backdrop-blur">
           {/* Filtres centraux en mobile */}
+          {showTypeTabs && (
           <div className="flex gap-1 overflow-x-auto pb-3 mb-3 border-b">
             {visibleTabs.map((tab) => (
               <button
@@ -281,7 +313,7 @@ export function Header() {
                   setMenuOpen(false);
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                  filters.type === tab.id || (filters.type === "tout" && tab.id === "tout")
+                  rawTypeTab === tab.id
                     ? "bg-primary/20 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
@@ -291,6 +323,7 @@ export function Header() {
               </button>
             ))}
           </div>
+          )}
 
           {/* Liens de navigation */}
           <div className="space-y-1">

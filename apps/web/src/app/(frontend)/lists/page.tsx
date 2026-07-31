@@ -9,6 +9,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,12 +19,27 @@ import { ListDialog } from "@/components/lists/ListDialog";
 import { useLists } from "@/hooks/api/useLists";
 import { useAuthStore } from "@/store/authStore";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import {
+  parseTitleFilters,
+  hasActiveTitleFilters,
+  titleMatchesFilters,
+} from "@/lib/titleFilters";
 
 export default function ListsPage() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const filters = parseTitleFilters(searchParams);
 
   const { data: lists, isLoading, error } = useLists(isAuthenticated);
+
+  // Une liste "correspond" aux filtres actifs si au moins un de ses titres y
+  // correspond (bug filtres header sur accueil/watchlist/listes/historique).
+  const filteredLists = hasActiveTitleFilters(filters)
+    ? lists?.filter((list) =>
+        (list.items ?? []).some((item) => titleMatchesFilters(item, filters)),
+      )
+    : lists;
 
   if (isAuthLoading) {
     return (
@@ -68,9 +84,17 @@ export default function ListsPage() {
               Erreur lors du chargement des listes.
             </AlertDescription>
           </Alert>
+        ) : filteredLists?.length === 0 && (lists?.length ?? 0) > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aucune liste ne correspond aux filtres actifs.
+          </p>
+        ) : filteredLists?.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Vous n&apos;avez pas encore de liste.
+          </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {lists?.map((list) => (
+            {filteredLists?.map((list) => (
               <ListCard key={list.id} list={list} />
             ))}
           </div>

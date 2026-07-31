@@ -121,12 +121,23 @@ export type UserRating = {
   episode?: Episode;
 };
 
+/** Métadonnées allégées d'un item de liste, suffisantes pour le filtrage par
+ * type/genre/pays/année/note — pas les champs d'affichage (cf. `GET /lists`). */
+export type ListItemFilterMeta = {
+  type: "film" | "serie";
+  year: number | null;
+  note: number | null;
+  genreIds: string[];
+  countryIds: string[];
+};
+
 export type UserList = {
   id: string;
   nom: string;
   type: "watchlist" | "favoris" | "custom";
   description?: string;
-  items?: Title[];
+  items?: ListItemFilterMeta[];
+  _count?: { list_items: number };
   shares?: ListShare[];
 };
 
@@ -244,15 +255,10 @@ export type ListDetail = {
   nom: string;
   type: "watchlist" | "favoris" | "custom";
   description: string | null;
-  user_id: string;
   created_at: string;
-  items: Array<{
-    title_id: string;
-    position: number | null;
-    added_at: string;
-    titles: TitleSearchResult;
-  }>;
-  shares: Array<{
+  items: Array<Title & { addedAt: string; position: number | null }>;
+  // GET /lists/:id ne renvoie pas encore les partages — non implémenté côté backend.
+  shares?: Array<{
     shared_with_user_id: string;
     permission: "lecture" | "edition";
     shared_at: string;

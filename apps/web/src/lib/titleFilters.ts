@@ -67,3 +67,79 @@ export function buildFilterQueryString(
   }
   return next.toString();
 }
+
+/**
+ * Forme minimale requise pour évaluer un titre contre les `TitleFilters` —
+ * chaque page adapte sa propre forme de donnée (Title, ListItemFilterMeta,
+ * TitleSearchResult, ...) vers celle-ci avant de filtrer (bug filtres header
+ * sur accueil/watchlist/listes/historique).
+ */
+export type FilterableTitle = {
+  type: "film" | "serie";
+  year: number | null;
+  note: number | null;
+  genreIds: string[];
+  countryIds: string[];
+};
+
+/** Adapte un `Title`/`TitleSearchResult` (genres/pays en objets) vers `FilterableTitle`. */
+export function toFilterableTitle(title: {
+  type: "film" | "serie";
+  dateSortie?: string | null;
+  note?: number | null;
+  genres?: { id: string }[];
+  pays?: { id: string }[];
+}): FilterableTitle {
+  return {
+    type: title.type,
+    year: title.dateSortie ? new Date(title.dateSortie).getFullYear() : null,
+    note: title.note ?? null,
+    genreIds: title.genres?.map((g) => g.id) ?? [],
+    countryIds: title.pays?.map((p) => p.id) ?? [],
+  };
+}
+
+export function titleMatchesFilters(
+  title: FilterableTitle,
+  filters: TitleFilters,
+): boolean {
+  if (filters.type !== "tout" && title.type !== filters.type) return false;
+
+  if (
+    filters.genreIds.length > 0 &&
+    !filters.genreIds.some((id) => title.genreIds.includes(id))
+  )
+    return false;
+
+  if (
+    filters.countryIds.length > 0 &&
+    !filters.countryIds.some((id) => title.countryIds.includes(id))
+  )
+    return false;
+
+  if (
+    filters.yearMin !== null &&
+    (title.year === null || title.year < filters.yearMin)
+  )
+    return false;
+
+  if (
+    filters.yearMax !== null &&
+    (title.year === null || title.year > filters.yearMax)
+  )
+    return false;
+
+  if (
+    filters.noteImdbMin !== null &&
+    (title.note === null || title.note < filters.noteImdbMin)
+  )
+    return false;
+
+  if (
+    filters.noteImdbMax !== null &&
+    (title.note === null || title.note > filters.noteImdbMax)
+  )
+    return false;
+
+  return true;
+}

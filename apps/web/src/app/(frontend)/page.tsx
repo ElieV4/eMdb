@@ -7,6 +7,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   PlayCircle,
   Star,
@@ -27,7 +28,13 @@ import {
 } from "@/hooks/api/useDashboard";
 import { useCalendar } from "@/hooks/api/useCalendar";
 import { useLists } from "@/hooks/api/useLists";
+import { useList } from "@/hooks/api/useList";
 import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
+import {
+  parseTitleFilters,
+  titleMatchesFilters,
+  toFilterableTitle,
+} from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
 
 // Convertir Title en TitleSearchResult pour compatibilité avec TitleCard
@@ -177,6 +184,8 @@ function StatCard({
 
 export default function HomePage() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
+  const searchParams = useSearchParams();
+  const filters = parseTitleFilters(searchParams);
 
   // Hooks pour les données du dashboard
   const { data: recentWatches } = useRecentWatches(4, isAuthenticated);
@@ -193,11 +202,24 @@ export default function HomePage() {
     useRecommendations(6);
 
   const { data: userLists } = useLists(isAuthenticated);
+  const watchlistId = userLists?.find((list) => list.type === "watchlist")?.id;
+  // GET /lists ne renvoie pas les titres au format affichable — on récupère
+  // le détail de la liste watchlist pour avoir ses items complets.
+  const { data: watchlistDetail } = useList(watchlistId ?? "");
   const { data: watchedTitles } = useWatchedTitles();
   const { data: followedTitleIds } = useFollowedTitleIds();
 
-  const watchlist = userLists?.find((list) => list.type === "watchlist");
-  const watchlistItems = watchlist?.items ?? [];
+  const watchlistItems = (watchlistDetail?.items ?? []).filter((item) =>
+    titleMatchesFilters(toFilterableTitle(item), filters),
+  );
+
+  // Filtre appliqué sur le type uniquement : les visionnages récents
+  // n'embarquent pas les genres/pays/note du titre (donnée non disponible
+  // sans changement backend plus large).
+  const filteredRecentWatches = (recentWatches ?? []).filter((watch) => {
+    if (filters.type === "tout") return true;
+    return watch.titles?.type === filters.type;
+  });
 
   // Si l'authentification est encore en cours de vérification
   if (isAuthLoading) {
@@ -267,14 +289,14 @@ export default function HomePage() {
           </div>
 
           {/* Historique */}
-          {recentWatches && recentWatches.length > 0 && (
+          {filteredRecentWatches.length > 0 && (
             <DashboardSection
               title="Historique"
               actionLabel="Voir tout l'historique"
               actionHref="/history"
             >
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {recentWatches.slice(0, 4).map((watch) => (
+                {filteredRecentWatches.slice(0, 4).map((watch) => (
                   <ContinueWatchingCard key={watch.id} watch={watch} />
                 ))}
               </div>
@@ -313,7 +335,7 @@ export default function HomePage() {
             actionLabel={
               watchlistItems.length > 0 ? "Voir la watchlist" : undefined
             }
-            actionHref={watchlist ? `/profile` : undefined}
+            actionHref={watchlistItems.length > 0 ? `/watchlist` : undefined}
           >
             {watchlistItems.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">

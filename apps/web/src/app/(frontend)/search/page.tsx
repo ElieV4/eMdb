@@ -5,8 +5,8 @@
 
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TitleCard } from "@/components/titles/TitleCard";
@@ -24,28 +24,24 @@ import {
 // Nombre d'éléments par page
 const ITEMS_PER_PAGE = 20;
 
-interface SearchPageProps {
-  searchParams: {
-    query?: string;
-    type?: string;
-    page?: string;
-  };
-}
-
-export default function SearchPage({ searchParams }: SearchPageProps) {
+export default function SearchPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // Paramètres de recherche depuis l'URL
-  const urlQuery = searchParams.query || "";
-  const urlTab = searchParams.type as SearchType | "tout" | null;
-  const urlPage = searchParams.page || "1";
+  // Paramètres de recherche depuis l'URL — lus via useSearchParams() (et non
+  // via une prop searchParams figée au montage) pour rester réactifs quand le
+  // header change le filtre `type` sans démonter la page (bug #33).
+  const urlQuery = searchParams.get("query") || "";
+  const activeTab = (searchParams.get("type") as SearchType | "tout" | null) || "tout";
+  const page = parseInt(searchParams.get("page") || "1") || 1;
 
-  // État local
+  // État local pour le champ de recherche (contrôlé, pour une saisie fluide)
   const [query, setQuery] = useState(urlQuery);
-  const [activeTab] = useState<SearchType | "tout">(
-    urlTab || "tout",
-  );
-  const [page, setPage] = useState<number>(parseInt(urlPage) || 1);
+
+  // Resynchroniser le champ si l'URL change ailleurs (navigation, retour arrière)
+  useEffect(() => {
+    setQuery(urlQuery);
+  }, [urlQuery]);
 
   // Mettre à jour l'URL quand les paramètres changent
   const updateUrl = (
@@ -54,28 +50,23 @@ export default function SearchPage({ searchParams }: SearchPageProps) {
     newPage?: number,
   ) => {
     const params = new URLSearchParams();
-    if (newQuery || query) params.set("query", newQuery || query);
-    if (newTab || activeTab !== "tout") {
-      if (newTab === "tout") params.delete("type");
-      else params.set("type", newTab || activeTab);
-    }
-    if (newPage || page > 1) {
-      if (newPage === 1) params.delete("page");
-      else params.set("page", (newPage || page).toString());
-    }
+    const q = newQuery ?? query;
+    const tab = newTab ?? activeTab;
+    const p = newPage ?? page;
+    if (q) params.set("query", q);
+    if (tab !== "tout") params.set("type", tab);
+    if (p > 1) params.set("page", p.toString());
     router.replace(`/search?${params.toString()}`);
   };
 
   // Gérer le changement de query
   const handleQueryChange = (value: string) => {
     setQuery(value);
-    setPage(1);
     updateUrl(value, undefined, 1);
   };
 
   // Gérer le changement de page
   const handlePageChange = (newPage: number) => {
-    setPage(newPage);
     updateUrl(query, activeTab, newPage);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
