@@ -153,3 +153,23 @@ export function useTrendingTitles(type?: "film" | "serie", limit: number = 10) {
     gcTime: 30 * 60 * 1000,
   });
 }
+
+// ============================================
+// Hooks : listes de référence pour les menus de filtre (bug #28/#34)
+// ============================================
+
+export function useTitleGenres() {
+  return useQuery({
+    queryKey: ["titles", "genres"],
+    queryFn: () => apiFetch<{ id: string; nom: string }[]>("/titles/genres"),
+    staleTime: 60 * 60 * 1000, // 1h — quasi-statique
+  });
+}
+
+export function useTitleCountries() {
+  return useQuery({
+    queryKey: ["titles", "countries"],
+    queryFn: () => apiFetch<{ id: string; nom: string }[]>("/titles/countries"),
+    staleTime: 60 * 60 * 1000,
+  });
+}

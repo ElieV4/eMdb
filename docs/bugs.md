@@ -351,6 +351,36 @@
 - **Fichiers modifiés :** `apps/web/src/app/(frontend)/people/[id]/page.tsx`
 - **Vérification manuelle :** Cliqué sur une personne connexe depuis la page de Tom Holland → arrivée correcte sur `/people/:id`.
 
+### 28. Module filmographie : menu filtre manquant
+- **Symptôme :** Le module filmographie n'avait aucun filtre. Impossible de filtrer par date de sortie, pays de production, genre ou rating IMDB.
+- **Cause racine :** `Filmography.tsx` affichait les groupes par rôle sans aucun contrôle de filtrage. `getFilmography()` ne remontait pas non plus les genres/pays du titre.
+- **Correction (redirigée en cours de route) :** L'implémentation initiale ajoutait un composant `FilmographyFilters` local au module (comme prévu ci-dessus), avec un filtre Tout/Films/Séries propre au module. Sur retour utilisateur, ces contrôles ont été déplacés dans le **menu filtre du header** (celui du bug #34, jusque-là un simple placeholder) plutôt que dupliqués dans chaque module — le header pilote maintenant n'importe quelle page via les paramètres d'URL, et `Filmography.tsx` se contente de les lire :
+  - Backend : `getFilmography()` inclut désormais `title_genres`/`title_countries` par titre (`apps/api/src/people/people.service.ts`)
+  - Backend : nouveaux endpoints publics `GET /titles/genres` et `GET /titles/countries` (listes de référence pour les menus de filtre)
+  - Frontend : `apps/web/src/lib/titleFilters.ts` — logique partagée de parsing/écriture des filtres dans l'URL (`type`, `genres`, `pays`, `yearMin`, `yearMax`, `noteImdbMin`)
+  - Frontend : `Header.tsx` — les onglets Tout/Film/Série écrivent dans l'URL de la page courante ; le bouton "Filtres" déploie une sidebar droite (`FilterSidebar.tsx`, sur demande utilisateur — remplace le dropdown initial)
+  - Frontend : `FilterSidebar.tsx` — année et note IMDB en sliders **double sens** (min ET max, pas juste un minimum — `apps/web/src/components/ui/slider.tsx`, nouveau wrapper `@base-ui/react/slider`), genre et pays en **dropdowns** multi-sélection (un `DropdownMenu` dédié par filtre, plutôt qu'une liste à cocher toujours dépliée)
+  - Frontend : `Filmography.tsx` lit les filtres via `useSearchParams()` et ne gère plus lui-même de UI de filtre
+  - `apps/web/src/app/(frontend)/layout.tsx` : `<Header />` encapsulé dans un `<Suspense>` (`useSearchParams()` l'exige pour le rendu statique des pages non-dynamiques)
+- **Limitation connue (filtre "ma note")** : le filtre par note personnelle envisagé initialement a été abandonné — `GET /ratings` renvoie `{ data, ... }` avec un champ `note_perso`, pas `{ items, ... }` avec `note` comme le type `PaginationResult<UserRating>` le laisse penser (même défaut que le bug #18, jamais corrigé pour `/ratings`). Voir bug #39.
+- **Limitation connue (bruit console)** : ouvrir un dropdown genre/pays de la sidebar peut déclencher une erreur React récupérable (`Base UI: MenuGroupContext is missing`) visible en mode dev. Sans impact fonctionnel constaté (testé : sliders double sens, dropdowns genre/pays, reset — tous fonctionnels), cause exacte non identifiée.
+- **Fichiers modifiés :**
+  - `apps/api/src/people/people.service.ts`
+  - `apps/api/src/titles/titles.controller.ts`, `apps/api/src/titles/titles.service.ts`
+  - `apps/web/src/lib/types/api.ts` (`FilmographyItem.titre.title_genres`/`title_countries`)
+  - `apps/web/src/lib/titleFilters.ts` (nouveau — `noteImdbMax` en plus de `noteImdbMin`)
+  - `apps/web/src/hooks/api/useTitles.ts`, `apps/web/src/hooks/api/index.ts` (`useTitleGenres`, `useTitleCountries`)
+  - `apps/web/src/components/ui/slider.tsx` (nouveau)
+  - `apps/web/src/components/layout/Header.tsx`
+  - `apps/web/src/components/layout/FilterSidebar.tsx` (nouveau)
+  - `apps/web/src/components/people/Filmography.tsx`
+  - `apps/web/src/app/(frontend)/layout.tsx`
+- **Tests unitaires à créer :**
+  - Vérifier que `parseTitleFilters()` lit correctement chaque paramètre d'URL
+  - Vérifier que `Filmography` filtre par type/année/genre/pays/note IMDB (min et max) à partir des query params
+  - Vérifier que le header écrit les bons paramètres d'URL au clic sur un onglet type, une case à cocher, ou un slider
+- **Vérification manuelle :** Testé sur Christopher Nolan — sidebar droite déployée depuis le bouton "Filtres" du header, filtre Films, genre Drame (dropdown), plage d'années et plage de notes IMDB (sliders double sens) — chaque combinaison réduit correctement la liste ; bouton "Réinitialiser" efface tous les filtres.
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -367,19 +397,6 @@
 ---
 
 ## Bugs à corriger — Page People
-
-### 28. Module filmographie : menu filtre manquant
-- **Symptôme :** Le module filmographie n'a aucun filtre. Impossible de filtrer par date de sortie, pays de production, genre, rating IMDB ou user_rating.
-- **Cause racine :** `Filmography.tsx` affiche les groupes par rôle sans aucun contrôle de filtrage.
-- **Fichiers concernés :** `apps/web/src/components/people/Filmography.tsx`, `apps/api/src/people/people.service.ts` (enrichissement des données)
-- **Correction proposée :**
-  - Créer un composant `FilmographyFilters` avec filtres : date de sortie (année min/max), pays de production, genre, rating IMDB (min), user_rating (min)
-  - Enrichir le backend `getFilmography()` pour inclure `title_genres` et `title_countries` dans la réponse
-  - Filtrage côté frontend sur les `FilmographyItem` déjà chargés
-- **Tests unitaires à créer :**
-  - Vérifier que les filtres réduisent la liste des titres
-  - Vérifier que le filtre par genre fonctionne
-  - Vérifier que le filtre par année fonctionne
 
 ### 29. Icone vu (œil rouge) manquante sur les affiches
 - **Symptôme :** Aucune icone visuelle n'indique qu'un titre a déjà été vu par l'utilisateur quand il apparaît sous forme d'affiche.
@@ -454,26 +471,19 @@
 - **Symptôme :** Les boutons de filtre dans le header (Tout, Film, Série, Personne) ne changent pas les résultats de la page recherche.
 - **Cause racine :** Le `activeFilter` est un état local du `Header.tsx` qui n'est pas synchronisé avec la page recherche. La page recherche a ses propres tabs supprimés, mais le header ne communique pas le filtre actif à la page.
 - **Fichiers concernés :** `apps/web/src/components/layout/Header.tsx`, `apps/web/src/app/(frontend)/search/page.tsx`
-- **Correction proposée :**
-  - Passer le filtre actif via les paramètres d'URL (`?type=film`, `?type=serie`, etc.)
-  - Ou utiliser un store Zustand partagé pour l'état du filtre
-  - La page recherche doit lire ce filtre et l'appliquer à ses appels API
+- **Statut :** **partiellement résolu** (bug #28) — `Header.tsx` écrit désormais le filtre `type` dans les paramètres d'URL de la page courante (`apps/web/src/lib/titleFilters.ts`) au lieu d'un state local ; consommé par le module filmographie (`Filmography.tsx`). **Reste à faire :** la page `/search` elle-même ne lit pas encore ce paramètre pour filtrer ses propres résultats — brancher `useSearchParams()` + `parseTitleFilters()` côté `search/page.tsx`.
 
 ### 34. Menu filtre du header à refondre
 - **Symptôme :** Le menu "Filtres" dans le header est un simple dropdown de texte inutile. Il doit contenir des contrôles fonctionnels : dropdown pour genres/région/statut, curseur pour durée et date de sortie, toggle pour vu et watchlist.
 - **Cause racine :** Le menu filtre a été implémenté comme un placeholder avec des `DropdownMenuItem` vides.
 - **Fichiers concernés :** `apps/web/src/components/layout/Header.tsx`
-- **Correction proposée :**
-  - Remplacer le dropdown simple par :
-    - Dropdown pour **Genre** (multi-select)
-    - Dropdown pour **Région (pays)** (multi-select)
-    - Dropdown pour **Statut** (disponible, prévu, etc.)
-    - Curseur (range slider) pour **Durée** (min-max)
-    - Curseur (range slider) pour **Date de sortie** (année min-max)
-    - Toggle pour **Dans vu**
-    - Toggle pour **Dans watchlist**
-  - Le menu ne doit être accessible que sur les pages : recherche, calendrier, watchlist, historique, listes
-  - Ne pas afficher le menu sur les pages : titres, épisodes, séries
+- **Statut :** **partiellement résolu** (bug #28) — le bouton "Filtres" du header déploie désormais une sidebar droite (`FilterSidebar.tsx`) contenant : dropdown **Genre** (multi-select), dropdown **Région (pays)** (multi-select), curseur **Année de sortie** (range slider double sens), curseur **Note IMDB** (range slider double sens, min ET max). Écrivent tous dans les paramètres d'URL de la page courante.
+- **Reste à faire :**
+  - Dropdown **Statut** (disponible, prévu, etc.)
+  - Curseur (range slider) pour **Durée**
+  - Toggle pour **Dans vu**
+  - Toggle pour **Dans watchlist**
+  - Restreindre l'affichage du menu aux pages recherche/calendrier/watchlist/historique/listes (actuellement affiché sur toutes les pages, y compris titres/épisodes/séries où il ne devrait pas apparaître)
 
 ### 35. URL `?type=film` ou `?type=serie` dans les recommandations cause "The operation was aborted"
 - **Symptôme :** Quand on clique sur un film dans "Titres recommandés", l'URL contient `?type=film` ou `?type=serie` et la page affiche "The operation was aborted". La page charge normalement si on retire le suffixe de l'URL.
@@ -511,6 +521,15 @@
 - **Correction proposée :**
   - Dans `getOrImportByTmdbId`, vérifier aussi si le titre a au moins un credit sans `episode_id` en base
   - Si absent (titre importé en mode léger uniquement), déclencher un import complet (`withCredits: true`, ou un import différentiel des credits manquants) même si le titre existe déjà
+
+### 39. `GET /ratings` : réponse incohérente avec le type frontend (`data` vs `items`, `note_perso` vs `note`)
+- **Symptôme :** Découvert en marge du bug #28 (envisagé un filtre "ma note" dans la filmographie, abandonné à cause de ce bug). Potentiellement, la liste "Notes" du profil affiche des valeurs `undefined` (date, note) si elle consomme `useUserRatings()` en s'appuyant sur son typage.
+- **Cause racine :** `RatingsService.listUserRatings()` (`apps/api/src/ratings/ratings.service.ts:326`) retourne `{ data, total, page, limit }` avec des champs `note_perso`/`created_at`/`updated_at`, alors que le hook frontend `useUserRatings()` (`apps/web/src/hooks/api/useUserRatings.ts`) type la réponse `PaginationResult<UserRating>`, qui attend `{ items, total, page, limit, totalPages }` avec `note`/`createdAt`. C'est le même défaut que le bug #18 (déjà corrigé pour `/watches` : `data` → `items` + `totalPages`), jamais appliqué à `/ratings`.
+- **Fichiers concernés :** `apps/api/src/ratings/ratings.service.ts` (`listUserRatings`, `formatRating`), `apps/web/src/hooks/api/useUserRatings.ts`, `apps/web/src/lib/types/api.ts` (`UserRating`)
+- **Correction proposée :**
+  - Aligner `listUserRatings()` sur le même format que `listWatches()` : renommer `data` → `items`, ajouter `totalPages`
+  - Aligner `formatRating()` sur le type frontend `UserRating` (`note`, `createdAt`) ou aligner le type frontend sur le format backend (`note_perso`, `created_at`) — choisir un seul sens de vérité plutôt que deux formats parallèles
+  - Vérifier tous les consommateurs de `useUserRatings()` (page profil, historique de notes) une fois corrigé
 
 ---
 

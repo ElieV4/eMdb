@@ -402,6 +402,8 @@ export type FilmographyItem = {
     type: "film" | "serie";
     date_sortie?: string | null;
     note_imdb?: number | null;
+    title_genres?: Array<{ genre_id: string; genres: Genre }>;
+    title_countries?: Array<{ country_id: string; countries: Country }>;
   };
   episode_id?: string | null;
 };

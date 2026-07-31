@@ -24,6 +24,21 @@ export class TitlesController {
     return this.titlesService.searchTitles(query.q, query.type);
   }
 
+  /**
+   * GET /titles/genres, GET /titles/countries
+   * Liste de référence (public) pour les menus de filtre.
+   * Placés avant `:id` pour ne pas être interceptés par ce paramètre générique.
+   */
+  @Get('genres')
+  async listGenres() {
+    return this.titlesService.listGenres();
+  }
+
+  @Get('countries')
+  async listCountries() {
+    return this.titlesService.listCountries();
+  }
+
   @Get('tmdb/:tmdbId')
   async getOrImport(@Param('tmdbId') tmdbId: string, @Query('type') type: 'film' | 'serie') {
     const id = parseInt(tmdbId, 10);

@@ -7,6 +7,8 @@ export {
   useTitles,
   useTitle,
   useTrendingTitles,
+  useTitleGenres,
+  useTitleCountries,
   type TitlesSearchParams,
   type TitlesSearchResponse,
 } from "./useTitles";

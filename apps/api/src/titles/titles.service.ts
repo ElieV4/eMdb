@@ -133,6 +133,26 @@ export class TitlesService {
   }
 
   /**
+   * Liste de référence de tous les genres (public), pour les menus de filtre.
+   */
+  async listGenres() {
+    return this.prisma.genres.findMany({
+      select: { id: true, nom: true },
+      orderBy: { nom: 'asc' },
+    });
+  }
+
+  /**
+   * Liste de référence de tous les pays (public), pour les menus de filtre.
+   */
+  async listCountries() {
+    return this.prisma.countries.findMany({
+      select: { id: true, nom: true },
+      orderBy: { nom: 'asc' },
+    });
+  }
+
+  /**
    * "Get or import" : cherche un titre par tmdb_id, sinon déclenche l'import.
    *
    * @param tmdbId - ID TMDB du titre

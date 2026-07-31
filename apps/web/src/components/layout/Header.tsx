@@ -1,27 +1,39 @@
 /**
  * Header global de l'application.
  * Transparent, avec filtres de type (tout/film/série/personne) au centre
- * et menu filtre (genre, date, durée, statut, région, dans vu, dans watchlist) à droite.
+ * et bouton "Filtres" à droite qui déploie une sidebar de filtres
+ * (genre, pays, année, note IMDB).
+ * Les filtres sont portés par les paramètres d'URL de la page courante
+ * (bug #28/#33/#34) : n'importe quelle page peut les lire via
+ * `parseTitleFilters(useSearchParams())`.
  * Redirige vers /login après déconnexion.
  */
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState, startTransition } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useLogout } from "@/hooks/auth/useLogout";
+import { useTitleGenres, useTitleCountries } from "@/hooks/api";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
+import { FilterSidebar } from "./FilterSidebar";
+import {
+  parseTitleFilters,
+  buildFilterQueryString,
+  hasActiveTitleFilters,
+  YEAR_RANGE_MIN,
+  YEAR_RANGE_MAX,
+  NOTE_IMDB_MIN,
+  NOTE_IMDB_MAX,
+} from "@/lib/titleFilters";
 import {
   Menu,
   X,
@@ -53,24 +65,45 @@ const FILTER_TABS: FilterTab[] = [
   { id: "personne", label: "Personne", icon: <Users className="h-3.5 w-3.5" /> },
 ];
 
-// Options du menu filtre
-const FILTER_OPTIONS = [
-  { id: "genre", label: "Genre" },
-  { id: "date", label: "Date de sortie" },
-  { id: "duree", label: "Durée" },
-  { id: "statut", label: "Statut" },
-  { id: "region", label: "Région (pays)" },
-  { id: "dans-vu", label: "Dans vu" },
-  { id: "dans-watchlist", label: "Dans watchlist" },
-];
-
 export function Header() {
   const { isAuthenticated, user } = useAuth();
   const logout = useLogout();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<string>("tout");
+  const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
+
+  const { data: genres } = useTitleGenres();
+  const { data: countries } = useTitleCountries();
+
+  const filters = parseTitleFilters(searchParams);
+
+  const [yearRange, setYearRange] = useState<[number, number]>([
+    filters.yearMin ?? YEAR_RANGE_MIN,
+    filters.yearMax ?? YEAR_RANGE_MAX,
+  ]);
+  const [noteRange, setNoteRange] = useState<[number, number]>([
+    filters.noteImdbMin ?? NOTE_IMDB_MIN,
+    filters.noteImdbMax ?? NOTE_IMDB_MAX,
+  ]);
+
+  // Resynchroniser les sliders si l'URL change ailleurs (navigation, reset)
+  useEffect(() => {
+    setYearRange([filters.yearMin ?? YEAR_RANGE_MIN, filters.yearMax ?? YEAR_RANGE_MAX]);
+    setNoteRange([filters.noteImdbMin ?? NOTE_IMDB_MIN, filters.noteImdbMax ?? NOTE_IMDB_MAX]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.yearMin, filters.yearMax, filters.noteImdbMin, filters.noteImdbMax]);
+
+  const navigateWithFilters = (updates: Record<string, string | null>) => {
+    const qs = buildFilterQueryString(searchParams, updates);
+    // startTransition : évite "Cannot update a component while rendering a
+    // different component" — un router.push() synchrone dans le même tick
+    // qu'une interaction menu/slider entre en conflit avec son rendu en cours.
+    startTransition(() => {
+      router.push(qs ? `${pathname}?${qs}` : pathname);
+    });
+  };
 
   // Détecter si on est sur la page search pour afficher l'onglet "Personne"
   const isSearchPage = pathname === "/search";
@@ -79,6 +112,50 @@ export function Header() {
   const visibleTabs = isSearchPage
     ? FILTER_TABS
     : FILTER_TABS.filter((t) => t.id !== "personne");
+
+  const setTypeFilter = (id: string) => {
+    navigateWithFilters({ type: id === "tout" ? null : id });
+  };
+
+  const toggleGenre = (id: string) => {
+    const next = filters.genreIds.includes(id)
+      ? filters.genreIds.filter((g) => g !== id)
+      : [...filters.genreIds, id];
+    navigateWithFilters({ genres: next.length > 0 ? next.join(",") : null });
+  };
+
+  const toggleCountry = (id: string) => {
+    const next = filters.countryIds.includes(id)
+      ? filters.countryIds.filter((c) => c !== id)
+      : [...filters.countryIds, id];
+    navigateWithFilters({ pays: next.length > 0 ? next.join(",") : null });
+  };
+
+  const commitYearRange = (next: [number, number]) => {
+    navigateWithFilters({
+      yearMin: next[0] === YEAR_RANGE_MIN ? null : String(next[0]),
+      yearMax: next[1] === YEAR_RANGE_MAX ? null : String(next[1]),
+    });
+  };
+
+  const commitNoteRange = (next: [number, number]) => {
+    navigateWithFilters({
+      noteImdbMin: next[0] === NOTE_IMDB_MIN ? null : String(next[0]),
+      noteImdbMax: next[1] === NOTE_IMDB_MAX ? null : String(next[1]),
+    });
+  };
+
+  const resetFilters = () => {
+    navigateWithFilters({
+      type: null,
+      genres: null,
+      pays: null,
+      yearMin: null,
+      yearMax: null,
+      noteImdbMin: null,
+      noteImdbMax: null,
+    });
+  };
 
   // Redirect to login after successful logout
   useEffect(() => {
@@ -106,9 +183,9 @@ export function Header() {
           {visibleTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveFilter(tab.id)}
+              onClick={() => setTypeFilter(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                activeFilter === tab.id
+                filters.type === tab.id || (filters.type === "tout" && tab.id === "tout")
                   ? "bg-primary/20 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
@@ -121,26 +198,18 @@ export function Header() {
 
         {/* Actions droite */}
         <div className="flex items-center gap-2">
-          {/* Menu filtre (genre, date, durée, statut, région, dans vu, dans watchlist) */}
-          <DropdownMenu>
-            <DropdownMenuTrigger className="hidden lg:flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-              <Filter className="h-3.5 w-3.5" />
-              <span>Filtres</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
-                  Filtres
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-              </DropdownMenuGroup>
-              {FILTER_OPTIONS.map((option) => (
-                <DropdownMenuItem key={option.id} className="text-sm cursor-pointer">
-                  {option.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Bouton "Filtres" — déploie la sidebar droite */}
+          <button
+            onClick={() => setFilterSidebarOpen((v) => !v)}
+            className={`hidden lg:flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              filterSidebarOpen || hasActiveTitleFilters(filters)
+                ? "bg-primary/20 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+            }`}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filtres</span>
+          </button>
 
           {/* Utilisateur connecté */}
           {isAuthenticated ? (
@@ -182,6 +251,23 @@ export function Header() {
         </div>
       </div>
 
+      <FilterSidebar
+        open={filterSidebarOpen}
+        onClose={() => setFilterSidebarOpen(false)}
+        filters={filters}
+        genres={genres}
+        countries={countries}
+        yearRange={yearRange}
+        onYearRangeChange={setYearRange}
+        onYearRangeCommit={commitYearRange}
+        noteRange={noteRange}
+        onNoteRangeChange={setNoteRange}
+        onNoteRangeCommit={commitNoteRange}
+        onToggleGenre={toggleGenre}
+        onToggleCountry={toggleCountry}
+        onReset={resetFilters}
+      />
+
       {/* Menu navigation mobile */}
       {menuOpen && (
         <nav className="border-t px-4 py-2 lg:hidden bg-background/95 backdrop-blur">
@@ -191,11 +277,11 @@ export function Header() {
               <button
                 key={tab.id}
                 onClick={() => {
-                  setActiveFilter(tab.id);
+                  setTypeFilter(tab.id);
                   setMenuOpen(false);
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                  activeFilter === tab.id
+                  filters.type === tab.id || (filters.type === "tout" && tab.id === "tout")
                     ? "bg-primary/20 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}

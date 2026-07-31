@@ -221,6 +221,18 @@ export class PeopleService {
             type: true,
             date_sortie: true,
             note_imdb: true,
+            title_genres: {
+              select: {
+                genre_id: true,
+                genres: { select: { id: true, nom: true } },
+              },
+            },
+            title_countries: {
+              select: {
+                country_id: true,
+                countries: { select: { id: true, nom: true } },
+              },
+            },
           },
         },
         roles: {
