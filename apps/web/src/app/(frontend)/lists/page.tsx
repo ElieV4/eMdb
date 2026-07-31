@@ -17,12 +17,21 @@ import { ListCard } from "@/components/lists/ListCard";
 import { ListDialog } from "@/components/lists/ListDialog";
 import { useLists } from "@/hooks/api/useLists";
 import { useAuthStore } from "@/store/authStore";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 
 export default function ListsPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: lists, isLoading, error } = useLists(isAuthenticated);
+
+  if (isAuthLoading) {
+    return (
+      <div className="container mx-auto max-w-7xl px-4 py-12">
+        <LoadingSpinner className="mx-auto" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

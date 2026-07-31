@@ -10,9 +10,18 @@
 
 import { useAuthStore } from "@/store/authStore";
 import { CalendarEpisodes } from "@/components/watches/CalendarEpisodes";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 
 export default function CalendarPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto max-w-7xl px-4 py-12">
+        <LoadingSpinner className="mx-auto" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

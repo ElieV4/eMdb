@@ -249,7 +249,7 @@ export default function HomePage() {
               icon={PlayCircle}
               label="Visionnages"
               value={recentWatches?.length || 0}
-              href="/watches"
+              href="/history"
             />
             <StatCard icon={Star} label="Notes" value={0} href="/ratings" />
             <StatCard
@@ -271,7 +271,7 @@ export default function HomePage() {
             <DashboardSection
               title="Historique"
               actionLabel="Voir tout l'historique"
-              actionHref="/watches"
+              actionHref="/history"
             >
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {recentWatches.slice(0, 4).map((watch) => (

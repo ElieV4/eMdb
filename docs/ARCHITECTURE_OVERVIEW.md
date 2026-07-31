@@ -168,7 +168,7 @@ apps/web/
   - JWT stocké en **httpOnly cookie** (sécurité maximale)
   - Middleware Next.js pour protéger les routes
   - Rafraîchissement automatique du token
-  - Routes publiques : `/`, `/login`, `/register`, `/titles/:id`, `/people/:id`
+  - Routes publiques : `/login`, `/register`, `/titles/:id`, `/people/:id` (l'accueil `/` nécessite une connexion)
 
 - **Données** :
   - Mapping direct des types TypeScript backend → frontend

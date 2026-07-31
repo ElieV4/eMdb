@@ -8,6 +8,7 @@
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/api/queryClient";
+import { useAuthBootstrap } from "@/hooks/auth/useAuthBootstrap";
 import "@/styles/globals.css";
 
 export default function RootLayout({
@@ -15,6 +16,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  useAuthBootstrap();
+
   return (
     <html lang="fr" className="dark">
       <body>

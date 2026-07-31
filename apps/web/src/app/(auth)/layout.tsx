@@ -10,7 +10,12 @@ export default function AuthLayout({
 }) {
   return (
     <div className="flex min-h-[80vh] items-center justify-center">
-      <div className="w-full max-w-sm space-y-6">{children}</div>
+      <div className="w-full max-w-sm space-y-6">
+        <div className="text-center text-3xl font-bold tracking-tight">
+          eMDB
+        </div>
+        {children}
+      </div>
     </div>
   );
 }

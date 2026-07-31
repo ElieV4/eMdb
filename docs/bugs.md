@@ -426,6 +426,38 @@
   - Vérifier que l'import d'un titre avec un casting important ne timeout pas avant complétion
 - **Vérification manuelle :** Cliqué sur "Conan the Barbarian" (tmdb 9387) depuis les recommandations de "The Odyssey" → erreur "signal is aborted without reason" après ~10s.
 
+### 32. Site accessible sans authentification
+- **Symptôme :** Le site était accessible sans être connecté, les pages protégées ne redirigeaient jamais vers `/login`.
+- **Cause racine :** `middleware.ts` se trouvait à `apps/web/middleware.ts` (racine du projet), mais l'app utilise un dossier `src/` (`apps/web/src/app/...`). Next.js exige que `middleware.ts` soit placé **dans** `src/` quand ce dossier existe, sinon il est silencieusement ignoré — aucune erreur, le fichier ne s'exécute simplement jamais. Confirmé par les logs du serveur dev : aucune ligne `Compiling /middleware` n'apparaissait avant la correction ; `Compiling /src/middleware` apparaît après.
+- **Correction :**
+  - Déplacé `apps/web/middleware.ts` → `apps/web/src/middleware.ts`
+  - `PUBLIC_PATHS` étendu à `/titles`, `/people` (fiches consultables sans connexion)
+  - **L'accueil (`/`) reste protégé** — sur demande explicite : contrairement à une première itération de ce fix qui l'avait rendu public (en suivant `docs/ARCHITECTURE_OVERVIEW.md`), l'utilisateur a précisé vouloir que `/` nécessite une connexion comme le reste. `ARCHITECTURE_OVERVIEW.md` mis à jour en conséquence.
+  - Ajouté un logo "eMDB" au-dessus du formulaire sur `/login` et `/register` (dans le layout partagé `(auth)/layout.tsx`, pour éviter de dupliquer dans les deux pages)
+- **Fichiers modifiés :** `apps/web/src/middleware.ts` (déplacé + PUBLIC_PATHS mis à jour), `apps/web/src/app/(auth)/layout.tsx` (logo), `docs/ARCHITECTURE_OVERVIEW.md`
+- **Tests unitaires à créer :**
+  - Vérifier que `/`, `/profile`, `/watchlist`, `/search`, `/calendar` redirigent vers `/login?redirect=...` sans cookie
+  - Vérifier que `/titles/:id`, `/people/:id` restent accessibles sans cookie
+- **Vérification manuelle :** Testé sans cookie — `/`, `/profile`, `/watchlist`, `/search`, `/calendar` redirigent bien vers `/login?redirect=...` ; `/titles/:id`, `/people/:id` restent accessibles. Après connexion (`elie.vincent4@gmail.com`), redirection correcte vers `/` avec cookie `emdb_access_token` posé. Logo "eMDB" confirmé visible au-dessus des formulaires sur `/login` et `/register`. Build de production confirme la prise en compte du middleware (`ƒ Middleware   26.6 kB` dans la sortie de `next build`, absent avant la correction).
+- **Note (hors scope, déjà signalé séparément) :** un rechargement complet de la page perd l'état d'authentification côté client (`useAuthStore` en mémoire uniquement, pas de bootstrap `/auth/refresh`) — le cookie `emdb_access_token` peut encore être valide et laisser passer le middleware, mais la page affiche quand même "Veuillez vous connecter" car le store Zustand est vide. C'est un problème distinct (déjà remonté comme tâche séparée), pas une régression de ce fix. **Corrigé par le bug #41.**
+
+### 41. Déconnexions intempestives : état d'authentification perdu au rechargement + routes manquantes (Watchlist, Historique)
+- **Symptôme :** L'utilisateur se retrouvait fréquemment "déconnecté" en apparence — en particulier en accédant à une page qui n'existait pas encore (Watchlist, Historique). Deux causes distinctes cumulées :
+  1. Cliquer sur "Watchlist" ou "Historique" dans la sidebar menait à une 404 : ces routes (`/watchlist`, `/history`) n'avaient pas de `page.tsx`. La 404 est rendue par `app/not-found.tsx`, **en dehors** du layout `(frontend)` (pas de `Sidebar`/`Header`) — toute l'interface disparaissait d'un coup, ce qui donnait l'impression d'une déconnexion plutôt que d'une simple page manquante.
+  2. Le store d'authentification (`useAuthStore`, Zustand) ne vit qu'en mémoire, sans aucun bootstrap au chargement de l'app (cf. note "hors scope" du bug #32). Après tout rechargement complet de page (F5, retour depuis la 404, navigation directe par URL), le store repartait à zéro même si le cookie `emdb_access_token` était toujours valide. Les pages `Calendrier` et `Listes` (qui vérifient `isAuthenticated` sans jamais le réhydrater) affichaient alors "Connectez-vous pour..." alors que l'utilisateur était bel et bien connecté.
+- **Correction :**
+  - Ajout du hook `useAuthBootstrap` (`apps/web/src/hooks/auth/useAuthBootstrap.ts`), appelé une fois dans `app/layout.tsx` : au montage, si le cookie `emdb_access_token` est présent mais que le store est vide, relit le cookie et appelle `GET /auth/me` pour réhydrater `user`/`accessToken` dans le store (avec `isLoading` pendant l'appel). En cas d'échec (token expiré/invalide), déconnecte proprement et nettoie le cookie.
+  - `CalendarPage` et `ListsPage` gèrent désormais aussi l'état `isLoading` du store (spinner) avant d'afficher "Connectez-vous...", pour éviter d'afficher le mauvais état pendant la réhydratation.
+  - Création de deux pages minimales manquantes, dans le layout `(frontend)` (donc avec Sidebar/Header) :
+    - `/watchlist` (`apps/web/src/app/(frontend)/watchlist/page.tsx`) : affiche les titres de la liste `type = "watchlist"` de l'utilisateur (créée automatiquement à l'inscription), réutilise `TitleCard`.
+    - `/history` (`apps/web/src/app/(frontend)/history/page.tsx`) : affiche les visionnages (`GET /watches`) avec suppression possible, sur le même modèle que la page `/ratings`.
+  - `/calendar` et `/lists` existaient déjà et fonctionnaient correctement une fois authentifié — seul le problème de réhydratation (point 2 ci-dessus) les affectait. `/dataviz` n'est pas une route à part : c'est une section de la page `/profile`, déjà en place avec un état "à venir" — aucune page dédiée à créer.
+- **Fichiers modifiés :** `apps/web/src/hooks/auth/useAuthBootstrap.ts` (nouveau), `apps/web/src/app/layout.tsx`, `apps/web/src/app/(frontend)/calendar/page.tsx`, `apps/web/src/app/(frontend)/lists/page.tsx`, `apps/web/src/app/(frontend)/watchlist/page.tsx` (nouveau), `apps/web/src/app/(frontend)/history/page.tsx` (nouveau)
+- **Tests unitaires à créer :**
+  - `useAuthBootstrap` : réhydrate le store depuis le cookie + `/auth/me` ; déconnecte et nettoie le cookie si `/auth/me` échoue ; ne fait rien si déjà authentifié ou si aucun cookie.
+  - `/watchlist` et `/history` : affichent l'état "Connectez-vous" si non authentifié, le contenu sinon.
+- **Vérification manuelle :** Testé avec un compte de test — après un rechargement complet de page, `/calendar` et `/lists` affichent bien le contenu authentifié au lieu de "Connectez-vous..." ; `/watchlist` et `/history` chargent normalement avec Sidebar/Header (fini le "Page introuvable" nu).
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -459,19 +491,24 @@
 - **Fichiers concernés :** `apps/web/src/components/titles/TitleCreditsSplit.tsx`, `apps/web/src/components/people/Filmography.tsx`, `apps/web/src/components/people/PersonBadge.tsx` (badge(s) de rôle par personne), `apps/web/src/lib/types/api.ts`
 - **Note :** `TitleCreditsSplit.tsx` sépare actuellement "Distribution" et "Équipe technique" via une constante `CREW_ROLES` en anglais (`Director`, `Producer`, ...) comparée aux libellés de rôle stockés en base, qui sont en français (`Réalisateur`, `Producteur`, ...) — la comparaison ne matche jamais, donc tout le monde atterrit dans "Distribution" aujourd'hui. Cette modification remplace ce mécanisme cassé plutôt que de le corriger isolément.
 
+### D. Unifier "Watchlist" et "Suivre" — le bookmark doit refléter la watchlist
+- **Description demandée :** "Watchlist" et "Suivre" doivent devenir la même chose. Concrètement : ajouter un film (pas seulement une série) à la watchlist doit faire apparaître l'icone bookmark sur son affiche (actuellement le bookmark n'est piloté que par le mécanisme "Suivre", cf. bug #30).
+- **Constat de l'existant (deux mécanismes aujourd'hui totalement indépendants) :**
+  - **Watchlist** : une liste comme une autre — une ligne `user_lists` avec `type = 'watchlist'`, des `list_items` classiques. Ajout via `POST /lists/:listId/items` (`apps/api/src/lists/`), UI dans `TitleActions.tsx` (menu burger "Listes" → toggle "Watchlist"). Fonctionne pour films et séries indifféremment.
+  - **Suivre** : table dédiée `user_follows_serie` (`user_id`, `title_id`). Endpoints `POST/DELETE/GET /follows` (`apps/api/src/watches/`). **`WatchesService.follow()` rejette explicitement les films** : `if (title.type !== 'serie') throw new BadRequestException('Seules les séries peuvent être suivies.')` (`watches.service.ts:410`). UI : bouton dédié dans `TitleActions.tsx`, affiché seulement pour les séries.
+  - Le bookmark (`followed` sur `TitlePoster`/`TitleCard`, bug #30) est alimenté uniquement par `useFollowedTitleIds()` → `GET /follows` — aucun lien avec la watchlist aujourd'hui.
+  - Le suivi (`follow`) sert aussi de base au calendrier des épisodes à venir et aux notifications de nouveaux épisodes (module Watches/notifications) — un film n'a pas d'épisodes, donc cette partie ne peut pas s'appliquer telle quelle aux films.
+- **Décision de conception à trancher avant implémentation (à valider avec l'utilisateur) :**
+  1. Le bookmark reflète **l'union** watchlist ∪ suivi (le plus simple : `useFollowedTitleIds` ou son équivalent regarde aussi les `list_items` de la liste `watchlist`), sans toucher à la restriction séries-only de `follow()` — un film ajouté à la watchlist affiche le bookmark, une série ajoutée à la watchlist OU suivie affiche le bookmark.
+  2. Fusion plus profonde : ajouter un titre à la watchlist déclenche automatiquement un `follow` quand c'est une série (unifie réellement les deux actions utilisateur), et retire la restriction séries-only uniquement pour la relation watchlist↔bookmark, pas pour le calendrier/notifications qui restent séries-only par nature.
+- **Fichiers concernés (pressentis) :** `apps/api/src/watches/watches.service.ts` (`follow`), `apps/api/src/lists/lists.service.ts` (`addItem`/`removeItem`), `apps/web/src/hooks/api/useFollowedTitleIds.ts`, `apps/web/src/components/titles/TitleActions.tsx`
+- **Tests à créer :**
+  - Vérifier qu'ajouter un film à la watchlist fait apparaître le bookmark sur son affiche
+  - Vérifier qu'ajouter une série à la watchlist fait apparaître le bookmark sans dupliquer une notification/calendrier si elle n'est pas explicitement suivie (selon l'option retenue)
+
 ---
 
 ## Bugs à corriger — Header & Navigation
-
-### 32. Site accessible sans authentification
-- **Symptôme :** Le site est accessible sans être connecté, les pages protégées ne redirigent pas vers `/login`.
-- **Cause racine :** Le middleware Next.js ne bloque pas correctement les routes protégées. Le cookie `emdb_access_token` n'est pas vérifié efficacement, ou le matcher du middleware ne couvre pas toutes les routes.
-- **Fichiers concernés :** `apps/web/middleware.ts`, `apps/web/src/app/layout.tsx`, `apps/web/src/app/(frontend)/layout.tsx`
-- **Correction proposée :**
-  - Vérifier la configuration du middleware (matcher, cookie check)
-  - S'assurer que le layout racine est minimal (déjà fait)
-  - Vérifier que les pages protégées sont bien dans le groupe `(frontend)`
-  - Ajouter une vérification côté client dans le layout frontend
 
 ### 33. Filtres de type du header (Tout/Film/Série/Personne) inopérants sur la page recherche
 - **Symptôme :** Les boutons de filtre dans le header (Tout, Film, Série, Personne) ne changent pas les résultats de la page recherche.
@@ -536,6 +573,17 @@
   - Aligner `listUserRatings()` sur le même format que `listWatches()` : renommer `data` → `items`, ajouter `totalPages`
   - Aligner `formatRating()` sur le type frontend `UserRating` (`note`, `createdAt`) ou aligner le type frontend sur le format backend (`note_perso`, `created_at`) — choisir un seul sens de vérité plutôt que deux formats parallèles
   - Vérifier tous les consommateurs de `useUserRatings()` (page profil, historique de notes) une fois corrigé
+
+### 42. Les listes apparaissent en double (page `/lists` et module listes du profil)
+- **Symptôme :** Signalé par l'utilisateur — les listes ("Ma Watchlist", "Mes Favoris") apparaissent chacune deux fois, à la fois sur la page `/lists` et dans le module listes de la page profil.
+- **Constat :** Les deux emplacements consomment le même hook `useLists()` (`apps/web/src/hooks/api/useLists.ts`, `queryKey: ["lists"]`) branché sur `GET /lists` — la duplication apparaissant aux deux endroits pointe vers une donnée dupliquée en amont (réponse API ou lignes en base), plutôt qu'un bug d'affichage propre à une page.
+- **Piste principale (non confirmée) :** `useRegister()` (`apps/web/src/hooks/auth/useRegister.ts`) crée automatiquement "Ma Watchlist" et "Mes Favoris" via deux appels `createList.mutate(...)` dans son `onSuccess`, sans garde d'idempotence côté frontend ni backend (aucune contrainte d'unicité `(user_id, type)` visible dans `lists.service.ts` pour les types `watchlist`/`favoris`). Un double déclenchement de ce `onSuccess` (ex. double-soumission du formulaire d'inscription, remount du composant) créerait alors deux lignes identiques par type, visibles partout où `GET /lists` est consommé.
+- **Fichiers à investiguer :** `apps/web/src/hooks/auth/useRegister.ts`, `apps/api/src/lists/lists.service.ts` (contrainte d'unicité manquante sur `user_lists(user_id, type)` pour `watchlist`/`favoris`), `apps/web/src/hooks/api/useCreateList.ts`
+- **Correction à envisager :**
+  - Backend : empêcher la création d'une deuxième liste `watchlist`/`favoris` pour le même utilisateur (contrainte unique ou vérification explicite avant insert)
+  - Frontend : protéger `useRegister()` contre un double appel de son `onSuccess` (React Query n'appelle normalement `onSuccess` qu'une fois par `mutate()`, donc vérifier aussi si `RegisterForm` ou un parent peut déclencher `mutate()` deux fois)
+  - Nettoyer les doublons déjà existants en base pour les comptes concernés
+- **Statut :** non corrigé — à investiguer plus en détail avant de trancher la correction.
 
 ---
 

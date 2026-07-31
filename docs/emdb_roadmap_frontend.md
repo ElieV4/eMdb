@@ -166,11 +166,16 @@ emdb/
 - [x] `hooks/auth/useLogin()` — mutation React Query pour `/auth/login`
 - [x] `hooks/auth/useRegister()` — mutation React Query pour `/auth/register`
 - [x] `hooks/auth/useLogout()` — mutation pour `/auth/logout`
-- [x] Middleware Next.js `middleware.ts` :
-  - Vérifier le token JWT à chaque navigation
-  - Rediriger vers `/login` si non authentifié (pour les routes protégées)
-  - Rafraîchir le token si expiré
-  - Routes publiques : `/`, `/login`, `/register`, `/titles/:id`, `/people/:id`
+- [x] Middleware Next.js `middleware.ts` (doit vivre dans `src/middleware.ts`, pas à la
+      racine de `apps/web/` — sinon Next.js l'ignore silencieusement, cf. bug #32) :
+  - Vérifier la présence du cookie `emdb_access_token` à chaque navigation
+  - Rediriger vers `/login?redirect=...` si absent (pour les routes protégées)
+  - Routes publiques : `/login`, `/register`, `/titles/:id`, `/people/:id` (l'accueil
+    `/` reste protégé, sur demande explicite — cf. bug #32)
+- [x] `hooks/auth/useAuthBootstrap()` (bug #41) : au montage de l'app, si le cookie
+      `emdb_access_token` est présent mais que le store Zustand est vide (rechargement
+      complet de page), relit le cookie et appelle `GET /auth/me` pour réhydrater
+      `user`/`accessToken` — remplace la case `fetchCurrentUser()` prévue ci-dessus.
 
 ### 0.4 Layout & composants de base
 
@@ -445,11 +450,12 @@ emdb/
 - [x] Calendrier intégré dans `app/profile/page.tsx` :
   - Liste des séries suivies avec épisodes non vus
   - Accessible depuis le tableau de bord et le profil
-- [x] `app/watches/page.tsx` — historique des visionnages :
-  - Liste paginée des watches (date, titre, épisode)
-  - Filtres : type (film/serie), date_from, date_to, title_id
-  - Tri par date (défaut : récent → ancien)
-  - Bouton "Supprimer" sur chaque watch
+- [x] `app/(frontend)/history/page.tsx` — historique des visionnages (bug #41 ; route
+      finalement `/history`, pas `/watches`, pour matcher le lien "Historique" de la
+      Sidebar — les liens de la page d'accueil qui pointaient vers `/watches`
+      [route jamais créée, 404] ont été corrigés vers `/history`) :
+  - Liste des derniers watches (date, titre, épisode), suppression possible
+  - Pas encore de filtres ni pagination avancée (minimum syndical) — à enrichir si besoin
 
 #### 4.1.2 Composants
 
@@ -532,6 +538,12 @@ emdb/
   - Bouton "Créer une liste"
   - Watchlist et favoris créés automatiquement à l'inscription
   - Accès depuis le profil utilisateur
+- [x] `app/(frontend)/watchlist/page.tsx` (bug #41) — page dédiée affichant les titres
+  de la liste `type = "watchlist"` de l'utilisateur (`TitleCard`), liée depuis la
+  Sidebar. Complète les listes déjà intégrées au profil ci-dessus.
+
+> ⚠️ Bug ouvert (#42, non corrigé) : les listes apparaissent en double à la fois sur
+> `/lists` et dans le module listes du profil — cf. `docs/bugs.md`.
 - [ ] `app/shared-lists/page.tsx` — listes partagées avec moi :
   - Liste des listes où j'ai accès (lecture/édition)
   - Indicateur de permission (lecture/édition)
@@ -1067,6 +1079,6 @@ Les 13 points identifiés dans [`docs/frontend-design-choices.md`](./frontend-de
 
 ---
 
-_Dernière mise à jour : 25 juillet 2026_
+_Dernière mise à jour : 31 juillet 2026_
 _Basé sur : `emdb_roadmap_backend.md` (v2), `packages/db/sql/db_init.sql` (v2), `README.md`, `docs/phase-*.md`_
 
