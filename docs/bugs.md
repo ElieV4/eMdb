@@ -458,6 +458,20 @@
   - `/watchlist` et `/history` : affichent l'état "Connectez-vous" si non authentifié, le contenu sinon.
 - **Vérification manuelle :** Testé avec un compte de test — après un rechargement complet de page, `/calendar` et `/lists` affichent bien le contenu authentifié au lieu de "Connectez-vous..." ; `/watchlist` et `/history` chargent normalement avec Sidebar/Header (fini le "Page introuvable" nu).
 
+### 42. Les listes apparaissent en double (page `/lists` et module listes du profil)
+- **Symptôme :** Signalé par l'utilisateur — les listes ("Ma Watchlist", "Mes Favoris") apparaissent chacune deux fois, à la fois sur la page `/lists` et dans le module listes de la page profil.
+- **Constat :** Les deux emplacements consomment le même hook `useLists()` (`apps/web/src/hooks/api/useLists.ts`, `queryKey: ["lists"]`) branché sur `GET /lists` — la duplication apparaissant aux deux endroits confirmait une donnée dupliquée en base, pas un bug d'affichage propre à une page.
+- **Cause racine confirmée (deux origines indépendantes, cumulables) :**
+  1. `useRegister()` (`apps/web/src/hooks/auth/useRegister.ts`) crée automatiquement "Ma Watchlist" et "Mes Favoris" via deux appels `createList.mutate(...)` dans son `onSuccess`. Instrumentation en direct (`console.log` + inspection réseau) : pour une inscription ne générant qu'**un seul** `POST /auth/register`, le callback `onSuccess` de la mutation s'est exécuté **deux fois**, à la même milliseconde côté client — comportement dev-only le plus vraisemblablement lié au double rendu de React 18 Strict Mode (actif par défaut sur Next.js 14 App Router). `createList.mutate()` était donc appelé deux fois par type, sans aucune garde d'idempotence côté backend (`lists.service.ts` insérait sans vérifier l'existant).
+  2. `ListDialog.tsx` ("Créer une liste") exposait un sélecteur de **type** (Watchlist / Favoris / Personnalisée) avec **"Watchlist" en valeur par défaut** — un utilisateur validant le formulaire sans changer le type créait une deuxième liste `watchlist` en plus de celle déjà auto-créée à l'inscription. Constaté en base sur un compte réel (3 listes `watchlist` au lieu d'une).
+- **Correction :**
+  - Backend (`apps/api/src/lists/lists.service.ts`, `createList`) : rendu idempotent pour `watchlist`/`favoris` — si une liste de ce type existe déjà pour l'utilisateur, elle est retournée telle quelle plutôt que d'en créer une deuxième. Neutralise la cause 1 sans dépendre de la compréhension exacte du double-appel React, et empêche définitivement la cause 2 même si le formulaire est un jour recontourné.
+  - Frontend (`apps/web/src/components/lists/ListDialog.tsx`) : suppression du sélecteur de type dans "Créer une liste" — seules les listes personnalisées (`type: "custom"`) sont créables depuis ce formulaire. `watchlist`/`favoris` restent uniques par utilisateur et gérées uniquement par l'inscription.
+  - Nettoyage des doublons existants en base (environnement de test, aucune donnée réelle concernée) : pour chaque paire dupliquée, conservation de la liste contenant le plus d'items, suppression de(s) l'autre(s).
+- **Fichiers modifiés :** `apps/api/src/lists/lists.service.ts`, `apps/web/src/components/lists/ListDialog.tsx`
+- **Non corrigé (hors scope) :** la cause exacte du double déclenchement de `onSuccess` dans `useRegister()` (probable artefact React Strict Mode / dev only) n'a pas été éliminée à la source — seul son effet (duplication en base) est neutralisé par l'idempotence backend. Un `POST /lists` redondant continue donc de partir à l'inscription, sans conséquence utilisateur.
+- **Vérification manuelle :** compte de test recréé après correction — une seule "Ma Watchlist" et un seul "Mes Favoris" après inscription ; formulaire "Créer une liste" ne propose plus que Nom/Description.
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -573,17 +587,6 @@
   - Aligner `listUserRatings()` sur le même format que `listWatches()` : renommer `data` → `items`, ajouter `totalPages`
   - Aligner `formatRating()` sur le type frontend `UserRating` (`note`, `createdAt`) ou aligner le type frontend sur le format backend (`note_perso`, `created_at`) — choisir un seul sens de vérité plutôt que deux formats parallèles
   - Vérifier tous les consommateurs de `useUserRatings()` (page profil, historique de notes) une fois corrigé
-
-### 42. Les listes apparaissent en double (page `/lists` et module listes du profil)
-- **Symptôme :** Signalé par l'utilisateur — les listes ("Ma Watchlist", "Mes Favoris") apparaissent chacune deux fois, à la fois sur la page `/lists` et dans le module listes de la page profil.
-- **Constat :** Les deux emplacements consomment le même hook `useLists()` (`apps/web/src/hooks/api/useLists.ts`, `queryKey: ["lists"]`) branché sur `GET /lists` — la duplication apparaissant aux deux endroits pointe vers une donnée dupliquée en amont (réponse API ou lignes en base), plutôt qu'un bug d'affichage propre à une page.
-- **Piste principale (non confirmée) :** `useRegister()` (`apps/web/src/hooks/auth/useRegister.ts`) crée automatiquement "Ma Watchlist" et "Mes Favoris" via deux appels `createList.mutate(...)` dans son `onSuccess`, sans garde d'idempotence côté frontend ni backend (aucune contrainte d'unicité `(user_id, type)` visible dans `lists.service.ts` pour les types `watchlist`/`favoris`). Un double déclenchement de ce `onSuccess` (ex. double-soumission du formulaire d'inscription, remount du composant) créerait alors deux lignes identiques par type, visibles partout où `GET /lists` est consommé.
-- **Fichiers à investiguer :** `apps/web/src/hooks/auth/useRegister.ts`, `apps/api/src/lists/lists.service.ts` (contrainte d'unicité manquante sur `user_lists(user_id, type)` pour `watchlist`/`favoris`), `apps/web/src/hooks/api/useCreateList.ts`
-- **Correction à envisager :**
-  - Backend : empêcher la création d'une deuxième liste `watchlist`/`favoris` pour le même utilisateur (contrainte unique ou vérification explicite avant insert)
-  - Frontend : protéger `useRegister()` contre un double appel de son `onSuccess` (React Query n'appelle normalement `onSuccess` qu'une fois par `mutate()`, donc vérifier aussi si `RegisterForm` ou un parent peut déclencher `mutate()` deux fois)
-  - Nettoyer les doublons déjà existants en base pour les comptes concernés
-- **Statut :** non corrigé — à investiguer plus en détail avant de trancher la correction.
 
 ---
 

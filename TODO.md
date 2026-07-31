@@ -1,50 +1,48 @@
-# Bug 41 — Déconnexions intempestives (routes manquantes + état d'auth non réhydraté)
+# Bug 42 — Les listes apparaissent en double
 
-Statut : **terminé, validé manuellement** (voir `docs/bugs.md` #41).
-(Le travail précédent sur les bugs #27-#32, #40 reste terminé, voir `docs/bugs.md`.)
+Statut : **terminé, validé manuellement** (voir `docs/bugs.md` #42).
+(Le travail précédent sur les bugs #27-#32, #40, #41 reste terminé, voir `docs/bugs.md`.)
 
-## Symptôme rapporté
+## Cause racine (deux origines cumulables)
 
-Déconnexions impromptues très fréquentes, en particulier en essayant d'accéder à
-une page qui n'existe pas encore (Watchlist, Historique) — et dans ce cas le
-redirect ne fonctionnait pas comme attendu.
-
-## Cause racine (deux problèmes cumulés)
-
-1. `/watchlist` et `/history` n'avaient pas de `page.tsx` → 404 rendue par
-   `app/not-found.tsx`, **hors** du layout `(frontend)` → Sidebar/Header
-   disparaissent complètement, ce qui ressemble à une déconnexion.
-2. `useAuthStore` (Zustand) ne vit qu'en mémoire, sans bootstrap au chargement
-   de l'app. Après un rechargement complet, le store repart à zéro même si le
-   cookie `emdb_access_token` est encore valide → les pages qui vérifient
-   `isAuthenticated` (Calendrier, Listes) affichent "Connectez-vous..." alors
-   que l'utilisateur est bien connecté.
+1. `useRegister()` (`apps/web/src/hooks/auth/useRegister.ts`) crée "Ma Watchlist"
+   et "Mes Favoris" via `createList.mutate(...)` dans son `onSuccess`. Confirmé
+   par instrumentation (`console.log` + réseau) : pour un seul `POST
+   /auth/register`, `onSuccess` s'exécute deux fois à la même milliseconde
+   côté client (artefact dev-only, probable React 18 Strict Mode). Aucune
+   garde d'idempotence côté backend.
+2. `ListDialog.tsx` ("Créer une liste") proposait un sélecteur de type avec
+   "Watchlist" en valeur par défaut — validable par erreur, créant une
+   deuxième liste `watchlist`. Constaté sur un compte réel : 3 listes
+   `watchlist` au lieu d'une.
 
 ## Steps
 
-- [x] 1. Reproduit en conditions réelles (navigateur + dev server) : confirmé
-      les deux causes ci-dessus indépendamment.
-- [x] 2. Ajouté `useAuthBootstrap` (`apps/web/src/hooks/auth/useAuthBootstrap.ts`),
-      appelé dans `app/layout.tsx` : relit le cookie au montage, réhydrate le
-      store via `GET /auth/me` si besoin.
-- [x] 3. `CalendarPage` et `ListsPage` gèrent l'état `isLoading` du store avant
-      d'afficher "Connectez-vous...".
-- [x] 4. Créé les pages minimales manquantes `/watchlist` et `/history` dans le
-      layout `(frontend)`.
-- [x] 5. Trouvé un 3e cas de la même classe de bug : la page d'accueil liait
-      "Visionnages" et "Voir tout l'historique" vers `/watches` (route jamais
-      créée, 404). Corrigé vers `/history` (`apps/web/src/app/(frontend)/page.tsx`).
-- [x] 6. Vérifié dans le navigateur (compte de test) : `/calendar` et `/lists`
-      affichent le contenu authentifié après un rechargement complet ;
-      `/watchlist` et `/history` chargent normalement avec Sidebar/Header.
-- [x] 7. `npx tsc --noEmit` : aucune nouvelle erreur introduite (erreurs
-      préexistantes dans des fichiers de tests, non liées à ce fix).
-- [x] 8. Validation manuelle par l'utilisateur.
-- [x] 9. Documentation mise à jour : `docs/bugs.md` (#41), `docs/emdb_roadmap_frontend.md`.
-- [x] 10. Bug distinct découvert et documenté (non corrigé) : `docs/bugs.md` #42 —
-      listes en double sur `/lists` et le module listes du profil.
+- [x] 1. Requêté la base (`packages/db`, script temporaire + Prisma) pour
+      confirmer la duplication réelle (4 lignes dupliquées, 2 comptes).
+- [x] 2. Instrumenté `useRegister.onSuccess` avec un `console.log` temporaire,
+      reproduit une inscription : confirmé `onSuccess` appelé deux fois pour
+      un seul `POST /auth/register` (log retiré après diagnostic).
+- [x] 3. Backend : `ListsService.createList()` rendu idempotent pour
+      `watchlist`/`favoris` (retourne la liste existante au lieu d'en créer
+      une deuxième).
+- [x] 4. Découverte en cours de nettoyage : une 3e liste `watchlist` dupliquée
+      sur le compte réel de l'utilisateur, provenant de `ListDialog.tsx`
+      (type "Watchlist" par défaut, sélectionnable manuellement). Confirmé
+      avec l'utilisateur qu'il s'agit de données de test, pas de perte réelle.
+- [x] 5. Frontend : suppression du sélecteur de type dans `ListDialog.tsx` —
+      seules les listes personnalisées sont créables depuis ce formulaire.
+- [x] 6. Nettoyé les doublons existants en base (conservé la liste avec le
+      plus d'items par paire dupliquée).
+- [x] 7. Vérifié : nouvelle inscription de test → une seule "Ma Watchlist" /
+      "Mes Favoris" ; formulaire "Créer une liste" ne propose plus que
+      Nom/Description.
+- [x] 8. `npx tsc --noEmit` : aucune nouvelle erreur.
 
-## Note
+## Hors scope (non corrigé)
 
-`/dataviz` n'est pas une route séparée : c'est une section de `/profile`, déjà
-en place avec un état "à venir" — pas de page dédiée à créer.
+La cause exacte du double déclenchement de `onSuccess` dans `useRegister()`
+(probable artefact React Strict Mode / dev only) n'a pas été éliminée à la
+source — seul son effet (duplication en base) est neutralisé par
+l'idempotence backend. Un `POST /lists` redondant continue de partir à
+l'inscription, sans conséquence utilisateur visible.

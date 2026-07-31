@@ -34,9 +34,6 @@ type ListDialogProps = {
 
 export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
   const [nom, setNom] = useState("");
-  const [type, setType] = useState<"watchlist" | "favoris" | "custom">(
-    "watchlist",
-  );
   const [description, setDescription] = useState("");
 
   const createList = useCreateList();
@@ -45,11 +42,9 @@ export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
   useEffect(() => {
     if (list) {
       setNom(list.nom);
-      setType(list.type);
       setDescription(list.description || "");
     } else {
       setNom("");
-      setType("watchlist");
       setDescription("");
     }
   }, [list]);
@@ -64,9 +59,12 @@ export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
           data: { nom, description: description || undefined },
         });
       } else {
+        // Seules les listes personnalisées sont créables depuis ce formulaire :
+        // "Ma Watchlist" et "Mes Favoris" sont uniques par utilisateur et créées
+        // automatiquement à l'inscription (cf. bug #42).
         await createList.mutateAsync({
           nom,
-          type,
+          type: "custom",
           description: description || undefined,
         });
       }
@@ -94,19 +92,6 @@ export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
               required
               maxLength={100}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="type">Type</Label>
-            <select
-              id="type"
-              value={type}
-              onChange={(e) => setType(e.target.value as typeof type)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="watchlist">Watchlist</option>
-              <option value="favoris">Favoris</option>
-              <option value="custom">Personnalisée</option>
-            </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Description (optionnelle)</Label>

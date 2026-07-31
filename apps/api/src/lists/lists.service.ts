@@ -116,11 +116,27 @@ export class ListsService {
    * POST /lists
    * Crée une nouvelle liste pour l'utilisateur connecté.
    *
+   * Idempotent pour `watchlist`/`favoris` : un utilisateur ne peut avoir qu'une
+   * seule liste de chacun de ces deux types (créées automatiquement à
+   * l'inscription, cf. `useRegister()` côté frontend). Si une liste de ce type
+   * existe déjà, elle est retournée telle quelle plutôt que d'en créer une
+   * deuxième — évite les doublons en cas de double appel (bug #42).
+   *
    * @param userId - UUID de l'utilisateur connecté
    * @param dto - Données de la liste
-   * @returns La liste créée
+   * @returns La liste créée, ou la liste existante si `type` est `watchlist`/`favoris` et qu'une existe déjà
    */
   async createList(userId: string, dto: CreateListDto) {
+    if (dto.type === 'watchlist' || dto.type === 'favoris') {
+      const existing = await this.prisma.user_lists.findFirst({
+        where: { user_id: userId, type: dto.type },
+        orderBy: { created_at: 'asc' },
+      });
+      if (existing) {
+        return existing;
+      }
+    }
+
     return this.prisma.user_lists.create({
       data: {
         user_id: userId,
