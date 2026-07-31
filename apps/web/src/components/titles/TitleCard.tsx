@@ -120,6 +120,8 @@ export function TitleCard({
 export function TitleCardHorizontal({
   title,
   className,
+  watched = false,
+  followed = false,
 }: Omit<TitleCardProps, "compact">) {
   const {
     id,
@@ -154,6 +156,8 @@ export function TitleCardHorizontal({
         width={80}
         height={120}
         className="shrink-0"
+        watched={watched}
+        followed={followed}
       />
 
       <div className="flex-1 min-w-0">

@@ -18,7 +18,9 @@ export function useWatchedTitles() {
   return useQuery<Set<string>>({
     queryKey: ["watched-titles-set"],
     queryFn: async (): Promise<Set<string>> => {
-      const data = await apiFetch<WatchesResponse>(`/watches?limit=500`);
+      // limit max autorisé par ListWatchesFilterDto (apps/api/src/watches/dto) est 100 ;
+      // une valeur supérieure fait échouer la requête en 400.
+      const data = await apiFetch<WatchesResponse>(`/watches?limit=100`);
       const items = data.items ?? [];
       const set = new Set<string>();
       for (const watch of items) {

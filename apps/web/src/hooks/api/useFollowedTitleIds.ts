@@ -9,9 +9,10 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/apiClient";
 import { useAuthStore } from "@/store/authStore";
 
+// GET /follows renvoie directement les champs du titre suivi (id = l'id du
+// titre lui-même), pas un objet de liaison avec un champ `title_id` séparé.
 type FollowEntry = {
-  user_id: string;
-  title_id: string;
+  id: string;
   followed_at: string;
 };
 
@@ -24,8 +25,8 @@ export function useFollowedTitleIds() {
       const data = await apiFetch<FollowEntry[]>(`/follows`);
       const set = new Set<string>();
       for (const follow of data) {
-        if (follow.title_id) {
-          set.add(follow.title_id);
+        if (follow.id) {
+          set.add(follow.id);
         }
       }
       return set;

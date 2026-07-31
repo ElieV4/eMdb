@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Plus } from "lucide-react";
 import { TitleCard } from "@/components/titles/TitleCard";
+import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
 
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuthStore();
@@ -23,6 +24,8 @@ export default function ProfilePage() {
     isLoading: isLoadingLists,
     error: listsError,
   } = useLists(isAuthenticated);
+  const { data: watchedTitles } = useWatchedTitles();
+  const { data: followedTitleIds } = useFollowedTitleIds();
 
   const favorites = lists?.find((list) => list.type === "favoris");
 
@@ -70,6 +73,8 @@ export default function ProfilePage() {
                   key={title.id}
                   title={{ ...title, local: true }}
                   compact
+                  watched={watchedTitles?.has(title.id)}
+                  followed={followedTitleIds?.has(title.id)}
                 />
               ))}
             </div>

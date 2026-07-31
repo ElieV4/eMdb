@@ -7,6 +7,7 @@
 "use client";
 
 import { TitleCard } from "@/components/titles/TitleCard";
+import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
 import { TitleSearchResult } from "@/lib/types/api";
 
 type ListItemsGridProps = {
@@ -24,6 +25,9 @@ export function ListItemsGrid({
   onRemove,
   canEdit = false,
 }: ListItemsGridProps) {
+  const { data: watchedTitles } = useWatchedTitles();
+  const { data: followedTitleIds } = useFollowedTitleIds();
+
   if (items.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -36,7 +40,12 @@ export function ListItemsGrid({
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
       {items.map((item) => (
         <div key={item.title_id} className="relative group">
-          <TitleCard title={item.titles} showType={false} />
+          <TitleCard
+            title={item.titles}
+            showType={false}
+            watched={watchedTitles?.has(item.title_id)}
+            followed={followedTitleIds?.has(item.title_id)}
+          />
           {canEdit && onRemove && (
             <button
               type="button"

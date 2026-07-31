@@ -3,6 +3,8 @@
  * Réutilise TitleCard avec le mapping titleRecommendationToSearchResult.
  */
 
+"use client";
+
 import Link from "next/link";
 import {
   TitleRecommendation,
@@ -10,6 +12,7 @@ import {
 } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 import { TitleCard } from "./TitleCard";
+import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
 
 interface TitleRecommendationsProps {
   recommendations: TitleRecommendation[];
@@ -20,6 +23,9 @@ export function TitleRecommendations({
   recommendations,
   className,
 }: TitleRecommendationsProps) {
+  const { data: watchedTitles } = useWatchedTitles();
+  const { data: followedTitleIds } = useFollowedTitleIds();
+
   if (!recommendations || recommendations.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-4">
@@ -40,6 +46,8 @@ export function TitleRecommendations({
                 title={titleRecommendationToSearchResult(rec)}
                 compact
                 showType={false}
+                watched={rec.id ? watchedTitles?.has(rec.id) : undefined}
+                followed={rec.id ? followedTitleIds?.has(rec.id) : undefined}
               />
             </div>
           ))}

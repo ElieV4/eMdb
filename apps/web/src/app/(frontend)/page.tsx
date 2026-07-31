@@ -27,6 +27,7 @@ import {
 } from "@/hooks/api/useDashboard";
 import { useCalendar } from "@/hooks/api/useCalendar";
 import { useLists } from "@/hooks/api/useLists";
+import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
 import { Title, TitleSearchResult } from "@/lib/types/api";
 
 // Convertir Title en TitleSearchResult pour compatibilité avec TitleCard
@@ -192,6 +193,8 @@ export default function HomePage() {
     useRecommendations(6);
 
   const { data: userLists } = useLists(isAuthenticated);
+  const { data: watchedTitles } = useWatchedTitles();
+  const { data: followedTitleIds } = useFollowedTitleIds();
 
   const watchlist = userLists?.find((list) => list.type === "watchlist");
   const watchlistItems = watchlist?.items ?? [];
@@ -319,6 +322,8 @@ export default function HomePage() {
                     key={title.id}
                     title={titleToSearchResult(title)}
                     compact
+                    watched={watchedTitles?.has(title.id)}
+                    followed={followedTitleIds?.has(title.id)}
                   />
                 ))}
               </div>
@@ -352,6 +357,8 @@ export default function HomePage() {
                     key={title.id}
                     title={titleToSearchResult(title)}
                     compact
+                    watched={watchedTitles?.has(title.id)}
+                    followed={followedTitleIds?.has(title.id)}
                   />
                 ))}
               </div>
@@ -388,6 +395,8 @@ export default function HomePage() {
                     key={title.id}
                     title={titleToSearchResult(title)}
                     compact
+                    watched={watchedTitles?.has(title.id)}
+                    followed={followedTitleIds?.has(title.id)}
                   />
                 ))}
               </div>

@@ -14,6 +14,7 @@ import {
 } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 import { TitleCard } from "@/components/titles/TitleCard";
+import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
 import { parseTitleFilters } from "@/lib/titleFilters";
 
 interface FilmographyProps {
@@ -29,6 +30,8 @@ export function Filmography({ filmography, className }: FilmographyProps) {
   const [expandedRoles, setExpandedRoles] = useState<Record<string, boolean>>(
     {},
   );
+  const { data: watchedTitles } = useWatchedTitles();
+  const { data: followedTitleIds } = useFollowedTitleIds();
 
   const allRoles = Object.keys(filmography);
 
@@ -114,6 +117,8 @@ export function Filmography({ filmography, className }: FilmographyProps) {
                       title={filmographyToSearchResult(item)}
                       compact
                       showType={false}
+                      watched={watchedTitles?.has(item.titre.id)}
+                      followed={followedTitleIds?.has(item.titre.id)}
                     />
                   ))}
                 </div>

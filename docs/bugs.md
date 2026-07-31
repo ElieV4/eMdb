@@ -381,6 +381,34 @@
   - Vérifier que le header écrit les bons paramètres d'URL au clic sur un onglet type, une case à cocher, ou un slider
 - **Vérification manuelle :** Testé sur Christopher Nolan — sidebar droite déployée depuis le bouton "Filtres" du header, filtre Films, genre Drame (dropdown), plage d'années et plage de notes IMDB (sliders double sens) — chaque combinaison réduit correctement la liste ; bouton "Réinitialiser" efface tous les filtres.
 
+### 29. Icone vu (œil rouge) manquante sur les affiches
+- **Symptôme :** Aucune icone visuelle n'indiquait qu'un titre a déjà été vu par l'utilisateur quand il apparaît sous forme d'affiche.
+- **Cause racine :** `TitlePoster.tsx` avait déjà le rendu de l'icone (`Eye` rouge conditionnelle sur `watched`) et `TitleCard` la propageait déjà correctement — mais **aucun des 7 call sites de `<TitleCard>` dans l'app ne passait la prop**, et `TitleCardHorizontal` ne l'acceptait même pas. Le hook `useWatchedTitles()` existait déjà mais n'était appelé nulle part (composant + hook scaffoldés dans une session antérieure, jamais branchés).
+- **Bug annexe découvert en testant :** `useWatchedTitles()` appelait `GET /watches?limit=500`, mais `ListWatchesFilterDto` plafonne `limit` à 100 (`@Max(100)`) → la requête échouait systématiquement en 400, donc le Set était toujours vide même une fois branché.
+- **Correction :**
+  - `useWatchedTitles.ts` : `limit=500` → `limit=100` (le maximum autorisé par le DTO)
+  - `TitleCardHorizontal` (`TitleCard.tsx`) : accepte désormais `watched`/`followed` et les transmet à `TitlePoster` (ne le faisait pas du tout)
+  - Appel de `useWatchedTitles()`/`useFollowedTitleIds()` + propagation de `watched`/`followed` dans les 7 call sites de `<TitleCard>` : `Filmography.tsx`, `search/page.tsx`, `profile/page.tsx` (Mes Favoris), `TitleRecommendations.tsx`, `ListReorder.tsx` (via `SortableItem`), `(frontend)/page.tsx` (Watchlist/Recommandés/Titres populaires), `ListItemsGrid.tsx`
+  - `TitleRecommendations.tsx` : ajout de `"use client"` (nécessaire dès qu'il appelle des hooks ; son absence faisait échouer le build à cause du barrel `@/hooks/api` tirant `useSearch.ts` dans l'arbre de modules)
+- **Hors scope (décision) :** `FollowedSeriesGrid.tsx` n'utilise pas `TitleCard`/`TitlePoster` (layout en ligne fait main) et affiche déjà un état de suivi explicite via `FollowButton` — pas retouché.
+- **Fichiers modifiés :** `apps/web/src/hooks/api/useWatchedTitles.ts`, `apps/web/src/components/titles/TitleCard.tsx`, `apps/web/src/components/titles/TitleRecommendations.tsx`, `apps/web/src/components/people/Filmography.tsx`, `apps/web/src/app/(frontend)/search/page.tsx`, `apps/web/src/app/(frontend)/profile/page.tsx`, `apps/web/src/app/(frontend)/page.tsx`, `apps/web/src/components/lists/ListReorder.tsx`, `apps/web/src/components/lists/ListItemsGrid.tsx`
+- **Tests unitaires à créer :**
+  - Vérifier que chaque call site de `TitleCard` passe `watched`/`followed` à partir des hooks
+  - Vérifier que `useWatchedTitles()` utilise un `limit` valide (≤100)
+- **Vérification manuelle :** Recherché "The Martian" (déjà vu par le compte de test) → icone œil rouge visible sur l'affiche, confirmé aussi via l'inspection des props React (`watched: true`).
+
+### 30. Icone bookmark manquante sur les affiches de séries suivies
+- **Symptôme :** Aucune icone visuelle n'indiquait qu'une série est suivie par l'utilisateur quand elle apparaît sous forme d'affiche.
+- **Cause racine :** Même situation que le bug #29 — composant et hook déjà en place, aucun call site ne les utilisait.
+- **Bug annexe découvert en testant :** `useFollowedTitleIds()` lisait `follow.title_id`, mais `GET /follows` renvoie directement les champs du titre suivi avec `id` comme id du titre (pas d'enveloppe avec un champ `title_id` séparé) — le Set était donc toujours vide même une fois branché et même sans erreur réseau.
+- **Correction :**
+  - `useFollowedTitleIds.ts` : lit désormais `follow.id` (et le type `FollowEntry` corrigé en conséquence)
+  - Même câblage que le bug #29 dans les mêmes 7 call sites
+- **Fichiers modifiés :** `apps/web/src/hooks/api/useFollowedTitleIds.ts` (+ les mêmes fichiers que le bug #29)
+- **Tests unitaires à créer :**
+  - Vérifier que `useFollowedTitleIds()` lit le bon champ (`id`, pas `title_id`) dans la réponse de `GET /follows`
+- **Vérification manuelle :** Recherché "House of the Dragon" (suivie par le compte de test) → icone bookmark visible sur l'affiche, confirmé via l'inspection des props React (`followed: true`).
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -397,32 +425,6 @@
 ---
 
 ## Bugs à corriger — Page People
-
-### 29. Icone vu (œil rouge) manquante sur les affiches
-- **Symptôme :** Aucune icone visuelle n'indique qu'un titre a déjà été vu par l'utilisateur quand il apparaît sous forme d'affiche.
-- **Cause racine :** `TitlePoster.tsx` n'affiche aucune icone de visionnage. Les composants qui utilisent `TitleCard` ne propagent pas l'état de visionnage.
-- **Fichiers concernés :** `apps/web/src/components/titles/TitlePoster.tsx`, `apps/web/src/components/titles/TitleCard.tsx`, et tous les modules affichant des affiches (recommandés, listes, watchlist, filmographie, recherche, episodes)
-- **Correction proposée :**
-  - Ajouter une prop `watched?: boolean` à `TitlePoster` et afficher une icone `Eye` rouge au milieu-bas de l'affiche
-  - Propager cette prop depuis `TitleCard` vers tous les modules
-  - Créer un hook `useWatchedTitles()` qui retourne un `Set<string>` des title_ids visionnés
-- **Tests unitaires à créer :**
-  - Vérifier que l'icone œil rouge s'affiche quand `watched=true`
-  - Vérifier que l'icone ne s'affiche pas quand `watched=false`
-  - Vérifier que `TitleCard` propage correctement la prop `watched`
-
-### 30. Icone bookmark manquante sur les affiches de séries suivies
-- **Symptôme :** Aucune icone visuelle n'indique qu'une série est suivie par l'utilisateur quand elle apparaît sous forme d'affiche.
-- **Cause racine :** `TitlePoster.tsx` n'affiche aucune icone de suivi. Les composants qui utilisent `TitleCard` ne propagent pas l'état de suivi.
-- **Fichiers concernés :** `apps/web/src/components/titles/TitlePoster.tsx`, `apps/web/src/components/titles/TitleCard.tsx`, et tous les modules affichant des affiches (séries recommandées, listes, watchlist, filmographie, recherche)
-- **Correction proposée :**
-  - Ajouter une prop `followed?: boolean` à `TitlePoster` et afficher une icone `Bookmark` au milieu-haut de l'affiche
-  - Propager cette prop depuis `TitleCard` vers tous les modules
-  - Réutiliser le hook `useUserFollows()` pour obtenir les séries suivies
-- **Tests unitaires à créer :**
-  - Vérifier que l'icone bookmark s'affiche quand `followed=true`
-  - Vérifier que l'icone ne s'affiche pas quand `followed=false`
-  - Vérifier que `TitleCard` propage correctement la prop `followed`
 
 ### 31. Titres recommandés : URL `undefined` au clic sur une affiche
 - **Symptôme :** Quand on clique sur une affiche dans "Titres recommandés", l'URL devient `/titles/undefined` et la page est introuvable.

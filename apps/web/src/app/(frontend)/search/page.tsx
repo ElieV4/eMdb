@@ -14,6 +14,7 @@ import { PersonCard } from "@/components/people/PersonCard";
 import { SimplePagination } from "@/components/common/SimplePagination";
 import { useTitles } from "@/hooks/api/useTitles";
 import { usePeople } from "@/hooks/api/usePeople";
+import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
 import {
   TitleSearchResult,
   PersonSearchResult,
@@ -100,6 +101,9 @@ export default function SearchPage({ searchParams }: SearchPageProps) {
     page,
     limit: ITEMS_PER_PAGE,
   });
+
+  const { data: watchedTitles } = useWatchedTitles();
+  const { data: followedTitleIds } = useFollowedTitleIds();
 
   // État de chargement
   const isLoading = isTitlesLoading || isPeopleLoading;
@@ -190,7 +194,13 @@ export default function SearchPage({ searchParams }: SearchPageProps) {
                       <PersonCard key={person.id} person={person} compact />
                     ))
                   : titlesData?.items.map((title: TitleSearchResult) => (
-                      <TitleCard key={title.id} title={title} compact />
+                      <TitleCard
+                        key={title.id}
+                        title={title}
+                        compact
+                        watched={watchedTitles?.has(title.id)}
+                        followed={followedTitleIds?.has(title.id)}
+                      />
                     ))}
               </div>
 

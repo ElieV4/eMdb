@@ -22,6 +22,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useReorderItems } from "@/hooks/api/useReorderItems";
 import { TitleCard } from "@/components/titles/TitleCard";
+import { useWatchedTitles, useFollowedTitleIds } from "@/hooks/api";
 import { TitleSearchResult } from "@/lib/types/api";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -37,9 +38,13 @@ type ListReorderProps = {
 function SortableItem({
   title,
   onRemove,
+  watched,
+  followed,
 }: {
   title: TitleSearchResult;
   onRemove?: (id: string) => void;
+  watched?: boolean;
+  followed?: boolean;
 }) {
   const {
     attributes,
@@ -59,7 +64,12 @@ function SortableItem({
   return (
     <div ref={setNodeRef} style={style} className="relative group">
       <div {...attributes} {...listeners}>
-        <TitleCard title={title} showType={false} />
+        <TitleCard
+          title={title}
+          showType={false}
+          watched={watched}
+          followed={followed}
+        />
       </div>
       {onRemove && (
         <button
@@ -77,6 +87,8 @@ function SortableItem({
 
 export function ListReorder({ items, onSuccess }: ListReorderProps) {
   const reorder = useReorderItems();
+  const { data: watchedTitles } = useWatchedTitles();
+  const { data: followedTitleIds } = useFollowedTitleIds();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -134,6 +146,8 @@ export function ListReorder({ items, onSuccess }: ListReorderProps) {
               key={item.title_id}
               title={item.titles}
               onRemove={onSuccess}
+              watched={watchedTitles?.has(item.title_id)}
+              followed={followedTitleIds?.has(item.title_id)}
             />
           ))}
         </div>
