@@ -409,6 +409,23 @@
   - Vérifier que `useFollowedTitleIds()` lit le bon champ (`id`, pas `title_id`) dans la réponse de `GET /follows`
 - **Vérification manuelle :** Recherché "House of the Dragon" (suivie par le compte de test) → icone bookmark visible sur l'affiche, confirmé via l'inspection des props React (`followed: true`).
 
+### 31. Titres recommandés : URL `undefined` au clic sur une affiche
+- **Symptôme :** Quand on cliquait sur une affiche dans "Titres recommandés", l'URL devenait `/titles/undefined` et la page était introuvable.
+- **Constat :** Déjà corrigé avant cette session (non documenté comme tel) — `titleRecommendationToSearchResult()` (`apps/web/src/lib/types/api.ts`) calcule déjà `local: !!rec.id` et retombe sur `tmdbId` quand `id` est absent, exactement la correction proposée ci-dessous.
+- **Vérification manuelle (cette session) :** Titre "The Odyssey" → section "Titres recommandés" → tous les hrefs générés sont soit `/titles/:uuid` (titres locaux) soit `/titles/tmdb/:tmdbId?type=film` (titres non-locaux, ex. `/titles/tmdb/9387?type=film` pour "Conan the Barbarian") — aucun `/titles/undefined` observé. Cliqué sur "Conan the Barbarian" → navigation correcte vers `/titles/tmdb/9387?type=film` (voir bug #40 pour ce qui se passe ensuite).
+- **Fichiers concernés :** `apps/web/src/lib/types/api.ts`
+
+### 40. Import d'un titre recommandé non-local expire après 10s
+- **Symptôme :** Cliquer sur un titre recommandé non-local avec un casting important (ex. "Conan the Barbarian" depuis la page "The Odyssey") affiche une erreur "signal is aborted without reason" au lieu de la page du titre.
+- **Cause racine :** `GET /titles/tmdb/:tmdbId` (`titles.controller.ts` → `getOrImportByTmdbId` → `importTitleByTmdbId` avec `withCredits` par défaut, donc `true`) importe tout le casting/l'équipe technique du titre de façon synchrone dans la requête HTTP, y compris l'import complet de chaque nouvelle personne (cast/crew) — comme documenté pour le bug #27 avant sa correction. `apiFetch` (`apps/web/src/lib/api/apiClient.ts`) applique un timeout fixe de 10s à tous les appels sauf ceux qui passent explicitement un `timeoutMs` plus long (fait pour le refresh de filmographie, bug #27, mais pas pour cette route).
+- **Fichiers concernés :** `apps/web/src/app/(frontend)/titles/tmdb/[tmdbId]/page.tsx` (appelant), `apps/web/src/lib/api/apiClient.ts`, `apps/api/src/titles/titles.service.ts` (`getOrImportByTmdbId`)
+- **Correction proposée :**
+  - Court terme : passer un `timeoutMs` plus long (ex. 60-120s) pour cet appel spécifique, comme fait pour `useRefreshFilmography` (bug #27)
+  - Fond : envisager de rendre cet import asynchrone (job BullMQ + polling, cf. `IMPORT_QUEUE_NAME`/`createImportQueue` déjà existants dans `apps/worker/src/worker.ts` mais non utilisés depuis l'API) plutôt que de bloquer la requête HTTP le temps de tout importer
+- **Tests unitaires à créer :**
+  - Vérifier que l'import d'un titre avec un casting important ne timeout pas avant complétion
+- **Vérification manuelle :** Cliqué sur "Conan the Barbarian" (tmdb 9387) depuis les recommandations de "The Odyssey" → erreur "signal is aborted without reason" après ~10s.
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -423,19 +440,6 @@
   - `apps/web/src/__tests__/unit/pages/EpisodeDetailPage.test.tsx` — vérifie que `WatchButton`, `RatingInput` et le bouton "Historique" sont présents pour un utilisateur authentifié.
 
 ---
-
-## Bugs à corriger — Page People
-
-### 31. Titres recommandés : URL `undefined` au clic sur une affiche
-- **Symptôme :** Quand on clique sur une affiche dans "Titres recommandés", l'URL devient `/titles/undefined` et la page est introuvable.
-- **Cause racine :** `titleRecommendationToSearchResult()` met systématiquement `local: true` et `id: rec.id`. Mais quand le titre recommandé n'est pas en local (fallback TMDB), `rec.id` est `undefined` → le href devient `/titles/undefined`.
-- **Fichiers concernés :** `apps/web/src/lib/types/api.ts`, `apps/web/src/components/titles/TitleCard.tsx`
-- **Correction proposée :**
-  - Corriger `titleRecommendationToSearchResult()` : mettre `local: !!rec.id`, et s'assurer que `tmdbId` est défini quand `id` est absent
-  - Le href devient `/titles/tmdb/:tmdbId?type=...` pour les titres non-locaux
-- **Tests unitaires à créer :**
-  - Vérifier que le href est `/titles/tmdb/123?type=film` quand `id` est absent et `tmdb_id=123`
-  - Vérifier que le href est `/titles/1` quand `id="1"` et `local=true`
 
 ---
 
