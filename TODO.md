@@ -1,70 +1,72 @@
-# Modification C — Liste unique dédupliquée + filtre rôle multi-sélection
+# Modification G — Nouvelle page "Découvrir"
 
-Statut : **terminé** (voir `docs/bugs.md` modification C).
+Statut : **terminé** (voir `docs/bugs.md` modification G).
 
 ## Contexte
 
-Après le bug #34 (menu filtre du header), l'utilisateur a jugé ce bug peu
-clair, a demandé de le retirer du fichier et d'annuler les changements de
-code associés (fait — voir historique), puis a demandé d'enchaîner sur la
-première **modification** (pas bug) non faite de `docs/bugs.md`. Dans
-l'ordre du document, ce sont A puis B — mais leur propre texte indique
-qu'elles sont remplacées/fusionnées par **C**, qui est donc la modification
-réellement actionnable.
+Après la modification C (commit `020e96b`), l'utilisateur a demandé
+d'enchaîner sur la première modification lettrée non faite du document.
+Dans l'ordre : D, E, F sont déjà faites ; G était la première non faite,
+avec un point explicitement laissé "à trancher" (source de données pour le
+module "Attendus").
 
-## Demande (modification C)
+## Décision prise (sans repasser par l'utilisateur)
 
-Remplacer l'affichage actuel des modules "Distribution & Équipe" (page
-titre) et "Filmographie" (page personne) — plusieurs listes séparées par
-rôle — par une liste unique de valeurs distinctes (une personne ou un titre
-n'apparaît qu'une fois même avec plusieurs rôles), avec le ou les rôles en
-badge sur chaque élément, et un filtre par rôle en haut sous forme de
-boutons multi-sélectionnables.
+Le document proposait déjà lui-même l'algo de repli à utiliser si aucune
+donnée TMDB directe n'existe pour "Attendus" : "titres non sortis triés par
+popularité TMDB décroissante". Cette proposition étant déjà une réponse
+concrète et implémentable (pas une vraie fourche de design ouverte),
+implémenté directement plutôt que de reposer la question.
+
+Décision structurante prise en implémentant : les 4 modules interrogent
+TMDB **en direct** (trending/discover), pas la base locale — à la
+différence de "Titres populaires" sur l'accueil qui ne liste que les
+titres déjà importés. Cohérent avec l'objectif "découverte" : faire
+apparaître du contenu externe, importé à la demande au clic (mécanisme
+déjà en place, `GET /titles/tmdb/:tmdbId`).
 
 ## Steps
 
-- [x] 1. `apps/web/src/lib/creditGrouping.ts` (nouveau) : `dedupeGroupedByEntity()`
-      générique, applicable à `CreditGrouped` et `FilmographyGrouped` (même
-      forme `Record<role, item[]>`).
-- [x] 2. `TitleCreditsSplit.tsx` réécrit : suppression du découpage
-      Distribution/Équipe technique et de `CREW_ROLES` (constante EN cassée
-      — ne matchait jamais les libellés FR stockés en base, donc tout le
-      monde atterrissait dans "Distribution", y compris les réalisateurs).
-      Liste unique + filtre rôle (boutons, "Tout" + un par rôle présent) +
-      badge de rôle(s) par personne sur `PersonBadge`.
-- [x] 3. `Filmography.tsx` réécrit : même traitement pour les titres (dédup
-      par `titre.id`), filtre rôle local en plus des filtres d'attribut
-      header (type/année/genre/pays/note, toujours actifs par ailleurs).
-      Badges de rôle sous chaque `TitleCard`.
-- [x] 4. `Filmography.test.tsx` adapté (`getByText` → `getAllByText`, un
-      rôle apparaît maintenant deux fois : bouton de filtre + badge).
-- [x] 5. `tsc --noEmit` (web) : aucune erreur. `jest` (web) : 196 passent,
-      baseline strictement inchangée (10 suites en échec, toutes
-      pré-existantes — confirmé en isolant les changements via `git stash`
-      et en re-testant sur le code déjà commité : mêmes échecs à
-      l'identique, dont `Filmography.test.tsx` lui-même, qui échouait déjà
-      avant cette modification pour une raison indépendante
-      — `useSearchParams()` renvoie `null` dans cet environnement de test).
-- [x] 6. Vérifié en navigateur, sur un titre réel (Dune: Part Two,
-      importé cette session) : le module "Distribution & Équipe" affiche
-      désormais correctement tous les rôles (Réalisateur, Scénariste,
-      Producteur, etc. — avant ce correctif, Denis Villeneuve apparaissait
-      comme un simple acteur de plus). Filtrer sur "Réalisateur" affiche
-      une seule carte dédupliquée "Denis Villeneuve — Producteur •
-      Scénariste • Réalisateur". Page personne (Denis Villeneuve) : "Dune:
-      Part Two" apparaît une fois avec ses 3 badges de rôle. Page studio
-      (Legendary Pictures, réutilise `Filmography`) : aucune régression.
-- [x] 7. `docs/bugs.md` : A et B marqués comme remplacés par C, C marquée
-      "✅ fait" avec détails + note sur le bug pré-existant (non corrigé,
-      hors périmètre) de `useSearchParams()` renvoyant `null` en test,
-      qui affecte aussi `PersonCard`/`TitleActions`/`TitleRecommendations`/
-      `TitleCard` (mêmes suites déjà en échec avant cette session).
+- [x] 1. Repéré dans `@emdb/tmdb-client` : `getTrending`, `getDiscoverMovie`,
+      `getDiscoverTv` existaient déjà (jamais utilisés côté API) — aucun
+      nouveau client TMDB nécessaire.
+- [x] 2. Backend `apps/api/src/discover/` (nouveau module) :
+      `GET /discover/:module?limit=` (`tendances|populaires|attendus|sorties`).
+      Mapping unifié des champs movie/tv (noms différents : `title`/`name`,
+      `release_date`/`first_air_date`) + détection `local`/`local_id` par
+      lookup batch sur `tmdb_id` (même principe que `TitlesService.searchTitles`).
+- [x] 3. Frontend : `hooks/api/useDiscover.ts` + page
+      `app/(frontend)/discover/page.tsx` (4 sections, réutilise `TitleCard`
+      sans modification — `TitleSearchResult` portait déjà `dateSortie`/
+      `note`, simplement jamais peuplés par le mapper de recherche
+      existant). Lien "Découvrir" ajouté à la nav du header.
+- [x] 4. `tsc --noEmit` (web + api) : aucune erreur. `jest` (web + api) :
+      baseline strictement inchangée (196/207 web, 175/181 api — mêmes
+      échecs pré-existants qu'avant cette session).
+- [x] 5. Vérifié en navigateur avec de vraies données TMDB : les 4 modules
+      chargent (Tendances : Spider-Man Brand New Day, House of the
+      Dragon... / Attendus : Avengers Doomsday, Dune Part Three... /
+      Sorties : ajusté `vote_count.gte` de 1 à 50 en cours de route — sans
+      ce seuil, "Sorties" remontait des titres obscurs à une seule note
+      parfaite plutôt que de vraies sorties grand public).
+- [x] 6. Cliqué sur un titre non-local ("Supergirl") → import déclenché.
+      Le premier clic déclenche le bug #35 déjà documenté ("signal is
+      aborted", même route `/titles/tmdb/:id?type=` que "Titres
+      recommandés") — hors périmètre de cette modification, non corrigé
+      ici. Un rechargement confirme l'import réussi (fiche complète,
+      studios, distribution dédupliquée). Retour sur `/discover` : la carte
+      pointe désormais vers l'id local, confirmant la détection `local`.
+- [x] 7. `docs/bugs.md` modification G mise à jour : "✅ fait", décision
+      documentée, fichiers modifiés, vérification manuelle.
 
 ## Reste du backlog
 
+- Bug #35 (`?type=` cause "operation aborted") : reconfirmé, affecte
+  maintenant aussi "Découvrir" en plus de "Titres recommandés" — toujours
+  non corrigé.
 - `docs/bugs.md` bug #34 (menu filtre header, curseur Durée) : retiré du
   fichier et code annulé sur demande de l'utilisateur — à reprendre
   éventuellement plus tard sous une forme mieux comprise.
-- Bugs #35, #46-52 et modifications G, M-U : non implémentés, en attente
-  de priorisation (l'utilisateur a dit "on reviendra sur les bugs plus
-  tard" — focus resté sur les modifications lettrées pour l'instant).
+- Bugs #46-52 et modifications M-U : non implémentés, en attente de
+  priorisation ("on reviendra sur les bugs plus tard").
+- Prochaine modification lettrée non faite après G : **M**.

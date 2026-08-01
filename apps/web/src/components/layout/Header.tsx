@@ -44,6 +44,7 @@ import {
   Tv,
   Users,
   Search,
+  Compass,
   Calendar,
   List,
   History,
@@ -208,6 +209,7 @@ export function Header() {
   const navLinks = [
     { href: "/", label: "Accueil", icon: <Search className="h-4 w-4" /> },
     { href: "/search", label: "Recherche", icon: <Search className="h-4 w-4" /> },
+    { href: "/discover", label: "Découvrir", icon: <Compass className="h-4 w-4" /> },
     { href: "/calendar", label: "Calendrier", icon: <Calendar className="h-4 w-4" /> },
     { href: "/watchlist", label: "Watchlist", icon: <BookmarkCheck className="h-4 w-4" /> },
     { href: "/lists", label: "Listes", icon: <List className="h-4 w-4" /> },

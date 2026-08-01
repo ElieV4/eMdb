@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { TitlesModule } from './titles/titles.module';
 import { PeopleModule } from './people/people.module';
 import { StudiosModule } from './studios/studios.module';
+import { DiscoverModule } from './discover/discover.module';
 import { SeasonsEpisodesModule } from './seasons-episodes/seasons-episodes.module';
 import { CreditsModule } from './credits/credits.module';
 import { DatavizModule } from './dataviz/dataviz.module';
@@ -31,6 +32,7 @@ import * as path from 'node:path';
     TitlesModule,
     PeopleModule,
     StudiosModule,
+    DiscoverModule,
     SeasonsEpisodesModule,
     CreditsModule,
     DatavizModule,
