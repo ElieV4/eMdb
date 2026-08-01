@@ -2,11 +2,18 @@
  * Header global de l'application.
  * Transparent, avec filtres de type (tout/film/série/personne) au centre
  * et bouton "Filtres" à droite qui déploie une sidebar de filtres
- * (genre, pays, année, note IMDB).
+ * (genre, pays, année, note IMDB, listes, statut, date de visionnage).
  * Les filtres sont portés par les paramètres d'URL de la page courante
  * (bug #28/#33/#34) : n'importe quelle page peut les lire via
  * `parseTitleFilters(useSearchParams())`.
- * Redirige vers /login après déconnexion.
+ * Modification O : le header filtre s'affiche désormais sur toutes les
+ * pages (le composant lui-même n'est de toute façon jamais monté sur
+ * /login ni /register, qui ont leur propre layout sans Header). Le filtre
+ * par type est centré au milieu du header quand le panneau "Filtres" est
+ * fermé, et rejoint le haut du panneau quand il est ouvert (cf.
+ * `FilterSidebar.tsx`). L'icône profil (avec son dropdown Profil/
+ * Déconnexion) a été retirée : la déconnexion se fait désormais depuis un
+ * bouton dédié sur la page Profil elle-même.
  */
 
 "use client";
@@ -15,15 +22,9 @@ import { useEffect, useState, startTransition } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/useAuth";
-import { useLogout } from "@/hooks/auth/useLogout";
 import { useTitleGenres, useTitleCountries, useLists } from "@/hooks/api";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { TypeFilterTabs, FilterTab } from "./TypeFilterTabs";
 import { FilterSidebar } from "./FilterSidebar";
 import {
   parseTitleFilters,
@@ -37,8 +38,6 @@ import {
 import {
   Menu,
   X,
-  User,
-  LogOut,
   Filter,
   Film,
   Tv,
@@ -52,13 +51,6 @@ import {
   BookmarkCheck,
 } from "lucide-react";
 
-// Types de filtre
-type FilterTab = {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-};
-
 const FILTER_TABS: FilterTab[] = [
   { id: "tout", label: "Tout", icon: <Search className="h-3.5 w-3.5" /> },
   { id: "film", label: "Film", icon: <Film className="h-3.5 w-3.5" /> },
@@ -66,21 +58,8 @@ const FILTER_TABS: FilterTab[] = [
   { id: "personne", label: "Personne", icon: <Users className="h-3.5 w-3.5" /> },
 ];
 
-// Pages où les filtres de type/genre/pays/année/note ont un effet réel sur le
-// contenu affiché (bug #33/#34). "/" est un préfixe exact, les autres
-// couvrent aussi leurs sous-routes (ex. /lists/:id).
-const FILTER_VISIBLE_PATHS = [
-  "/",
-  "/search",
-  "/calendar",
-  "/watchlist",
-  "/lists",
-  "/history",
-];
-
 export function Header() {
-  const { isAuthenticated, user } = useAuth();
-  const logout = useLogout();
+  const { isAuthenticated } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -105,18 +84,33 @@ export function Header() {
     filters.noteImdbMin ?? NOTE_IMDB_MIN,
     filters.noteImdbMax ?? NOTE_IMDB_MAX,
   ]);
+  const [watchedYearRange, setWatchedYearRange] = useState<[number, number]>([
+    filters.watchedYearMin ?? YEAR_RANGE_MIN,
+    filters.watchedYearMax ?? YEAR_RANGE_MAX,
+  ]);
 
   // Resynchroniser les sliders si l'URL change ailleurs (navigation, reset)
   useEffect(() => {
     setYearRange([filters.yearMin ?? YEAR_RANGE_MIN, filters.yearMax ?? YEAR_RANGE_MAX]);
     setNoteRange([filters.noteImdbMin ?? NOTE_IMDB_MIN, filters.noteImdbMax ?? NOTE_IMDB_MAX]);
+    setWatchedYearRange([
+      filters.watchedYearMin ?? YEAR_RANGE_MIN,
+      filters.watchedYearMax ?? YEAR_RANGE_MAX,
+    ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.yearMin, filters.yearMax, filters.noteImdbMin, filters.noteImdbMax]);
+  }, [
+    filters.yearMin,
+    filters.yearMax,
+    filters.noteImdbMin,
+    filters.noteImdbMax,
+    filters.watchedYearMin,
+    filters.watchedYearMax,
+  ]);
 
   const navigateWithFilters = (updates: Record<string, string | null>) => {
     const qs = buildFilterQueryString(searchParams, updates);
     // startTransition : évite "Cannot update a component while rendering a
-    // different component" — un router.push() synchrone dans le même tick
+    // différent component" — un router.push() synchrone dans le même tick
     // qu'une interaction menu/slider entre en conflit avec son rendu en cours.
     startTransition(() => {
       router.push(qs ? `${pathname}?${qs}` : pathname);
@@ -125,16 +119,9 @@ export function Header() {
 
   // Détecter si on est sur la page search pour afficher l'onglet "Personne"
   const isSearchPage = pathname === "/search";
-
-  // Pages où les filtres de type ont un effet réel (bug #33/#34 : le menu
-  // s'affichait partout, y compris sur des pages où il ne filtrait rien).
-  const showTypeTabs = FILTER_VISIBLE_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(path + "/"),
-  );
-  // Le bouton "Filtres" s'affiche sur l'historique aussi (menu absent à tort) :
-  // Listes et "vu/tout/non vu" s'y appliquent, même si genre/pays/année/note
-  // ne portent pas de donnée sur les visionnages.
-  const showFilterSidebarButton = showTypeTabs;
+  // Le filtre "Date de visionnage" n'a de sens que sur l'historique (seule
+  // page où chaque entrée porte une date de visionnage individuelle).
+  const isHistoryPage = pathname === "/history";
 
   // Filtrer les tabs selon la page
   const visibleTabs = isSearchPage
@@ -166,6 +153,24 @@ export function Header() {
     navigateWithFilters({ listes: next.length > 0 ? next.join(",") : null });
   };
 
+  // "Tout sélectionner" (modification O) : permet ensuite d'exclure des
+  // valeurs facilement en décochant individuellement depuis un état complet,
+  // plutôt que de partir d'un état vide (équivalent à "tout" côté filtre).
+  const selectAllGenres = () => {
+    const ids = (genres ?? []).map((g) => g.id);
+    navigateWithFilters({ genres: ids.length > 0 ? ids.join(",") : null });
+  };
+
+  const selectAllCountries = () => {
+    const ids = (countries ?? []).map((c) => c.id);
+    navigateWithFilters({ pays: ids.length > 0 ? ids.join(",") : null });
+  };
+
+  const selectAllLists = () => {
+    const ids = (userLists ?? []).map((l) => l.id);
+    navigateWithFilters({ listes: ids.length > 0 ? ids.join(",") : null });
+  };
+
   const setWatchedStatus = (status: string) => {
     navigateWithFilters({ vu: status === "tout" ? null : status });
   };
@@ -184,6 +189,13 @@ export function Header() {
     });
   };
 
+  const commitWatchedYearRange = (next: [number, number]) => {
+    navigateWithFilters({
+      vuAnneeMin: next[0] === YEAR_RANGE_MIN ? null : String(next[0]),
+      vuAnneeMax: next[1] === YEAR_RANGE_MAX ? null : String(next[1]),
+    });
+  };
+
   const resetFilters = () => {
     navigateWithFilters({
       type: null,
@@ -195,15 +207,10 @@ export function Header() {
       noteImdbMax: null,
       listes: null,
       vu: null,
+      vuAnneeMin: null,
+      vuAnneeMax: null,
     });
   };
-
-  // Redirect to login after successful logout
-  useEffect(() => {
-    if (logout.isSuccess) {
-      router.push("/login");
-    }
-  }, [logout.isSuccess, router]);
 
   // Navigation links for mobile menu
   const navLinks = [
@@ -219,65 +226,33 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2">
-        {/* Filtres centraux - visible sur desktop uniquement, pages pertinentes seulement */}
-        <div className="hidden lg:flex items-center gap-1">
-          {showTypeTabs &&
-            visibleTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setTypeFilter(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                  rawTypeTab === tab.id
-                    ? "bg-primary/20 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                }`}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
+      <div className="mx-auto grid grid-cols-3 items-center max-w-7xl px-4 py-2">
+        {/* Colonne gauche : vide (équilibre la grille pour un centrage réel) */}
+        <div />
+
+        {/* Filtres centraux - visible sur desktop uniquement, masqués quand
+            le panneau "Filtres" est ouvert (le filtre par type y migre
+            alors en premier contrôle, cf. FilterSidebar). */}
+        <div className="hidden lg:flex items-center justify-center gap-1">
+          {!filterSidebarOpen && (
+            <TypeFilterTabs tabs={visibleTabs} active={rawTypeTab} onChange={setTypeFilter} />
+          )}
         </div>
 
         {/* Actions droite */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           {/* Bouton "Filtres" — déploie la sidebar droite */}
-          {showFilterSidebarButton && (
-            <button
-              onClick={() => setFilterSidebarOpen((v) => !v)}
-              className={`hidden lg:flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                filterSidebarOpen || hasActiveTitleFilters(filters)
-                  ? "bg-primary/20 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              }`}
-            >
-              <Filter className="h-3.5 w-3.5" />
-              <span>Filtres</span>
-            </button>
-          )}
-
-          {/* Utilisateur connecté */}
-          {isAuthenticated ? (
-            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-              <DropdownMenuTrigger className="flex items-center justify-center rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" aria-label="Menu utilisateur">
-                <User className="h-5 w-5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <div className="px-2 py-1.5 text-sm font-medium">
-                  {user?.pseudo}
-                </div>
-                <DropdownMenuItem>
-                  <Link href="/profile" className="w-full">
-                    Profil
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => logout.mutate()}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Déconnexion
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
+          <button
+            onClick={() => setFilterSidebarOpen((v) => !v)}
+            className={`hidden lg:flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              filterSidebarOpen || hasActiveTitleFilters(filters)
+                ? "bg-primary/20 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+            }`}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filtres</span>
+          </button>
 
           {/* Menu hamburger mobile */}
           <Button
@@ -296,53 +271,49 @@ export function Header() {
         </div>
       </div>
 
-      {showFilterSidebarButton && (
-        <FilterSidebar
-          open={filterSidebarOpen}
-          onClose={() => setFilterSidebarOpen(false)}
-          filters={filters}
-          genres={genres}
-          countries={countries}
-          lists={userLists}
-          yearRange={yearRange}
-          onYearRangeChange={setYearRange}
-          onYearRangeCommit={commitYearRange}
-          noteRange={noteRange}
-          onNoteRangeChange={setNoteRange}
-          onNoteRangeCommit={commitNoteRange}
-          onToggleGenre={toggleGenre}
-          onToggleCountry={toggleCountry}
-          onToggleList={toggleList}
-          onWatchedStatusChange={setWatchedStatus}
-          onReset={resetFilters}
-        />
-      )}
+      <FilterSidebar
+        open={filterSidebarOpen}
+        onClose={() => setFilterSidebarOpen(false)}
+        filters={filters}
+        typeTabs={visibleTabs}
+        activeType={rawTypeTab}
+        onTypeChange={setTypeFilter}
+        genres={genres}
+        countries={countries}
+        lists={userLists}
+        yearRange={yearRange}
+        onYearRangeChange={setYearRange}
+        onYearRangeCommit={commitYearRange}
+        noteRange={noteRange}
+        onNoteRangeChange={setNoteRange}
+        onNoteRangeCommit={commitNoteRange}
+        showWatchedDateFilter={isHistoryPage}
+        watchedYearRange={watchedYearRange}
+        onWatchedYearRangeChange={setWatchedYearRange}
+        onWatchedYearRangeCommit={commitWatchedYearRange}
+        onToggleGenre={toggleGenre}
+        onToggleCountry={toggleCountry}
+        onToggleList={toggleList}
+        onSelectAllGenres={selectAllGenres}
+        onSelectAllCountries={selectAllCountries}
+        onSelectAllLists={selectAllLists}
+        onWatchedStatusChange={setWatchedStatus}
+        onReset={resetFilters}
+      />
 
       {/* Menu navigation mobile */}
       {menuOpen && (
         <nav className="border-t px-4 py-2 lg:hidden bg-background/95 backdrop-blur">
           {/* Filtres centraux en mobile */}
-          {showTypeTabs && (
-          <div className="flex gap-1 overflow-x-auto pb-3 mb-3 border-b">
-            {visibleTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setTypeFilter(tab.id);
-                  setMenuOpen(false);
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                  rawTypeTab === tab.id
-                    ? "bg-primary/20 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                }`}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-          )}
+          <TypeFilterTabs
+            tabs={visibleTabs}
+            active={rawTypeTab}
+            onChange={(id) => {
+              setTypeFilter(id);
+              setMenuOpen(false);
+            }}
+            className="overflow-x-auto pb-3 mb-3 border-b flex-nowrap"
+          />
 
           {/* Liens de navigation */}
           <div className="space-y-1">

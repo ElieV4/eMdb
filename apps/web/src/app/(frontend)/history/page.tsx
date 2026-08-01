@@ -66,14 +66,24 @@ export default function HistoryPage() {
     );
   }
 
-  // Filtre "Listes" et "vu / tout / non vu" (menu filtres, absent jusqu'ici
-  // sur l'historique) : appliqués côté client, les visionnages n'étant filtrables
-  // côté serveur que par type.
+  // Filtre "Listes", "vu / tout / non vu" et "Date de visionnage" (menu
+  // filtres, modification O) : appliqués côté client, les visionnages
+  // n'étant filtrables côté serveur que par type.
   const filteredWatches = (data?.items ?? []).filter((watch) => {
     if (filters.watchedStatus === "non_vu") return false; // tout l'historique est déjà "vu"
-    if (filters.listIds.length === 0) return true;
-    const watchLists = listIdsByTitle.get(watch.title_id) ?? [];
-    return filters.listIds.some((id) => watchLists.includes(id));
+
+    if (filters.listIds.length > 0) {
+      const watchLists = listIdsByTitle.get(watch.title_id) ?? [];
+      if (!filters.listIds.some((id) => watchLists.includes(id))) return false;
+    }
+
+    if (filters.watchedYearMin !== null || filters.watchedYearMax !== null) {
+      const year = new Date(watch.date_vue).getFullYear();
+      if (filters.watchedYearMin !== null && year < filters.watchedYearMin) return false;
+      if (filters.watchedYearMax !== null && year > filters.watchedYearMax) return false;
+    }
+
+    return true;
   });
 
   const groups = groupByPeriod<UserWatch>(
@@ -84,7 +94,11 @@ export default function HistoryPage() {
   );
 
   const hasActiveFilter =
-    filters.type !== "tout" || filters.listIds.length > 0 || filters.watchedStatus !== "tout";
+    filters.type !== "tout" ||
+    filters.listIds.length > 0 ||
+    filters.watchedStatus !== "tout" ||
+    filters.watchedYearMin !== null ||
+    filters.watchedYearMax !== null;
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">

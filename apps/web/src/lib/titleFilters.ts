@@ -18,6 +18,10 @@ export type TitleFilters = {
   noteImdbMax: number | null;
   listIds: string[];
   watchedStatus: WatchedStatusFilter;
+  /** Filtre "date de visionnage" (année) — n'a de sens que sur /history,
+   * ne s'applique jamais aux titres eux-mêmes (cf. `titleMatchesFilters`). */
+  watchedYearMin: number | null;
+  watchedYearMax: number | null;
 };
 
 export const YEAR_RANGE_MIN = 1900;
@@ -32,6 +36,8 @@ export function parseTitleFilters(searchParams: URLSearchParams): TitleFilters {
   const noteImdbMin = searchParams.get("noteImdbMin");
   const noteImdbMax = searchParams.get("noteImdbMax");
   const watchedStatus = searchParams.get("vu");
+  const watchedYearMin = searchParams.get("vuAnneeMin");
+  const watchedYearMax = searchParams.get("vuAnneeMax");
 
   return {
     type: type === "film" || type === "serie" ? type : "tout",
@@ -43,6 +49,8 @@ export function parseTitleFilters(searchParams: URLSearchParams): TitleFilters {
     noteImdbMax: noteImdbMax ? Number(noteImdbMax) : null,
     listIds: searchParams.get("listes")?.split(",").filter(Boolean) ?? [],
     watchedStatus: watchedStatus === "vu" || watchedStatus === "non_vu" ? watchedStatus : "tout",
+    watchedYearMin: watchedYearMin ? Number(watchedYearMin) : null,
+    watchedYearMax: watchedYearMax ? Number(watchedYearMax) : null,
   };
 }
 
@@ -56,7 +64,9 @@ export function hasActiveTitleFilters(filters: TitleFilters) {
     filters.noteImdbMin !== null ||
     filters.noteImdbMax !== null ||
     filters.listIds.length > 0 ||
-    filters.watchedStatus !== "tout"
+    filters.watchedStatus !== "tout" ||
+    filters.watchedYearMin !== null ||
+    filters.watchedYearMax !== null
   );
 }
 
@@ -81,14 +91,24 @@ export function buildFilterQueryString(
  * chaque page adapte sa propre forme de donnée (Title, ListItemFilterMeta,
  * TitleSearchResult, ...) vers celle-ci avant de filtrer (bug filtres header
  * sur accueil/watchlist/listes/historique).
+ *
+ * `year`/`note`/`genreIds`/`countryIds` acceptent `undefined` — distinct de
+ * `null`/`[]` — pour les surfaces qui ne peuvent tout simplement pas
+ * calculer cette donnée (modification O : modules "Découvrir", qui
+ * consomment directement les réponses TMDB trending/discover, lesquelles ne
+ * portent ni les ids de genre/pays locaux ni, pour "Titres recommandés",
+ * l'année de sortie). `undefined` signifie "non applicable ici, ne pas
+ * filtrer dessus" ; `null`/`[]` reste "calculé, et effectivement vide/inconnu"
+ * (continue d'exclure un titre sur un filtre actif, comportement inchangé
+ * pour tous les appelants existants qui calculent toujours une vraie valeur).
  */
 export type FilterableTitle = {
   id: string;
   type: "film" | "serie";
-  year: number | null;
-  note: number | null;
-  genreIds: string[];
-  countryIds: string[];
+  year: number | null | undefined;
+  note: number | null | undefined;
+  genreIds: string[] | undefined;
+  countryIds: string[] | undefined;
   /** Ids des listes utilisateur contenant ce titre (filtre "Listes"). */
   listIds: string[];
   /** Le titre a-t-il été marqué comme vu (filtre "vu / tout / non vu") ? */
@@ -145,36 +165,42 @@ export function titleMatchesFilters(
 
   if (
     filters.genreIds.length > 0 &&
-    !filters.genreIds.some((id) => title.genreIds.includes(id))
+    title.genreIds !== undefined &&
+    !filters.genreIds.some((id) => title.genreIds!.includes(id))
   )
     return false;
 
   if (
     filters.countryIds.length > 0 &&
-    !filters.countryIds.some((id) => title.countryIds.includes(id))
+    title.countryIds !== undefined &&
+    !filters.countryIds.some((id) => title.countryIds!.includes(id))
   )
     return false;
 
   if (
     filters.yearMin !== null &&
+    title.year !== undefined &&
     (title.year === null || title.year < filters.yearMin)
   )
     return false;
 
   if (
     filters.yearMax !== null &&
+    title.year !== undefined &&
     (title.year === null || title.year > filters.yearMax)
   )
     return false;
 
   if (
     filters.noteImdbMin !== null &&
+    title.note !== undefined &&
     (title.note === null || title.note < filters.noteImdbMin)
   )
     return false;
 
   if (
     filters.noteImdbMax !== null &&
+    title.note !== undefined &&
     (title.note === null || title.note > filters.noteImdbMax)
   )
     return false;

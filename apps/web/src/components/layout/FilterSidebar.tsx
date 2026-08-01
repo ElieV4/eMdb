@@ -1,6 +1,9 @@
 /**
- * Sidebar droite des filtres (année, note IMDB, genre, pays), déployée
- * depuis le bouton "Filtres" du header (bug #28/#34).
+ * Sidebar droite des filtres, déployée depuis le bouton "Filtres" du header
+ * (bug #28/#34, modification O).
+ * Ordre des contrôles (modification O) : Type (rejoint le panneau à
+ * l'ouverture, cf. `Header.tsx`) → Statut → Année de sortie → Date de
+ * visionnage (uniquement sur /history) → Note IMDB → Genre → Pays → Listes.
  */
 
 "use client";
@@ -12,8 +15,11 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuCheckboxItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { TypeFilterTabs, FilterTab } from "./TypeFilterTabs";
 import {
   TitleFilters,
   WatchedStatusFilter,
@@ -40,10 +46,67 @@ const WATCHED_STATUS_OPTIONS: { value: WatchedStatusFilter; label: string }[] = 
   { value: "non_vu", label: "Non vu" },
 ];
 
+function MultiSelectDropdown({
+  label,
+  options,
+  selectedIds,
+  onToggle,
+  onSelectAll,
+}: {
+  label: string;
+  options: RefOption[] | undefined;
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+  onSelectAll: () => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs text-muted-foreground">{label}</label>
+      <DropdownMenu>
+        <DropdownMenuTrigger className="flex w-full items-center justify-between rounded-md border border-border px-2.5 py-1.5 text-sm hover:bg-muted">
+          <span>
+            {selectedIds.length > 0
+              ? `${selectedIds.length} sélectionné${selectedIds.length > 1 ? "s" : ""}`
+              : "Tous"}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="max-h-72 w-64 overflow-y-auto">
+          <DropdownMenuItem
+            onClick={onSelectAll}
+            disabled={!options || options.length === 0}
+          >
+            Tout sélectionner
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {options && options.length > 0 ? (
+            options.map((option) => (
+              <DropdownMenuCheckboxItem
+                key={option.id}
+                checked={selectedIds.includes(option.id)}
+                onCheckedChange={() => onToggle(option.id)}
+              >
+                {option.nom}
+              </DropdownMenuCheckboxItem>
+            ))
+          ) : (
+            <div className="px-2 py-1.5 text-xs text-muted-foreground">
+              Aucune option
+            </div>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
 interface FilterSidebarProps {
   open: boolean;
   onClose: () => void;
   filters: TitleFilters;
+  typeTabs: FilterTab[];
+  activeType: string;
+  onTypeChange: (id: string) => void;
   genres?: RefOption[];
   countries?: RefOption[];
   lists?: ListOption[];
@@ -53,9 +116,16 @@ interface FilterSidebarProps {
   noteRange: [number, number];
   onNoteRangeChange: (next: [number, number]) => void;
   onNoteRangeCommit: (next: [number, number]) => void;
+  showWatchedDateFilter?: boolean;
+  watchedYearRange?: [number, number];
+  onWatchedYearRangeChange?: (next: [number, number]) => void;
+  onWatchedYearRangeCommit?: (next: [number, number]) => void;
   onToggleGenre: (id: string) => void;
   onToggleCountry: (id: string) => void;
   onToggleList: (id: string) => void;
+  onSelectAllGenres: () => void;
+  onSelectAllCountries: () => void;
+  onSelectAllLists: () => void;
   onWatchedStatusChange: (status: string) => void;
   onReset: () => void;
 }
@@ -64,6 +134,9 @@ export function FilterSidebar({
   open,
   onClose,
   filters,
+  typeTabs,
+  activeType,
+  onTypeChange,
   genres,
   countries,
   lists,
@@ -73,9 +146,16 @@ export function FilterSidebar({
   noteRange,
   onNoteRangeChange,
   onNoteRangeCommit,
+  showWatchedDateFilter,
+  watchedYearRange,
+  onWatchedYearRangeChange,
+  onWatchedYearRangeCommit,
   onToggleGenre,
   onToggleCountry,
   onToggleList,
+  onSelectAllGenres,
+  onSelectAllCountries,
+  onSelectAllLists,
   onWatchedStatusChange,
   onReset,
 }: FilterSidebarProps) {
@@ -112,6 +192,18 @@ export function FilterSidebar({
         </div>
 
         <div className="space-y-6">
+          {typeTabs.length > 0 && (
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Type</label>
+              <TypeFilterTabs
+                tabs={typeTabs}
+                active={activeType}
+                onChange={onTypeChange}
+                className="flex-wrap"
+              />
+            </div>
+          )}
+
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Statut</label>
             <div className="flex flex-wrap gap-1">
@@ -134,40 +226,6 @@ export function FilterSidebar({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Listes</label>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex w-full items-center justify-between rounded-md border border-border px-2.5 py-1.5 text-sm hover:bg-muted">
-                <span>
-                  {filters.listIds.length > 0
-                    ? `${filters.listIds.length} sélectionnée${filters.listIds.length > 1 ? "s" : ""}`
-                    : "Toutes"}
-                </span>
-                <ChevronDown className="h-3.5 w-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="max-h-72 w-64 overflow-y-auto"
-              >
-                {lists && lists.length > 0 ? (
-                  lists.map((list) => (
-                    <DropdownMenuCheckboxItem
-                      key={list.id}
-                      checked={filters.listIds.includes(list.id)}
-                      onCheckedChange={() => onToggleList(list.id)}
-                    >
-                      {list.nom}
-                    </DropdownMenuCheckboxItem>
-                  ))
-                ) : (
-                  <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                    Aucune liste
-                  </div>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <div className="space-y-1">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Année de sortie</span>
               <span>
@@ -185,6 +243,27 @@ export function FilterSidebar({
               }
             />
           </div>
+
+          {showWatchedDateFilter && watchedYearRange && onWatchedYearRangeChange && onWatchedYearRangeCommit && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Date de visionnage</span>
+                <span>
+                  {watchedYearRange[0]} – {watchedYearRange[1]}
+                </span>
+              </div>
+              <Slider
+                value={watchedYearRange}
+                min={YEAR_RANGE_MIN}
+                max={YEAR_RANGE_MAX}
+                step={1}
+                onValueChange={(next) => onWatchedYearRangeChange(next as [number, number])}
+                onValueCommitted={(next) =>
+                  onWatchedYearRangeCommit(next as [number, number])
+                }
+              />
+            </div>
+          )}
 
           <div className="space-y-1">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -205,63 +284,29 @@ export function FilterSidebar({
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Genre</label>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex w-full items-center justify-between rounded-md border border-border px-2.5 py-1.5 text-sm hover:bg-muted">
-                <span>
-                  {filters.genreIds.length > 0
-                    ? `${filters.genreIds.length} sélectionné${filters.genreIds.length > 1 ? "s" : ""}`
-                    : "Tous"}
-                </span>
-                <ChevronDown className="h-3.5 w-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="max-h-72 w-64 overflow-y-auto"
-              >
-                {genres?.map((genre) => (
-                  <DropdownMenuCheckboxItem
-                    key={genre.id}
-                    checked={filters.genreIds.includes(genre.id)}
-                    onCheckedChange={() => onToggleGenre(genre.id)}
-                  >
-                    {genre.nom}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <MultiSelectDropdown
+            label="Genre"
+            options={genres}
+            selectedIds={filters.genreIds}
+            onToggle={onToggleGenre}
+            onSelectAll={onSelectAllGenres}
+          />
 
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">
-              Région (pays)
-            </label>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex w-full items-center justify-between rounded-md border border-border px-2.5 py-1.5 text-sm hover:bg-muted">
-                <span>
-                  {filters.countryIds.length > 0
-                    ? `${filters.countryIds.length} sélectionné${filters.countryIds.length > 1 ? "s" : ""}`
-                    : "Tous"}
-                </span>
-                <ChevronDown className="h-3.5 w-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="max-h-72 w-64 overflow-y-auto"
-              >
-                {countries?.map((country) => (
-                  <DropdownMenuCheckboxItem
-                    key={country.id}
-                    checked={filters.countryIds.includes(country.id)}
-                    onCheckedChange={() => onToggleCountry(country.id)}
-                  >
-                    {country.nom}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <MultiSelectDropdown
+            label="Pays"
+            options={countries}
+            selectedIds={filters.countryIds}
+            onToggle={onToggleCountry}
+            onSelectAll={onSelectAllCountries}
+          />
+
+          <MultiSelectDropdown
+            label="Listes"
+            options={lists}
+            selectedIds={filters.listIds}
+            onToggle={onToggleList}
+            onSelectAll={onSelectAllLists}
+          />
         </div>
       </aside>
     </>

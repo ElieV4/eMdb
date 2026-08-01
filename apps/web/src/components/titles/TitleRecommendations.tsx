@@ -1,18 +1,32 @@
 /**
  * Carrousel horizontal de titres recommandés.
  * Réutilise TitleCard avec le mapping titleRecommendationToSearchResult.
+ *
+ * Applique les filtres du header (modification O) : type, note IMDB,
+ * statut vu, listes. L'année de sortie, le genre et le pays ne sont PAS
+ * disponibles sur `TitleRecommendation` (endpoint recommandations TMDB,
+ * qui ne renvoie ni date ni genre/pays) — ces trois filtres ne s'appliquent
+ * donc pas ici.
  */
 
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   TitleRecommendation,
   titleRecommendationToSearchResult,
 } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 import { TitleCard } from "./TitleCard";
-import { useWatchedTitles, useListMembership } from "@/hooks/api";
+import { useWatchedTitles, useListMembership, useLists } from "@/hooks/api";
+import { useAuth } from "@/hooks/auth/useAuth";
+import {
+  parseTitleFilters,
+  titleMatchesFilters,
+  buildListIdsByTitle,
+  FilterableTitle,
+} from "@/lib/titleFilters";
 
 interface TitleRecommendationsProps {
   recommendations: TitleRecommendation[];
@@ -25,11 +39,38 @@ export function TitleRecommendations({
 }: TitleRecommendationsProps) {
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
+  const { isAuthenticated } = useAuth();
+  const { data: userLists } = useLists(isAuthenticated);
+  const listIdsByTitle = buildListIdsByTitle(userLists);
+  const filters = parseTitleFilters(useSearchParams());
+
+  const toFilterable = (rec: TitleRecommendation): FilterableTitle => ({
+    id: rec.id || "",
+    type: rec.type,
+    year: undefined,
+    note: rec.note_imdb ?? null,
+    genreIds: undefined,
+    countryIds: undefined,
+    listIds: rec.id ? listIdsByTitle.get(rec.id) ?? [] : [],
+    watched: rec.id ? watchedTitles?.has(rec.id) ?? false : false,
+  });
+
+  const filtered = (recommendations ?? []).filter((rec) =>
+    titleMatchesFilters(toFilterable(rec), filters),
+  );
 
   if (!recommendations || recommendations.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-4">
         Aucune recommandation disponible pour ce titre.
+      </p>
+    );
+  }
+
+  if (filtered.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-4">
+        Aucune recommandation ne correspond aux filtres actifs.
       </p>
     );
   }
@@ -40,7 +81,7 @@ export function TitleRecommendations({
 
       <div className="relative">
         <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide">
-          {recommendations.map((rec) => (
+          {filtered.map((rec) => (
             <div key={rec.id} className="shrink-0 w-40">
               <TitleCard
                 title={titleRecommendationToSearchResult(rec)}

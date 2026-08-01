@@ -123,6 +123,22 @@ export default function HomePage() {
     ),
   );
 
+  // Filtres du header (modification O) : recommandations et titres
+  // populaires viennent tous deux de la base locale (`Title[]`), donc
+  // genres/pays/année/note sont disponibles — tous les filtres s'appliquent.
+  const filteredRecommendations = (recommendations ?? []).filter((title) =>
+    titleMatchesFilters(
+      toFilterableTitle(title, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      filters,
+    ),
+  );
+  const filteredPopularTitles = (popularTitles ?? []).filter((title) =>
+    titleMatchesFilters(
+      toFilterableTitle(title, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      filters,
+    ),
+  );
+
   // Filtre appliqué sur le type uniquement : les visionnages récents
   // n'embarquent pas les genres/pays/note du titre (donnée non disponible
   // sans changement backend plus large).
@@ -288,9 +304,9 @@ export default function HomePage() {
                   />
                 ))}
               </div>
-            ) : recommendations && recommendations.length > 0 ? (
-              <CardSlider moreHref={recommendations.length > 10 ? "/recommendations" : undefined}>
-                {recommendations.slice(0, 10).map((title) => (
+            ) : filteredRecommendations.length > 0 ? (
+              <CardSlider moreHref={filteredRecommendations.length > 10 ? "/recommendations" : undefined}>
+                {filteredRecommendations.slice(0, 10).map((title) => (
                   <TitleCard
                     key={title.id}
                     title={titleToSearchResult(title)}
@@ -304,7 +320,9 @@ export default function HomePage() {
               </CardSlider>
             ) : (
               <p className="text-sm text-muted-foreground py-4">
-                Commencez à noter des titres pour recevoir des recommandations.
+                {recommendations && recommendations.length > 0
+                  ? "Aucune recommandation ne correspond aux filtres actifs."
+                  : "Commencez à noter des titres pour recevoir des recommandations."}
               </p>
             )}
           </DashboardSection>
@@ -328,9 +346,9 @@ export default function HomePage() {
                   />
                 ))}
               </div>
-            ) : popularTitles && popularTitles.length > 0 ? (
+            ) : filteredPopularTitles.length > 0 ? (
               <CardSlider moreHref="/search">
-                {popularTitles.slice(0, 10).map((title) => (
+                {filteredPopularTitles.slice(0, 10).map((title) => (
                   <TitleCard
                     key={title.id}
                     title={titleToSearchResult(title)}
@@ -344,7 +362,9 @@ export default function HomePage() {
               </CardSlider>
             ) : (
               <p className="text-sm text-muted-foreground py-4">
-                Aucun titre populaire trouvé.
+                {popularTitles && popularTitles.length > 0
+                  ? "Aucun titre populaire ne correspond aux filtres actifs."
+                  : "Aucun titre populaire trouvé."}
               </p>
             )}
           </DashboardSection>
