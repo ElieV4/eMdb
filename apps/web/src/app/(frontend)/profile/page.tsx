@@ -5,9 +5,10 @@ import { useAuthStore } from "@/store/authStore";
 import { useLists } from "@/hooks/api";
 import { useList } from "@/hooks/api/useList";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { useWatchedTitles, useListMembership } from "@/hooks/api";
+import { DatavizSection } from "@/components/dataviz/DatavizSection";
+import { AdminRefreshButton } from "@/components/admin/AdminRefreshButton";
 
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuthStore();
@@ -80,40 +81,14 @@ export default function ProfilePage() {
 
         {/* Dataviz */}
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            Statistiques de visionnage
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">Films vus</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">Épisodes vus</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">0h</div>
-                <p className="text-xs text-muted-foreground">Temps total</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">Notes données</p>
-              </CardContent>
-            </Card>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Statistiques de visionnage
+            </h2>
+            <AdminRefreshButton />
           </div>
-          <div className="mt-6 p-8 border-2 border-dashed rounded-lg text-center text-muted-foreground">
-            <BarChart3 className="mx-auto h-12 w-12 mb-4 opacity-50" />
-            <p>Les graphiques détaillés seront disponibles prochainement.</p>
-          </div>
+          <DatavizSection />
         </section>
 
         {/* Notifications */}
@@ -128,9 +103,7 @@ export default function ProfilePage() {
                 <Bell className="h-4 w-4 text-primary" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">
-                  Nouvel épisode disponible
-                </p>
+                <p className="text-sm font-medium">Nouvel épisode disponible</p>
                 <p className="text-xs text-muted-foreground">
                   Une série que vous suivez a un nouvel épisode.
                 </p>
