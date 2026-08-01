@@ -1,55 +1,67 @@
-# Modification H — Menu contextuel "⋮" sur les affiches
+# Modifications K & L — suite Historique/Calendrier + Studios
 
-Statut : **terminé** (voir `docs/bugs.md` modification H).
+Statut : **terminé** (voir `docs/bugs.md` modifications K et L).
 
 ## Demande
 
-Sur les affiches de titres, quel que soit le module, bouton "⋮" en haut à
-droite avec dropdown contextuel : ajouter/retirer de la watchlist ; marquer
-comme vu (avec choix de date) / retirer de l'historique.
+- `/history` et `/calendar` : garder le format affiche (comme le module
+  accueil) plutôt que le format ligne ; ajouter une période "Tout".
+- Ajouter le menu "Filtres" du header sur `/history` (absent depuis la
+  modif #43) ; y ajouter un dropdown "Listes" et un toggle "vu / tout /
+  non vu".
+- Ajouter les studios dans les infos de la page titre.
+- Créer une page studio reprenant la structure de la page personne
+  (filmographie + personnes connexes).
 
 ## Steps
 
-- [x] 1. Nouveau composant `TitleQuickActionsMenu.tsx`, réutilise les hooks
-      existants (`useAddItem`/`useRemoveItem`, `useCreateWatch`/
-      `useDeleteAllWatches`, `useListMembership`).
-- [x] 2. Contrainte structurelle : le bouton ne peut pas être imbriqué dans
-      le `<Link>` de la carte (même classe de bug que #45). `TitleCard`/
-      `TitleCardHorizontal` restructurés : menu rendu en frère du `<Link>`,
-      positionné par-dessus en absolu (pas de navigation accidentelle).
-- [x] 3. `TitlePoster` : badge de type déplacé en bas-droite (laisse la place
-      au bouton "⋮" en haut-droite).
-- [x] 4. `useListMembership()` étendu pour exposer `watchlistId`/`favorisId`
-      (nécessaires pour appeler addItem/removeItem depuis le menu).
-- [x] 5. Bug connexe trouvé et corrigé : `useCreateWatch`/`useDeleteWatch`/
-      `useDeleteAllWatches` n'invalidaient pas `["watched-titles-set"]` —
-      l'icone "vu" ne se mettait à jour qu'après reload complet (affectait
-      aussi l'ancien `WatchButton`, pas seulement ce nouveau menu).
-- [x] 6. `TitleCard.test.tsx` : ajout d'un `QueryClientProvider` autour des
-      rendus (désormais nécessaire, `TitleQuickActionsMenu` utilise
-      `useQuery`) — régression de test détectée et corrigée avant commit.
-- [x] 7. `npx tsc --noEmit` : aucune erreur. Suite jest complète : 196
-      passent, 0 régression (même baseline de 10 suites en échec
-      préexistant, sans rapport).
-- [x] 8. Vérifié dans le navigateur : bouton "⋮" sur `/search` et
-      `/watchlist` — ouverture sans navigation, contenu contextuel correct,
-      retrait watchlist + marquer/retirer "vu" fonctionnent et se reflètent
-      immédiatement sur l'affiche (sans rechargement, grâce au point 5).
-- [x] 9. Ajustement demandé après premier retour : le bouton "⋮", positionné
-      par rapport au wrapper de carte (bloc, s'étire à la largeur de la
-      cellule de grille), atterrissait hors de l'affiche sur les écrans
-      larges — cellule de grille plus large que l'affiche (150/200px fixes).
-      Corrigé en fixant la largeur du wrapper à celle de l'affiche
-      (`posterWidth`), symétrique avec les icones de gauche qui sont
-      naturellement alignées (rendues à l'intérieur du propre conteneur de
-      `TitlePoster`). Vérifié à 1400px de large : bouton bien à l'intérieur
-      des bords de l'affiche.
+- [x] 1. `periodGrouping.ts` : période `"tout"` (un seul groupe).
+- [x] 2. `/history` et `/calendar` : `DateListItem` (ligne) → `DateCard`
+      (affiche) en grille. `DateListItem.tsx` supprimé (mort). `DateCard`
+      reçoit un `onRemove` optionnel (croix au survol, rendue en sibling du
+      `Link` pour éviter l'imbrication `<button>`/`<a>`).
+- [x] 3. `titleFilters.ts` : `listIds`/`watchedStatus` ajoutés à
+      `TitleFilters` (`?listes=`, `?vu=`). `FilterableTitle` porte
+      `id`/`listIds`/`watched`. Nouvel utilitaire `buildListIdsByTitle()`.
+      Propagé à toutes les pages consommatrices (accueil, watchlist,
+      listes, détail liste, historique).
+- [x] 4. `Header.tsx` : bouton "Filtres" affiché aussi sur `/history`
+      (exclusion retirée). `FilterSidebar.tsx` : toggle "Statut"
+      (Tout/Vu/Non vu) + dropdown "Listes" (multi-sélection).
+- [x] 5. `tsc --noEmit` + `jest` (web) : aucune erreur, baseline inchangée
+      (196 passent, 10 suites en échec pré-existant sans rapport).
+- [x] 6. `packages/tmdb-sync/src/index.ts` : `ensureStudioIds()` +
+      insertion `title_studios`, à partir de `tmdbData.production_companies`
+      (jamais consommé jusqu'ici alors que le modèle et l'affichage
+      `TitleInfo.tsx` existaient déjà). Test dédié ajouté dans
+      `index.spec.ts`.
+      **Note technique :** `packages/tmdb-sync/src/index.js` (compilé) est
+      committé et pris en priorité par Jest (`moduleFileExtensions` liste
+      `js` avant `ts`) — il était déjà désynchronisé de `index.ts` avant ce
+      lot. Recompilé (`npm run build` + copie `dist/tmdb-sync/src/*` →
+      `src/`) pour que les tests reflètent le code réel.
+- [x] 7. Backend `apps/api/src/studios/` (nouveau module, miroir de
+      `people`) : `GET /studios/:id`, `/studios/:id/filmography` (groupé
+      Films/Séries, même forme que `FilmographyGrouped`), `/studios/:id/people`
+      ("personnes connexes" calculées localement — pas d'équivalent TMDB
+      pour un studio — via les personnes les plus créditées sur ses titres).
+- [x] 8. Frontend `apps/web/src/app/(frontend)/studios/[id]/page.tsx` +
+      `hooks/api/useStudio.ts` + `components/studios/StudioHero.tsx` —
+      réutilise directement `Filmography` et `PersonCard` (people) sans
+      dupliquer de composant. `TitleInfo.tsx` : pastilles studios → liens.
+- [x] 9. `tsc --noEmit` (web + api + tmdb-sync) : aucune erreur. `jest`
+      (api) : 4 suites en échec, toutes pré-existantes et sans rapport
+      (DB locale sans fonctions PL/pgSQL, fixtures de rôle credits) —
+      confirmé par lecture du code, aucune ne touche aux fichiers modifiés.
+- [x] 10. Vérifié en navigateur bout en bout : import d'un titre TMDB
+       (`Dune: Part Two`, jamais en base) → `title_studios` peuplé →
+       `/studios/:id` affiche hero + filmographie + personnes connexes →
+       lien "Legendary Pictures" depuis la fiche titre pointe vers la page
+       studio. `/history` : grille d'affiches, croix "Retirer de
+       l'historique", période "Tout", filtre "Non vu" vide bien la liste.
 
 ## Reste du backlog (documenté, pas implémenté)
 
 - Modification G : page "Découvrir" (tendances/populaires/attendus/sorties)
   — nécessite de trancher la source de données pour "Attendus" (pas
   d'équivalent direct côté TMDB).
-- Modification J (nouvelle) : refonte Historique & Calendrier — module
-  accueil en liste avec badge de date relative, page dédiée façon widget
-  Outlook Android (filtre de période + groupement).

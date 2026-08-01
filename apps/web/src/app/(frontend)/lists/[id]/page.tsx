@@ -14,6 +14,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useList } from "@/hooks/api/useList";
+import { useLists } from "@/hooks/api/useLists";
 import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -24,6 +25,7 @@ import {
   parseTitleFilters,
   titleMatchesFilters,
   toFilterableTitle,
+  buildListIdsByTitle,
 } from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
 
@@ -57,8 +59,10 @@ export default function ListDetailPage() {
   const { data: list, isLoading, error } = useList(params.id);
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
+  const { data: allLists } = useLists(isAuthenticated);
 
   const filters = parseTitleFilters(searchParams);
+  const listIdsByTitle = buildListIdsByTitle(allLists);
 
   if (isAuthLoading) {
     return (
@@ -81,7 +85,10 @@ export default function ListDetailPage() {
 
   const items = list?.items ?? [];
   const filteredItems = items.filter((item) =>
-    titleMatchesFilters(toFilterableTitle(item), filters),
+    titleMatchesFilters(
+      toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      filters,
+    ),
   );
 
   return (

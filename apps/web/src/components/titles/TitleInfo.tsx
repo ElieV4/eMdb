@@ -3,6 +3,7 @@
  * Genres, pays, studios, date de sortie, durée, statut.
  */
 
+import Link from "next/link";
 import { Calendar, Clock, Globe, Film } from "lucide-react";
 import { TitleDetail } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
@@ -92,12 +93,13 @@ export function TitleInfo({ title, className }: TitleInfoProps) {
           <p className="text-sm font-medium">Studios :</p>
           <div className="flex flex-wrap gap-2">
             {title_studios.map((ts) => (
-              <span
+              <Link
                 key={ts.id}
-                className="px-3 py-1 text-sm rounded-full bg-muted/30"
+                href={`/studios/${ts.studios.id}`}
+                className="px-3 py-1 text-sm rounded-full bg-muted/30 hover:bg-muted/60 transition-colors"
               >
                 {ts.studios.nom}
-              </span>
+              </Link>
             ))}
           </div>
         </div>

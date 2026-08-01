@@ -8,10 +8,10 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { PlayCircle, Calendar, TrendingUp, Users } from "lucide-react";
+import { Calendar, TrendingUp, Users } from "lucide-react";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { CalendarEpisodes } from "@/components/watches/CalendarEpisodes";
+import { DateCardSlider, DateCardData } from "@/components/common/DateCardSlider";
 import { useAuthStore } from "@/store/authStore";
 import {
   useRecentWatches,
@@ -26,6 +26,7 @@ import {
   parseTitleFilters,
   titleMatchesFilters,
   toFilterableTitle,
+  buildListIdsByTitle,
 } from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
 
@@ -88,71 +89,13 @@ function DashboardSection({
   );
 }
 
-// Composant de card pour "Continue Watching"
-function ContinueWatchingCard({ watch }: { watch: any }) {
-  const title =
-    watch.titles?.titre_vf ||
-    watch.titles?.titre_vo ||
-    watch.episodes?.titre ||
-    "Inconnu";
-  const imageUrl = watch.titles?.affiche_url;
-
-  return (
-    <Link
-      href={
-        watch.episodes
-          ? `/episodes/${watch.episodes.id}`
-          : `/titles/${watch.title_id}`
-      }
-      className="group relative block overflow-hidden rounded-lg"
-    >
-      <div className="aspect-video relative bg-muted/20">
-        {imageUrl ? (
-          <img
-            src={`https://image.tmdb.org/t/p/w500${imageUrl}`}
-            alt={title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-muted flex items-center justify-center">
-            <span className="text-muted-foreground">Pas image</span>
-          </div>
-        )}
-
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <div className="text-center text-white">
-            <div className="flex items-center gap-2">
-              <PlayCircle className="h-10 w-10 fill-white/80" />
-              <span className="text-sm font-medium">Continuer</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-3 bg-background">
-        <h3 className="font-medium line-clamp-1 group-hover:text-primary">
-          {title}
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          {watch.episodes
-            ? `Episode ${watch.episodes.numero}`
-            : watch.titles?.type === "serie"
-              ? "Serie"
-              : "Film"}
-        </p>
-      </div>
-    </Link>
-  );
-}
-
 export default function HomePage() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const searchParams = useSearchParams();
   const filters = parseTitleFilters(searchParams);
 
   // Hooks pour les données du dashboard
-  const { data: recentWatches } = useRecentWatches(4, isAuthenticated);
+  const { data: recentWatches } = useRecentWatches(30, isAuthenticated);
 
   const { data: popularTitles, isLoading: isLoadingPopular } =
     usePopularTitles(8);
@@ -171,8 +114,12 @@ export default function HomePage() {
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
 
+  const listIdsByTitle = buildListIdsByTitle(userLists);
   const watchlistItems = (watchlistDetail?.items ?? []).filter((item) =>
-    titleMatchesFilters(toFilterableTitle(item), filters),
+    titleMatchesFilters(
+      toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      filters,
+    ),
   );
 
   // Filtre appliqué sur le type uniquement : les visionnages récents
@@ -182,6 +129,40 @@ export default function HomePage() {
     if (filters.type === "tout") return true;
     return watch.titles?.type === filters.type;
   });
+
+  const historyCards: DateCardData[] = filteredRecentWatches.map((watch) => ({
+    key: watch.id,
+    href: watch.episodes
+      ? `/episodes/${watch.episodes.id}`
+      : `/titles/${watch.title_id}`,
+    imageUrl: watch.titles?.affiche_url,
+    title:
+      watch.titles?.titre_vf ||
+      watch.titles?.titre_vo ||
+      watch.episodes?.titre ||
+      "Inconnu",
+    subtitle: watch.episodes
+      ? `Épisode ${watch.episodes.numero}`
+      : watch.titles?.type === "serie"
+        ? "Série"
+        : "Film",
+    date: watch.date_vue,
+  }));
+
+  const calendarCards: DateCardData[] = [...(calendarEntries ?? [])]
+    .sort((a, b) => {
+      const da = a.date_diffusion ? new Date(a.date_diffusion).getTime() : Infinity;
+      const db = b.date_diffusion ? new Date(b.date_diffusion).getTime() : Infinity;
+      return da - db;
+    })
+    .map((entry, idx) => ({
+      key: `${entry.title_id}-${entry.saison}-${entry.episode_numero}-${idx}`,
+      href: `/titles/${entry.title_id}`,
+      imageUrl: entry.affiche_url,
+      title: entry.titre_vf || entry.titre_vo,
+      subtitle: `S${String(entry.saison).padStart(2, "0")}E${String(entry.episode_numero).padStart(2, "0")}${entry.episode_titre ? ` — ${entry.episode_titre}` : ""}`,
+      date: entry.date_diffusion,
+    }));
 
   // Si l'authentification est encore en cours de vérification
   if (isAuthLoading) {
@@ -225,17 +206,13 @@ export default function HomePage() {
       {isAuthenticated ? (
         <div className="space-y-10">
           {/* Historique */}
-          {filteredRecentWatches.length > 0 && (
+          {historyCards.length > 0 && (
             <DashboardSection
               title="Historique"
               actionLabel="Voir tout l'historique"
               actionHref="/history"
             >
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {filteredRecentWatches.slice(0, 4).map((watch) => (
-                  <ContinueWatchingCard key={watch.id} watch={watch} />
-                ))}
-              </div>
+              <DateCardSlider items={historyCards} initialCount={20} />
             </DashboardSection>
           )}
 
@@ -247,16 +224,16 @@ export default function HomePage() {
             actionHref="/calendar"
           >
             {isLoadingCalendar ? (
-              <div className="space-y-3">
-                {Array.from({ length: 3 }).map((_, i) => (
+              <div className="flex gap-4 overflow-hidden">
+                {Array.from({ length: 5 }).map((_, i) => (
                   <div
                     key={i}
-                    className="h-24 rounded-lg bg-muted/50 animate-pulse"
+                    className="shrink-0 w-32 sm:w-36 aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
                   />
                 ))}
               </div>
-            ) : calendarEntries && calendarEntries.length > 0 ? (
-              <CalendarEpisodes />
+            ) : calendarCards.length > 0 ? (
+              <DateCardSlider items={calendarCards} initialCount={20} />
             ) : (
               <p className="text-sm text-muted-foreground py-4">
                 Aucun épisode à venir pour le moment.

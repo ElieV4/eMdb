@@ -17,6 +17,7 @@ import { AlertCircle, Plus } from "lucide-react";
 import { ListCard } from "@/components/lists/ListCard";
 import { ListDialog } from "@/components/lists/ListDialog";
 import { useLists } from "@/hooks/api/useLists";
+import { useWatchedTitles } from "@/hooks/api";
 import { useAuthStore } from "@/store/authStore";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import {
@@ -32,13 +33,29 @@ export default function ListsPage() {
   const filters = parseTitleFilters(searchParams);
 
   const { data: lists, isLoading, error } = useLists(isAuthenticated);
+  const { data: watchedTitles } = useWatchedTitles();
 
   // Une liste "correspond" aux filtres actifs si au moins un de ses titres y
   // correspond (bug filtres header sur accueil/watchlist/listes/historique).
+  // Le filtre "Listes" du menu filtre ici les *listes elles-mêmes* par id,
+  // plutôt que les titres qu'elles contiennent (ça n'aurait pas de sens
+  // d'évaluer l'appartenance à une liste sur la page qui liste les listes).
   const filteredLists = hasActiveTitleFilters(filters)
-    ? lists?.filter((list) =>
-        (list.items ?? []).some((item) => titleMatchesFilters(item, filters)),
-      )
+    ? lists?.filter((list) => {
+        if (filters.listIds.length > 0 && !filters.listIds.includes(list.id))
+          return false;
+        return (list.items ?? []).some((item) =>
+          titleMatchesFilters(
+            {
+              ...item,
+              id: item.titleId,
+              listIds: [list.id],
+              watched: watchedTitles?.has(item.titleId) ?? false,
+            },
+            filters,
+          ),
+        );
+      })
     : lists;
 
   if (isAuthLoading) {

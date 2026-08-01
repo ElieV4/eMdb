@@ -10,8 +10,10 @@ const prismaMock: any = {
   credits: { create: jest.fn(), findMany: jest.fn() },
   genres: { upsert: jest.fn() },
   countries: { upsert: jest.fn() },
+  studios: { upsert: jest.fn() },
   title_genres: { createMany: jest.fn() },
   title_countries: { createMany: jest.fn() },
+  title_studios: { createMany: jest.fn() },
   tmdb_sync_log: { create: jest.fn() },
   person_recommendations: { deleteMany: jest.fn(), createMany: jest.fn() },
   user_follows_serie: { findMany: jest.fn() },
@@ -172,6 +174,7 @@ describe('tmdb-sync', () => {
       poster_path: '/poster.jpg',
       genres: [{ id: 1, name: 'Action' }],
       production_countries: [{ iso_3166_1: 'US', name: 'United States' }],
+      production_companies: [{ id: 33, name: 'Studio TMDB', logo_path: '/logo.png' }],
       credits: {
         cast: [{ id: 22, name: 'Acteur', character: 'Personnage', order: 1 }],
         crew: [{ id: 23, name: 'Réalisateur', job: 'Director' }],
@@ -205,11 +208,13 @@ describe('tmdb-sync', () => {
     asMock(prismaMock.titles.upsert).mockResolvedValue({ id: 'new-title-uuid' });
     asMock(prismaMock.genres.upsert).mockResolvedValue({ id: 'genre-uuid' });
     asMock(prismaMock.countries.upsert).mockResolvedValue({ id: 'country-uuid' });
+    asMock(prismaMock.studios.upsert).mockResolvedValue({ id: 'studio-uuid' });
     asMock(prismaMock.people.upsert).mockResolvedValue({ id: 'person-uuid' });
     asMock(prismaMock.roles.upsert).mockResolvedValue({ id: 'role-uuid' });
     asMock(prismaMock.credits.create).mockResolvedValue({});
     asMock(prismaMock.title_genres.createMany).mockResolvedValue({ count: 1 });
     asMock(prismaMock.title_countries.createMany).mockResolvedValue({ count: 1 });
+    asMock(prismaMock.title_studios.createMany).mockResolvedValue({ count: 1 });
 
     const title = await importTitleByTmdbId(99, 'film');
 
@@ -218,6 +223,20 @@ describe('tmdb-sync', () => {
     expect(prismaMock.title_genres.createMany).toHaveBeenCalled();
     expect(prismaMock.countries.upsert).toHaveBeenCalled();
     expect(prismaMock.title_countries.createMany).toHaveBeenCalled();
+    expect(prismaMock.studios.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tmdb_id: 33 },
+        create: expect.objectContaining({
+          tmdb_id: 33,
+          nom: 'Studio TMDB',
+          logo_url: 'https://image.tmdb.org/t/p/w200/logo.png',
+        }),
+      }),
+    );
+    expect(prismaMock.title_studios.createMany).toHaveBeenCalledWith({
+      data: [{ title_id: 'new-title-uuid', studio_id: 'studio-uuid' }],
+      skipDuplicates: true,
+    });
     expect(prismaMock.credits.create).toHaveBeenCalledTimes(1);
   });
 

@@ -16,7 +16,7 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useLogout } from "@/hooks/auth/useLogout";
-import { useTitleGenres, useTitleCountries } from "@/hooks/api";
+import { useTitleGenres, useTitleCountries, useLists } from "@/hooks/api";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -88,6 +88,7 @@ export function Header() {
 
   const { data: genres } = useTitleGenres();
   const { data: countries } = useTitleCountries();
+  const { data: userLists } = useLists(isAuthenticated);
 
   const filters = parseTitleFilters(searchParams);
   // Valeur brute du paramètre `type`, y compris "personne" (spécifique à la
@@ -126,13 +127,13 @@ export function Header() {
 
   // Pages où les filtres de type ont un effet réel (bug #33/#34 : le menu
   // s'affichait partout, y compris sur des pages où il ne filtrait rien).
-  const isHistoryPage = pathname === "/history";
   const showTypeTabs = FILTER_VISIBLE_PATHS.some(
     (path) => pathname === path || pathname.startsWith(path + "/"),
   );
-  // Le menu "Filtres" (genre/pays/année/note) ne s'applique pas à
-  // l'historique : les visionnages n'embarquent pas ces données du titre.
-  const showFilterSidebarButton = showTypeTabs && !isHistoryPage;
+  // Le bouton "Filtres" s'affiche sur l'historique aussi (menu absent à tort) :
+  // Listes et "vu/tout/non vu" s'y appliquent, même si genre/pays/année/note
+  // ne portent pas de donnée sur les visionnages.
+  const showFilterSidebarButton = showTypeTabs;
 
   // Filtrer les tabs selon la page
   const visibleTabs = isSearchPage
@@ -155,6 +156,17 @@ export function Header() {
       ? filters.countryIds.filter((c) => c !== id)
       : [...filters.countryIds, id];
     navigateWithFilters({ pays: next.length > 0 ? next.join(",") : null });
+  };
+
+  const toggleList = (id: string) => {
+    const next = filters.listIds.includes(id)
+      ? filters.listIds.filter((l) => l !== id)
+      : [...filters.listIds, id];
+    navigateWithFilters({ listes: next.length > 0 ? next.join(",") : null });
+  };
+
+  const setWatchedStatus = (status: string) => {
+    navigateWithFilters({ vu: status === "tout" ? null : status });
   };
 
   const commitYearRange = (next: [number, number]) => {
@@ -180,6 +192,8 @@ export function Header() {
       yearMax: null,
       noteImdbMin: null,
       noteImdbMax: null,
+      listes: null,
+      vu: null,
     });
   };
 
@@ -287,6 +301,7 @@ export function Header() {
           filters={filters}
           genres={genres}
           countries={countries}
+          lists={userLists}
           yearRange={yearRange}
           onYearRangeChange={setYearRange}
           onYearRangeCommit={commitYearRange}
@@ -295,6 +310,8 @@ export function Header() {
           onNoteRangeCommit={commitNoteRange}
           onToggleGenre={toggleGenre}
           onToggleCountry={toggleCountry}
+          onToggleList={toggleList}
+          onWatchedStatusChange={setWatchedStatus}
           onReset={resetFilters}
         />
       )}

@@ -1,23 +1,44 @@
+import { resolveCrewRole } from '@emdb/tmdb-mapper';
+export { resolveCrewRole };
+/**
+ * Crée le credit reliant une personne déjà connue (person_id) à un titre déjà
+ * importé (title_id), sans importer le reste du casting/équipe du titre.
+ * Utilisé par le refresh de filmographie (bug 27) : contrairement à
+ * importTitleByTmdbId, on connaît déjà la personne et son rôle exact via
+ * getPersonCombinedCredits, donc pas besoin de réimporter tous les autres
+ * membres du casting pour retrouver cette seule ligne de credit.
+ */
+export declare function ensureCreditRecord(params: {
+    titleId: string;
+    personId: string;
+    role: string;
+    roleLibelle: string;
+    personnage?: string | null;
+    ordre?: number | null;
+    episodeId?: string | null;
+}): Promise<void>;
 export declare function importPersonByTmdbId(tmdbId: number): Promise<{
     id: string;
     tmdb_id: number | null;
     nom: string;
     genre: string | null;
+    source: string;
+    created_at: Date;
     date_naissance: Date | null;
     pays_id: string | null;
     photo_url: string | null;
     bio: string | null;
     wiki_url: string | null;
-    source: string;
-    created_at: Date;
 }>;
 export declare function importEpisodeGuestCredits(episodeId: string, tmdbId: number, seasonNumber: number, episodeNumber: number): Promise<void>;
-export declare function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie'): Promise<{
+export declare function importTitleByTmdbId(tmdbId: number, type: 'film' | 'serie', options?: {
+    withCredits?: boolean;
+}): Promise<{
     id: string;
     tmdb_id: number | null;
+    type: string;
     source: string;
     created_at: Date;
-    type: string;
     titre_vo: string;
     titre_vf: string | null;
     synopsis: string | null;
@@ -36,20 +57,20 @@ export declare function refreshPersonData(personId: string): Promise<{
     tmdb_id: number | null;
     nom: string;
     genre: string | null;
+    source: string;
+    created_at: Date;
     date_naissance: Date | null;
     pays_id: string | null;
     photo_url: string | null;
     bio: string | null;
     wiki_url: string | null;
-    source: string;
-    created_at: Date;
 }>;
 export declare function refreshTitleData(titleId: string): Promise<{
     id: string;
     tmdb_id: number | null;
+    type: string;
     source: string;
     created_at: Date;
-    type: string;
     titre_vo: string;
     titre_vf: string | null;
     synopsis: string | null;

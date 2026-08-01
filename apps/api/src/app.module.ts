@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { TitlesModule } from './titles/titles.module';
 import { PeopleModule } from './people/people.module';
+import { StudiosModule } from './studios/studios.module';
 import { SeasonsEpisodesModule } from './seasons-episodes/seasons-episodes.module';
 import { CreditsModule } from './credits/credits.module';
 import { DatavizModule } from './dataviz/dataviz.module';
@@ -29,6 +30,7 @@ import * as path from 'node:path';
     UsersModule,
     TitlesModule,
     PeopleModule,
+    StudiosModule,
     SeasonsEpisodesModule,
     CreditsModule,
     DatavizModule,

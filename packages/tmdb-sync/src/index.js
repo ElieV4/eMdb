@@ -1,5 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.resolveCrewRole = void 0;
+exports.ensureCreditRecord = ensureCreditRecord;
 exports.importPersonByTmdbId = importPersonByTmdbId;
 exports.importEpisodeGuestCredits = importEpisodeGuestCredits;
 exports.importTitleByTmdbId = importTitleByTmdbId;
@@ -15,6 +17,7 @@ exports.bootstrapRecommendationsFromTmdb = bootstrapRecommendationsFromTmdb;
 const db_1 = require("@emdb/db");
 const tmdb_client_1 = require("@emdb/tmdb-client");
 const tmdb_mapper_1 = require("@emdb/tmdb-mapper");
+Object.defineProperty(exports, "resolveCrewRole", { enumerable: true, get: function () { return tmdb_mapper_1.resolveCrewRole; } });
 const wikidata_client_1 = require("@emdb/wikidata-client");
 const ROLE_LIBELLES = {
     acteur: 'Acteur',
@@ -22,15 +25,44 @@ const ROLE_LIBELLES = {
     scenariste: 'Scénariste',
     autre: 'Autre',
 };
-async function ensureRoleId(role) {
-    const code = role;
-    const libelle = ROLE_LIBELLES[role] ?? 'Autre';
+async function ensureRoleId(code, libelle) {
+    const resolvedLibelle = libelle ?? ROLE_LIBELLES[code] ?? 'Autre';
     const roleRecord = await db_1.prisma.roles.upsert({
         where: { code },
-        update: { libelle },
-        create: { code, libelle },
+        update: { libelle: resolvedLibelle },
+        create: { code, libelle: resolvedLibelle },
     });
     return roleRecord.id;
+}
+/**
+ * Crée le credit reliant une personne déjà connue (person_id) à un titre déjà
+ * importé (title_id), sans importer le reste du casting/équipe du titre.
+ * Utilisé par le refresh de filmographie (bug 27) : contrairement à
+ * importTitleByTmdbId, on connaît déjà la personne et son rôle exact via
+ * getPersonCombinedCredits, donc pas besoin de réimporter tous les autres
+ * membres du casting pour retrouver cette seule ligne de credit.
+ */
+async function ensureCreditRecord(params) {
+    const roleId = await ensureRoleId(params.role, params.roleLibelle);
+    try {
+        await db_1.prisma.credits.create({
+            data: {
+                title_id: params.titleId,
+                person_id: params.personId,
+                episode_id: params.episodeId ?? null,
+                role_id: roleId,
+                personnage: params.personnage ?? null,
+                ordre: params.ordre ?? null,
+                source: 'tmdb',
+            },
+        });
+    }
+    catch (error) {
+        if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
+            return;
+        }
+        throw error;
+    }
 }
 async function createSyncLog(params) {
     await db_1.prisma.tmdb_sync_log.create({
@@ -126,7 +158,33 @@ async function ensureCountryIds(countries) {
     }
     return ids;
 }
-async function importTitleByTmdbId(tmdbId, type) {
+async function ensureStudioIds(companies) {
+    const ids = [];
+    for (const company of companies) {
+        if (!company.name) {
+            continue;
+        }
+        const logoUrl = company.logo_path
+            ? `https://image.tmdb.org/t/p/w200${company.logo_path}`
+            : null;
+        const record = await db_1.prisma.studios.upsert({
+            where: { tmdb_id: company.id },
+            create: {
+                tmdb_id: company.id,
+                nom: company.name,
+                logo_url: logoUrl,
+            },
+            update: {
+                nom: company.name,
+                logo_url: logoUrl,
+            },
+        });
+        ids.push(record.id);
+    }
+    return ids;
+}
+async function importTitleByTmdbId(tmdbId, type, options = {}) {
+    const withCredits = options.withCredits ?? true;
     console.log('[importTitleByTmdbId] start', tmdbId, type);
     await createSyncLog({
         tmdb_id: tmdbId,
@@ -162,12 +220,20 @@ async function importTitleByTmdbId(tmdbId, type) {
                 skipDuplicates: true,
             });
         }
-        if (tmdbData.credits) {
+        if (tmdbData.production_companies?.length) {
+            console.log('[importTitleByTmdbId] studios', tmdbId, tmdbData.production_companies.length);
+            const studioIds = await ensureStudioIds(tmdbData.production_companies);
+            await db_1.prisma.title_studios.createMany({
+                data: studioIds.map((studioId) => ({ title_id: title.id, studio_id: studioId })),
+                skipDuplicates: true,
+            });
+        }
+        if (withCredits && tmdbData.credits) {
             console.log('[importTitleByTmdbId] credits', tmdbId, tmdbData.credits?.cast?.length, tmdbData.credits?.crew?.length);
             const creditInserts = (0, tmdb_mapper_1.mapTmdbCredits)(tmdbData.credits, title.id, null);
             for (const credit of creditInserts) {
                 const person = await importPersonByTmdbId(credit.tmdb_person_id);
-                const roleId = await ensureRoleId(credit.role);
+                const roleId = await ensureRoleId(credit.role, credit.role_libelle);
                 try {
                     await db_1.prisma.credits.create({
                         data: {
@@ -283,10 +349,14 @@ async function refreshTitleData(titleId) {
         ? await (0, tmdb_client_1.getMovieDetails)(title.tmdb_id)
         : await (0, tmdb_client_1.getTvDetails)(title.tmdb_id);
     const updatePayload = title.type === 'film' ? (0, tmdb_mapper_1.mapTmdbMovieToTitle)(tmdbData) : (0, tmdb_mapper_1.mapTmdbTvToTitle)(tmdbData);
-    return db_1.prisma.titles.update({
+    const updated = await db_1.prisma.titles.update({
         where: { id: titleId },
         data: updatePayload,
     });
+    if (title.type === 'serie') {
+        await importSeasonsForSerie(titleId);
+    }
+    return updated;
 }
 /**
  * Génère des notifications pour les nouveaux épisodes des séries suivies.
@@ -575,4 +645,3 @@ async function bootstrapRecommendationsFromTmdb(titleId) {
     }
     return records;
 }
-//# sourceMappingURL=index.js.map

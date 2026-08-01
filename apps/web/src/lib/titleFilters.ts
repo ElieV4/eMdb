@@ -6,6 +6,7 @@
  */
 
 export type TitleTypeFilter = "tout" | "film" | "serie";
+export type WatchedStatusFilter = "tout" | "vu" | "non_vu";
 
 export type TitleFilters = {
   type: TitleTypeFilter;
@@ -15,6 +16,8 @@ export type TitleFilters = {
   yearMax: number | null;
   noteImdbMin: number | null;
   noteImdbMax: number | null;
+  listIds: string[];
+  watchedStatus: WatchedStatusFilter;
 };
 
 export const YEAR_RANGE_MIN = 1900;
@@ -28,6 +31,7 @@ export function parseTitleFilters(searchParams: URLSearchParams): TitleFilters {
   const yearMax = searchParams.get("yearMax");
   const noteImdbMin = searchParams.get("noteImdbMin");
   const noteImdbMax = searchParams.get("noteImdbMax");
+  const watchedStatus = searchParams.get("vu");
 
   return {
     type: type === "film" || type === "serie" ? type : "tout",
@@ -37,6 +41,8 @@ export function parseTitleFilters(searchParams: URLSearchParams): TitleFilters {
     yearMax: yearMax ? Number(yearMax) : null,
     noteImdbMin: noteImdbMin ? Number(noteImdbMin) : null,
     noteImdbMax: noteImdbMax ? Number(noteImdbMax) : null,
+    listIds: searchParams.get("listes")?.split(",").filter(Boolean) ?? [],
+    watchedStatus: watchedStatus === "vu" || watchedStatus === "non_vu" ? watchedStatus : "tout",
   };
 }
 
@@ -48,7 +54,9 @@ export function hasActiveTitleFilters(filters: TitleFilters) {
     filters.yearMin !== null ||
     filters.yearMax !== null ||
     filters.noteImdbMin !== null ||
-    filters.noteImdbMax !== null
+    filters.noteImdbMax !== null ||
+    filters.listIds.length > 0 ||
+    filters.watchedStatus !== "tout"
   );
 }
 
@@ -75,27 +83,57 @@ export function buildFilterQueryString(
  * sur accueil/watchlist/listes/historique).
  */
 export type FilterableTitle = {
+  id: string;
   type: "film" | "serie";
   year: number | null;
   note: number | null;
   genreIds: string[];
   countryIds: string[];
+  /** Ids des listes utilisateur contenant ce titre (filtre "Listes"). */
+  listIds: string[];
+  /** Le titre a-t-il été marqué comme vu (filtre "vu / tout / non vu") ? */
+  watched: boolean;
 };
 
+/** Ids de listes par titre, à partir de `useLists()` — pour le filtre "Listes". */
+export function buildListIdsByTitle(
+  lists: { id: string; items?: { titleId: string }[] }[] | undefined,
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const list of lists ?? []) {
+    for (const item of list.items ?? []) {
+      const arr = map.get(item.titleId);
+      if (arr) arr.push(list.id);
+      else map.set(item.titleId, [list.id]);
+    }
+  }
+  return map;
+}
+
 /** Adapte un `Title`/`TitleSearchResult` (genres/pays en objets) vers `FilterableTitle`. */
-export function toFilterableTitle(title: {
-  type: "film" | "serie";
-  dateSortie?: string | null;
-  note?: number | null;
-  genres?: { id: string }[];
-  pays?: { id: string }[];
-}): FilterableTitle {
+export function toFilterableTitle(
+  title: {
+    id: string;
+    type: "film" | "serie";
+    dateSortie?: string | null;
+    note?: number | null;
+    genres?: { id: string }[];
+    pays?: { id: string }[];
+  },
+  context?: {
+    watchedTitleIds?: Set<string>;
+    listIdsByTitle?: Map<string, string[]>;
+  },
+): FilterableTitle {
   return {
+    id: title.id,
     type: title.type,
     year: title.dateSortie ? new Date(title.dateSortie).getFullYear() : null,
     note: title.note ?? null,
     genreIds: title.genres?.map((g) => g.id) ?? [],
     countryIds: title.pays?.map((p) => p.id) ?? [],
+    listIds: context?.listIdsByTitle?.get(title.id) ?? [],
+    watched: context?.watchedTitleIds?.has(title.id) ?? false,
   };
 }
 
@@ -140,6 +178,15 @@ export function titleMatchesFilters(
     (title.note === null || title.note > filters.noteImdbMax)
   )
     return false;
+
+  if (
+    filters.listIds.length > 0 &&
+    !filters.listIds.some((id) => title.listIds.includes(id))
+  )
+    return false;
+
+  if (filters.watchedStatus === "vu" && !title.watched) return false;
+  if (filters.watchedStatus === "non_vu" && title.watched) return false;
 
   return true;
 }

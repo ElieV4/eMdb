@@ -210,6 +210,38 @@ async function ensureCountryIds(countries: { iso_3166_1: string; name: string }[
   return ids;
 }
 
+async function ensureStudioIds(
+  companies: { id: number; name: string; logo_path?: string | null }[],
+) {
+  const ids: string[] = [];
+
+  for (const company of companies) {
+    if (!company.name) {
+      continue;
+    }
+
+    const logoUrl = company.logo_path
+      ? `https://image.tmdb.org/t/p/w200${company.logo_path}`
+      : null;
+
+    const record = await prisma.studios.upsert({
+      where: { tmdb_id: company.id },
+      create: {
+        tmdb_id: company.id,
+        nom: company.name,
+        logo_url: logoUrl,
+      },
+      update: {
+        nom: company.name,
+        logo_url: logoUrl,
+      },
+    });
+    ids.push(record.id);
+  }
+
+  return ids;
+}
+
 export async function importTitleByTmdbId(
   tmdbId: number,
   type: 'film' | 'serie',
@@ -253,6 +285,15 @@ export async function importTitleByTmdbId(
       const countryIds = await ensureCountryIds(tmdbData.production_countries);
       await prisma.title_countries.createMany({
         data: countryIds.map((countryId) => ({ title_id: title.id, country_id: countryId })),
+        skipDuplicates: true,
+      });
+    }
+
+    if (tmdbData.production_companies?.length) {
+      console.log('[importTitleByTmdbId] studios', tmdbId, tmdbData.production_companies.length);
+      const studioIds = await ensureStudioIds(tmdbData.production_companies);
+      await prisma.title_studios.createMany({
+        data: studioIds.map((studioId) => ({ title_id: title.id, studio_id: studioId })),
         skipDuplicates: true,
       });
     }

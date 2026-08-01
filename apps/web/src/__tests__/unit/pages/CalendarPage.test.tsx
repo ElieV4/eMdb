@@ -11,10 +11,6 @@ jest.mock("@/store/authStore", () => ({
   }),
 }));
 
-jest.mock("@/components/watches/CalendarEpisodes", () => ({
-  CalendarEpisodes: () => <div data-testid="calendar-episodes">Calendar</div>,
-}));
-
 import { render, screen } from "@testing-library/react";
 import CalendarPage from "@/app/calendar/page";
 
@@ -24,8 +20,8 @@ describe("CalendarPage", () => {
     expect(screen.getByText("Calendrier")).toBeInTheDocument();
   });
 
-  it("affiche le composant CalendarEpisodes", () => {
+  it("affiche le filtre de période (modification J)", () => {
     render(<CalendarPage />);
-    expect(screen.getByTestId("calendar-episodes")).toBeInTheDocument();
+    expect(screen.getByText("Semaine")).toBeInTheDocument();
   });
 });

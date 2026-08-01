@@ -24,6 +24,7 @@ import {
   parseTitleFilters,
   titleMatchesFilters,
   toFilterableTitle,
+  buildListIdsByTitle,
 } from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
 
@@ -79,9 +80,13 @@ export default function WatchlistPage() {
     );
   }
 
+  const listIdsByTitle = buildListIdsByTitle(lists);
   const items = watchlist?.items ?? [];
   const filteredItems = items.filter((item) =>
-    titleMatchesFilters(toFilterableTitle(item), filters),
+    titleMatchesFilters(
+      toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      filters,
+    ),
   );
 
   return (

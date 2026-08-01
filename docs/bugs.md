@@ -523,6 +523,23 @@
 - **Fichiers modifiés :** `apps/web/src/components/watches/WatchButton.tsx`, `apps/web/src/components/titles/TitleActions.tsx`, `apps/web/src/components/titles/TitlePoster.tsx`, `apps/web/src/components/titles/TitleCard.tsx`, `apps/web/src/hooks/api/useListMembership.ts` (nouveau), `apps/web/src/hooks/api/index.ts`, `apps/api/src/lists/lists.service.ts`, `apps/api/src/lists/lists.service.spec.ts`, `apps/web/src/lib/types/api.ts`, et tous les consommateurs de `TitleCard` listés ci-dessus.
 - **Vérification manuelle :** sur la page titre, "Marquer comme vu" déclenche bien `POST /watches` (201) et le bouton passe à "Vu" (rouge) ; "Listes" ouvre le menu et cocher "Favoris" déclenche `POST /lists/:id/items` (201) ; sur `/watchlist`, l'affiche affiche bien cœur (favori) + bookmark (watchlist) + œil (vu) empilés en haut à gauche, avec tooltip au survol de chacun.
 
+### 46. Impossible d'ajouter un titre à la watchlist / à une liste
+- **Symptôme :** Signalé par l'utilisateur — action bloquée ou sans effet lors de l'ajout d'un titre à la watchlist ou à une liste. À reproduire précisément (module concerné, depuis quelle page) avant correction.
+- **Fichiers concernés (pressentis) :** `apps/web/src/components/titles/TitleQuickActionsMenu.tsx`, `apps/web/src/components/titles/TitleActions.tsx`, `apps/web/src/hooks/api/useAddItem.ts`/`useAddListItem.ts`, `apps/api/src/lists/lists.service.ts`
+
+### 47. Titres recommandés : les icônes vu/watchlist/favori ne se mettent pas à jour en temps réel
+- **Symptôme :** Dans le module "Titres recommandés" (page titre), ajouter/retirer un titre de la watchlist ou le marquer comme vu ne fait pas apparaître/disparaître l'icone correspondante sans rechargement complet de la page — alors que ce rafraîchissement en temps réel fonctionne ailleurs (bug #45 : invalidation de `["watched-titles-set"]`/`["lists"]`).
+- **Cause probable :** `TitleRecommendations.tsx` ne relit peut-être pas `useWatchedTitles()`/`useListMembership()` après mutation, ou les props `watched`/`inWatchlist`/`inFavorites` passées à `TitleCard` y sont figées au premier rendu (cf. le mécanisme déjà en place pour `search`/`watchlist`/accueil, bug #45).
+- **Fichiers concernés :** `apps/web/src/components/titles/TitleRecommendations.tsx`
+
+### 48. Le module "Distribution & Équipe"/filmographie ne charge pas toutes les données, seulement celles en cache
+- **Symptôme :** Signalé par l'utilisateur — le module filmographie n'affiche que ce qui était déjà en cache local, sans compléter avec les données fraîches. Possiblement lié au bug #27 (refresh TMDB fire-and-forget au chargement) : le refresh part bien mais son résultat n'est pas répercuté dans le rendu, ou expire/échoue silencieusement.
+- **Fichiers concernés (pressentis) :** `apps/web/src/hooks/api/useRefreshFilmography.ts`, `apps/web/src/app/(frontend)/people/[id]/page.tsx`, `apps/api/src/people/people.service.ts` (`refreshFilmography`)
+
+### 49. Les menus (dropdown) ne doivent pas être transparents
+- **Symptôme :** Les menus dropdown (`DropdownMenuContent` — menu utilisateur, "Listes", filtres Genre/Pays/Listes, etc.) laissent transparaître le contenu derrière eux au lieu d'avoir un fond opaque.
+- **Fichiers concernés :** `apps/web/src/components/ui/dropdown-menu.tsx`
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -592,14 +609,86 @@
 - **Fait :** nouveau composant `apps/web/src/components/ui/tooltip.tsx` (wrapper autour de `@base-ui/react/tooltip`, même convention que `dropdown-menu.tsx`), utilisé par les 3 icones de `TitlePoster.tsx` ("Dans les favoris" / "Dans la watchlist" / "Déjà vu"). Implémenté en même temps que le bug #45.
 - **Fichiers modifiés :** `apps/web/src/components/ui/tooltip.tsx` (nouveau), `apps/web/src/components/titles/TitlePoster.tsx`
 
-### J. Refonte Historique & Calendrier — même traitement pour les deux
+### J. Refonte Historique & Calendrier — même traitement pour les deux — ✅ fait
 - **Description demandée :** Historique (`/history`) et Calendrier (`/calendar`) doivent adopter le même comportement, à deux niveaux :
-  1. **Module intra-accueil** (les deux sections sur la page d'accueil) : titres affichés les uns derrière les autres (liste, pas grille), avec un badge en bas à droite de chaque élément donnant la date relative de sortie (calendrier) ou de visionnage (historique) du titre ou de l'épisode :
-     - Formats attendus : "dans 3h", "il y a 3h", "hier", "demain", "mercredi prochain", "jeudi dernier", ...
-     - Au-delà d'une semaine (passé ou futur) : date au format `jj/mm/aaaa`.
-  2. **Page dédiée** (`/history` et `/calendar`) : reprendre le format du widget Outlook sur Android — un filtre de période en haut de page (Jour / Semaine / Mois / Trimestre / Semestre / Année), et les titres groupés par période, chaque groupe affiché l'un en dessous de l'autre.
-- **Fichiers concernés (pressentis) :** `apps/web/src/app/(frontend)/history/page.tsx`, `apps/web/src/app/(frontend)/calendar/page.tsx`, `apps/web/src/app/(frontend)/page.tsx` (sections Historique/Calendrier de l'accueil), `apps/web/src/components/watches/CalendarEpisodes.tsx`, nouvelle fonction utilitaire de formatage de date relative (à mutualiser entre les deux modules plutôt que dupliquée), nouveau composant de filtre de période.
-- **Statut :** non implémenté.
+  1. **Module intra-accueil** (les deux sections sur la page d'accueil) : titres les uns à côté des autres (slider horizontal, précision donnée après un premier essai en liste verticale), badge en bas à droite de chaque vignette donnant la date relative de sortie (calendrier) ou de visionnage (historique) du titre ou de l'épisode ("dans 3h" / "il y a 3h" / "hier" / "demain" / "mercredi prochain" / "jeudi dernier" / au-delà d'une semaine, `jj/mm/aaaa"), avec un bouton "Voir davantage" au bout de 20 éléments (jusqu'à 30 chargés).
+  2. **Page dédiée** (`/history` et `/calendar`) : format widget Outlook Android — filtre de période en haut de page (Jour / Semaine / Mois / Trimestre / Semestre / Année), titres groupés par période, chaque groupe affiché l'un en dessous de l'autre.
+- **Fait :**
+  - `lib/relativeDate.ts` (nouveau) : `formatRelativeDate()`, tous les formats demandés, testé manuellement (script ponctuel) pour les cas limites (±3h, ±20min, hier/demain, ±4 jours, ±10 jours).
+  - `lib/periodGrouping.ts` (nouveau) : `groupByPeriod()` + `getPeriodBucket()` pour les 6 granularités, `PERIOD_OPTIONS`.
+  - `components/common/PeriodFilter.tsx` (nouveau) : sélecteur de période, même style que les tabs du header.
+  - `components/common/DateCard.tsx` + `DateCardSlider.tsx` (nouveaux) : carte compacte (vignette + badge date bas-droite) et slider horizontal avec "Voir davantage" (20 → 30, déjà chargé, pas de requête supplémentaire) — module accueil.
+  - `components/common/DateListItem.tsx` (nouveau) : ligne (vignette + badge date) — utilisé par `/calendar` (page dédiée, groupée par période).
+  - `app/(frontend)/page.tsx` : sections Historique et Calendrier basculées sur `DateCardSlider` (`useRecentWatches` passé à `limit=30`).
+  - `app/(frontend)/history/page.tsx` et `app/(frontend)/calendar/page.tsx` : `PeriodFilter` (état dans l'URL, `?period=...`, défaut "semaine") + regroupement via `groupByPeriod`. Sur `/calendar`, les épisodes sans `date_diffusion` connue sont affichés à part, dans un groupe "Date inconnue" (ne peuvent pas être placés dans une période).
+  - `components/watches/CalendarEpisodes.tsx` (groupait par série, plus utilisé nulle part) : supprimé.
+- **Fichiers modifiés :** `apps/web/src/lib/relativeDate.ts` (nouveau), `apps/web/src/lib/periodGrouping.ts` (nouveau), `apps/web/src/components/common/PeriodFilter.tsx` (nouveau), `apps/web/src/components/common/DateCard.tsx` (nouveau), `apps/web/src/components/common/DateCardSlider.tsx` (nouveau), `apps/web/src/components/common/DateListItem.tsx` (nouveau), `apps/web/src/app/(frontend)/page.tsx`, `apps/web/src/app/(frontend)/history/page.tsx`, `apps/web/src/app/(frontend)/calendar/page.tsx`, `apps/web/src/components/watches/CalendarEpisodes.tsx` (supprimé), `apps/web/src/__tests__/unit/pages/CalendarPage.test.tsx` (mock du composant supprimé retiré).
+- **Vérification manuelle :** accueil — slider horizontal avec badges "hier" sur Historique ; `/history` — filtre de période fonctionnel, bascule "Semaine" → "Mois" regroupe correctement ("Semaine du ..." → "Juillet 2026") ; `/calendar` — filtre affiché, état vide correct (compte de test sans série suivie, code non exercé sur données réelles mais structurellement identique à `/history`).
+
+### K. Historique/Calendrier : format affiche sur les pages dédiées, période "Tout", filtres Listes/Statut — ✅ fait
+- **Description demandée (retour sur J) :** sur les pages dédiées `/history` et `/calendar`, garder le format affiche (comme le module accueil) plutôt que le format ligne ; ajouter une période "Tout" (pas de regroupement) ; le menu "Filtres" du header était absent sur `/history` (exclu volontairement lors de J) — l'ajouter, et y ajouter un dropdown "Listes" et un toggle "vu / tout / non vu".
+- **Fait :**
+  - `lib/periodGrouping.ts` : ajout de la période `"tout"` (un seul groupe, libellé "Tout") à `Period`/`PERIOD_OPTIONS`/`getPeriodBucket`.
+  - `/history` et `/calendar` : basculés du format ligne (`DateListItem`) au format affiche en grille (`DateCard`), même composant que le slider accueil. `DateListItem.tsx` (devenu mort) supprimé. `DateCard` reçoit un `onRemove` optionnel (croix en haut à droite au survol, rendue en sibling du `Link` — même contrainte que le bug #45/modif H sur l'imbrication `<button>`/`<a>`) — utilisé par `/history` pour "Retirer de l'historique".
+  - `lib/titleFilters.ts` : `TitleFilters` étendu avec `listIds: string[]` (paramètre URL `listes`) et `watchedStatus: "tout"|"vu"|"non_vu"` (paramètre URL `vu`). `FilterableTitle` porte désormais `id`/`listIds`/`watched` ; nouvel utilitaire `buildListIdsByTitle()` (Map titre → listes) à partir de `useLists()`. Appliqué dans `titleMatchesFilters` et propagé à toutes les pages consommatrices (accueil, watchlist, listes, détail liste, historique).
+  - `Header.tsx`/`FilterSidebar.tsx` : le bouton "Filtres" s'affiche désormais aussi sur `/history` (l'exclusion `!isHistoryPage` de la modif #43 est retirée). Sidebar : nouveau toggle "Statut" (Tout/Vu/Non vu, style segmented control) et nouveau dropdown "Listes" (multi-sélection, même pattern que Genre/Pays).
+  - `/history` applique désormais Listes et Statut côté client (le type reste filtré côté serveur) ; "Non vu" vide la liste par construction (tout l'historique est déjà vu), comportement cohérent plutôt qu'un cas spécial.
+- **Fichiers modifiés :** `apps/web/src/lib/periodGrouping.ts`, `apps/web/src/lib/titleFilters.ts`, `apps/web/src/components/common/DateCard.tsx`, `apps/web/src/components/common/DateListItem.tsx` (supprimé), `apps/web/src/components/layout/Header.tsx`, `apps/web/src/components/layout/FilterSidebar.tsx`, `apps/web/src/app/(frontend)/history/page.tsx`, `apps/web/src/app/(frontend)/calendar/page.tsx`, `apps/web/src/app/(frontend)/page.tsx`, `apps/web/src/app/(frontend)/watchlist/page.tsx`, `apps/web/src/app/(frontend)/lists/page.tsx`, `apps/web/src/app/(frontend)/lists/[id]/page.tsx`.
+- **Vérification manuelle :** `/history` — grille d'affiches avec croix "Retirer de l'historique" au survol ; période "Tout" présente et sélectionnable ; bouton "Filtres" ouvre la sidebar avec "Statut" et "Listes" ; sélectionner "Non vu" vide bien la liste ("Aucun visionnage ne correspond au filtre actif"), "Tout" la restaure. `/calendar` — grille d'affiches, période "Tout" présente (page en erreur de chargement dans cet environnement de dev, cause pré-existante sans rapport : fonction PL/pgSQL `fn_episodes_non_vus` absente de la base locale — même cause que l'échec pré-existant de `plpgsql-functions.spec.ts`).
+
+### L. Studios : import TMDB, affichage sur la fiche titre, page dédiée — ✅ fait
+- **Description demandée :** ajouter les studios dans les infos de la page titre ; créer une page studio reprenant la structure de la page personne (filmographie + personnes connexes).
+- **Constat :** le modèle `studios`/`title_studios` et son affichage sur `TitleInfo.tsx` existaient déjà, mais `packages/tmdb-sync` n'importait jamais `tmdbData.production_companies` — la table restait vide pour tout titre importé depuis le début du projet.
+- **Fait :**
+  - `packages/tmdb-sync/src/index.ts` : `ensureStudioIds()` (miroir de `ensureGenreIds`/`ensureCountryIds`) + `prisma.title_studios.createMany()` dans `importTitleByTmdbId`, à partir de `tmdbData.production_companies`. `logo_url` construit depuis `logo_path` (`https://image.tmdb.org/t/p/w200...`).
+  - Backend : nouveau module `apps/api/src/studios` (`StudiosController`/`StudiosService`), miroir de `people` : `GET /studios/:id` (détail), `GET /studios/:id/filmography` (titres via `title_studios`, groupés par "Films"/"Séries" — même forme `FilmographyGrouped` que people, réutilisable telle quelle côté frontend), `GET /studios/:id/people` ("personnes connexes" : pas d'équivalent TMDB pour un studio, donc calculé localement — personnes les plus créditées sur les titres du studio, credits de niveau titre uniquement).
+  - Frontend : `hooks/api/useStudio.ts`, `components/studios/StudioHero.tsx` (miroir simplifié de `PersonHero`, sans bio/date de naissance), page `app/(frontend)/studios/[id]/page.tsx` (miroir de `people/[id]/page.tsx`, réutilise directement `Filmography` et `PersonCard`).
+  - `TitleInfo.tsx` : les pastilles "Studios" sont désormais des liens vers `/studios/:id`.
+- **Fichiers modifiés :** `packages/tmdb-sync/src/index.ts` (+ `index.spec.ts`), `apps/api/src/studios/studios.module.ts` (nouveau), `apps/api/src/studios/studios.controller.ts` (nouveau), `apps/api/src/studios/studios.service.ts` (nouveau), `apps/api/src/app.module.ts`, `apps/web/src/hooks/api/useStudio.ts` (nouveau), `apps/web/src/components/studios/StudioHero.tsx` (nouveau), `apps/web/src/app/(frontend)/studios/[id]/page.tsx` (nouveau), `apps/web/src/components/titles/TitleInfo.tsx`.
+- **Vérification manuelle :** import d'un titre TMDB non présent en local (`Dune: Part Two`, tmdb_id 693134) → `title_studios` peuplé ("Legendary Pictures") ; `/studios/:id` affiche hero + filmographie ("Films" → Dune: Part Two) + 12 personnes connexes ; lien "Legendary Pictures" sur la fiche titre pointe bien vers la page studio.
+
+### M. Toujours rouvrir le dropdown de date pour re-marquer un titre/épisode comme vu
+- **Description demandée :** Quand l'utilisateur veut revoir (re-marquer comme vu) un titre ou un épisode déjà vu, le dropdown de sélection de date doit systématiquement se réafficher plutôt qu'une action directe sans date.
+- **Fichiers concernés (pressentis) :** `apps/web/src/components/titles/TitleQuickActionsMenu.tsx`, `apps/web/src/components/watches/WatchButton.tsx`, `apps/web/src/components/watches/EpisodeSnapshot.tsx`
+
+### N. Sidebar de navigation : hiérarchie indentée
+- **Description demandée :** Restructurer la navigation en arborescence indentée :
+  - Recherche
+  - Accueil
+    - Watchlist
+    - Calendrier
+    - Historique
+    - Recommandés
+  - Découvrir
+    - Tendances
+    - Populaires
+    - Attendus
+    - Sorties
+  - Listes
+    - Favoris
+  - Profil
+- **Dépendance :** les sous-items de "Découvrir" supposent la modification G (page Découvrir, pas encore implémentée — décision à prendre sur la source "Attendus").
+- **Fichiers concernés :** `apps/web/src/components/layout/Header.tsx` (menu mobile actuel) et/ou nouveau composant sidebar si la nav bascule d'un header horizontal à une sidebar verticale (implique une refonte de layout plus large).
+
+### O. Menu Filtres : remonter le filtre Film/Série/Tout en haut
+- **Description demandée :** Dans la sidebar "Filtres" du header, le filtre de type (Tout/Film/Série) doit être le premier contrôle affiché, avant Statut/Listes/Année/Note/Genre/Pays.
+- **Fichier concerné :** `apps/web/src/components/layout/FilterSidebar.tsx` (le filtre de type est actuellement géré séparément dans `Header.tsx`, en dehors de la sidebar — à intégrer dedans pour pouvoir le positionner en premier).
+
+### P. Filtre "Studio" sur la page recherche
+- **Description demandée :** Ajouter un filtre par studio de production sur `/search`, en complément des filtres existants (genre, pays, année, note).
+- **Fichiers concernés :** `apps/web/src/app/(frontend)/search/page.tsx`, `apps/web/src/lib/titleFilters.ts` (nouveau `studioIds`), backend `GET /titles` (nouveau paramètre de filtrage par studio) — s'appuie sur le module studios (modification L).
+
+### Q. Confirmation avant suppression de l'historique de visionnage
+- **Description demandée :** Demander systématiquement une confirmation avant de supprimer un visionnage de l'historique (actuellement suppression immédiate au clic, cf. `DateCard.onRemove` sur `/history`, modification K).
+- **Fichiers concernés :** `apps/web/src/app/(frontend)/history/page.tsx`, `apps/web/src/components/common/DateCard.tsx` (ou dialogue de confirmation partagé, cf. `apps/web/src/components/ui/alert-dialog.tsx` déjà présent dans le projet).
+
+### R. Menu trois points (⋮) manquant dans le module historique
+- **Description demandée :** Le menu contextuel trois points (modification H — ajouter/retirer watchlist, marquer/retirer vu) doit aussi être disponible sur les vignettes du module Historique (`DateCard`), qui n'a aujourd'hui qu'une croix de suppression directe.
+- **Fichiers concernés :** `apps/web/src/components/common/DateCard.tsx`, `apps/web/src/components/titles/TitleQuickActionsMenu.tsx`, `apps/web/src/app/(frontend)/history/page.tsx`, `apps/web/src/app/(frontend)/page.tsx` (module accueil, même composant `DateCard`).
+
+### S. Listes : bouton trois points "Modifier la liste" / "Supprimer la liste" (absent sur Watchlist/Favoris)
+- **Description demandée :** Ajouter un bouton "⋮" en coin sur les cartes de liste (page `/lists`) ouvrant un menu avec "Modifier la liste" (titre + description) et "Supprimer la liste" (avec confirmation). Ce bouton ne doit **pas** apparaître sur les listes système Watchlist et Favoris (non renommables/supprimables).
+- **Fichiers concernés :** `apps/web/src/components/lists/ListCard.tsx`, `apps/web/src/components/lists/ListDialog.tsx` (probablement réutilisable pour l'édition), `apps/web/src/hooks/api/useUpdateList.ts`/`useDeleteList.ts` (déjà existants), `apps/web/src/components/ui/alert-dialog.tsx` (confirmation de suppression).
 
 ---
 
@@ -626,6 +715,7 @@
   - Nettoyer le paramètre `type` de l'URL avant de faire les appels API
   - Ou gérer le paramètre `type` dans la page de détail pour déterminer le type de contenu
   - Vérifier la fonction `titleRecommendationToSearchResult()` qui génère ces URLs
+- **Reconfirmé par l'utilisateur** (toujours non corrigé à ce jour) — cliquer sur un titre recommandé produit toujours "The operation was aborted" via le suffixe `?type=`.
 
 ---
 
