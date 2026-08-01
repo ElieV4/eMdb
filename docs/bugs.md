@@ -540,6 +540,22 @@
 - **Symptôme :** Les menus dropdown (`DropdownMenuContent` — menu utilisateur, "Listes", filtres Genre/Pays/Listes, etc.) laissent transparaître le contenu derrière eux au lieu d'avoir un fond opaque.
 - **Fichiers concernés :** `apps/web/src/components/ui/dropdown-menu.tsx`
 
+### 50. Le calendrier de sortie ne charge pas les épisodes des séries suivies
+- **Symptôme :** Signalé par l'utilisateur — `/calendar` n'affiche aucun épisode à venir pour les séries suivies.
+- **Diagnostiqué en marge de la modification K :** en environnement de dev local, `GET /calendar` répond `500`. Cause identifiée : `WatchesService.getCalendar()` appelle `countEpisodesNonVus()` (`@emdb/db`), qui exécute la fonction PL/pgSQL `fn_episodes_non_vus(uuid, uuid)` — absente de la base locale (`la fonction fn_episodes_non_vus(uuid, uuid) n'existe pas`, même constat que l'échec pré-existant de `plpgsql-functions.spec.ts`). À vérifier si c'est aussi la cause en environnement de l'utilisateur (migration SQL non appliquée) ou si un autre bug s'y ajoute une fois la fonction présente.
+- **Bug annexe repéré au passage :** `PrismaExceptionFilter` (`apps/api/src/common/filters/prisma-exception.filter.ts`) avale toute exception non-Prisma/non-HTTP sans la logger — un `500` générique ("Erreur serveur interne") ne laisse aucune trace côté serveur, ce qui a rendu ce diagnostic plus long que nécessaire.
+- **Fichiers concernés :** `packages/db` (migration SQL définissant `fn_episodes_non_vus`), `apps/api/src/watches/watches.service.ts` (`getCalendar`), `apps/api/src/common/filters/prisma-exception.filter.ts` (ajouter un `console.error`/logger avant la réponse générique).
+
+### 51. Page saison : boutons "Marquer comme vu" et "+" absents sur les épisodes
+- **Symptôme :** Sur la page d'une saison (liste des épisodes), aucun bouton "Marquer comme vu" ni bouton "+" (ajout rapide au visionnage) n'est présent sur chaque épisode — contrairement à la page épisode elle-même (bug #26, déjà corrigé) qui les a.
+- **Fichiers concernés (pressentis) :** page/composant listant les épisodes d'une saison (`apps/web/src/app/(frontend)/titles/[id]/page.tsx` ou composant saison dédié), `apps/web/src/components/watches/WatchButton.tsx`, `apps/web/src/components/watches/EpisodeSnapshot.tsx`
+
+### 52. Historique : les visionnages d'épisode n'affichent pas d'image (utiliser l'affiche de la série)
+- **Symptôme :** Sur `/history` et le module accueil, les vignettes des épisodes vus n'ont pas d'image (fond vide), contrairement aux films.
+- **Cause racine identifiée :** `WatchesService.listWatches()` (`apps/api/src/watches/watches.service.ts`) inclut `episodes: { select: { id, numero, titre, seasons: { select: { numero } } } }` — la relation `seasons → titles` (qui porterait `affiche_url` de la série) n'est pas sélectionnée. Côté frontend, `DateCard`/`DateCardSlider` (modification J/K) utilisent `watch.titles?.affiche_url`, qui est toujours `null` pour un visionnage d'épisode (`title_id` est `null` par construction, cf. bug #44 — seul `episode_id` est renseigné).
+- **Correction proposée :** dans `listWatches()`, étendre `episodes.select.seasons.select` avec `titles: { select: { affiche_url: true, titre_vo: true, titre_vf: true } }` ; côté frontend (`page.tsx`, `history/page.tsx`), utiliser `watch.episodes?.seasons?.titles?.affiche_url` en repli quand `watch.titles` est absent.
+- **Fichiers concernés :** `apps/api/src/watches/watches.service.ts`, `apps/web/src/lib/types/api.ts` (`UserWatch`), `apps/web/src/app/(frontend)/page.tsx`, `apps/web/src/app/(frontend)/history/page.tsx`
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -559,19 +575,27 @@
 
 ## Modifications à faire
 
-### A. Module personnes : filtre par badge rôle
+### A. Module personnes : filtre par badge rôle — remplacé par C (✅ fait sous cette forme)
 - **Description :** Ajouter un filtre par rôle (acteur, réalisateur, scénariste, autre) dans la page personne et la filmographie, sous forme de badges cliquables.
 - **Fichier concerné :** `apps/web/src/app/people/[id]/page.tsx`, `apps/web/src/components/people/Filmography.tsx`
 
-### B. Module filmographie : filtre par badge rôle
+### B. Module filmographie : filtre par badge rôle — remplacé par C (✅ fait sous cette forme)
 - **Description :** Ajouter un filtre par badge rôle dans le module filmographie pour afficher/masquer les crédits par rôle.
 - **Fichier concerné :** `apps/web/src/components/people/Filmography.tsx`
 
-### C. Modules "Distribution & Équipe" et "Filmographie" : liste unique dédupliquée + filtre rôle multi-sélection
+### C. Modules "Distribution & Équipe" et "Filmographie" : liste unique dédupliquée + filtre rôle multi-sélection — ✅ fait
 - **Description :** Remplacer l'affichage actuel (plusieurs listes séparées par rôle) par une liste unique de valeurs distinctes — une personne (dans Distribution & Équipe) ou un titre (dans Filmographie) n'apparaît qu'une seule fois même si elle a plusieurs rôles sur ce titre/cette filmographie, avec le ou les rôles affichés en badge sur chaque élément. Ajouter en haut du module un filtre par rôle sous forme de boutons multi-sélectionnables (Tout, Acteur, Réalisateur, Producteur, ...), plutôt que des listes séparées par rôle.
 - **Remplace/fusionne avec :** les items A et B ci-dessus (filtre par badge rôle) — cette modification change aussi la structure d'affichage sous-jacente, pas seulement l'ajout d'un filtre par-dessus les listes existantes.
-- **Fichiers concernés :** `apps/web/src/components/titles/TitleCreditsSplit.tsx`, `apps/web/src/components/people/Filmography.tsx`, `apps/web/src/components/people/PersonBadge.tsx` (badge(s) de rôle par personne), `apps/web/src/lib/types/api.ts`
-- **Note :** `TitleCreditsSplit.tsx` sépare actuellement "Distribution" et "Équipe technique" via une constante `CREW_ROLES` en anglais (`Director`, `Producer`, ...) comparée aux libellés de rôle stockés en base, qui sont en français (`Réalisateur`, `Producteur`, ...) — la comparaison ne matche jamais, donc tout le monde atterrit dans "Distribution" aujourd'hui. Cette modification remplace ce mécanisme cassé plutôt que de le corriger isolément.
+- **Fait :**
+  - Nouvel utilitaire générique `apps/web/src/lib/creditGrouping.ts` (`dedupeGroupedByEntity`) : déduplique un `Record<role, item[]>` (forme commune à `CreditGrouped` et `FilmographyGrouped`) en une liste d'entités uniques, chacune portant tous ses `{role, item}`.
+  - `TitleCreditsSplit.tsx` : suppression complète de l'ancien découpage Distribution/Équipe technique et de la constante `CREW_ROLES` (EN) cassée — liste unique de personnes, filtre par rôle (boutons multi-sélection, "Tout" + un bouton par rôle réellement présent), badge de rôle(s) sur chaque `PersonBadge` (ex. "Acteur (Paul Atreides)", ou "Producteur • Scénariste • Réalisateur" pour une personne à plusieurs rôles). "Voir plus" à 10.
+  - `Filmography.tsx` : même traitement côté titres — liste unique dédupliquée par `titre.id`, filtre par rôle local au module (indépendant des filtres d'attribut du header type/année/genre/pays/note, toujours actifs en plus), badges de rôle sous chaque `TitleCard`.
+  - Réutilisé tel quel par la page studio (modification L, qui appelle `Filmography` avec des clés "Films"/"Séries" au lieu de rôles) — fonctionne sans changement, chaque titre n'ayant qu'une seule clé (type) donc pas de dédup à faire, juste un filtre Films/Séries en plus.
+  - Tests : `Filmography.test.tsx` adapté (`getByText` → `getAllByText`, un rôle apparaît maintenant à la fois comme bouton de filtre et comme badge).
+- **Fichiers modifiés :** `apps/web/src/lib/creditGrouping.ts` (nouveau), `apps/web/src/components/titles/TitleCreditsSplit.tsx`, `apps/web/src/components/people/Filmography.tsx`, `apps/web/src/__tests__/unit/components/people/Filmography.test.tsx`.
+- **Note :** `TitleCreditsSplit.tsx` séparait auparavant "Distribution" et "Équipe technique" via une constante `CREW_ROLES` en anglais (`Director`, `Producer`, ...) comparée aux libellés de rôle stockés en base, qui sont en français (`Réalisateur`, `Producteur`, ...) — la comparaison ne matchait jamais, donc tout le monde atterrissait dans "Distribution". Confirmé en base sur "Dune: Part Two" : avant ce correctif, Denis Villeneuve (réalisateur/scénariste/producteur) y apparaissait comme un simple acteur de plus.
+- **Vérification manuelle :** `/titles/:id` (Dune: Part Two) — module "Distribution & Équipe" affiche les boutons de rôle (Acteur, Réalisateur, Scénariste, Producteur, Producteur exécutif, Directeur de la photographie, Compositeur, Monteur, Casting, Autre) ; filtrer sur "Réalisateur" affiche une seule carte "Denis Villeneuve — Producteur • Scénariste • Réalisateur" (dédupliqué). `/people/:id` (Denis Villeneuve) — "Dune: Part Two" apparaît une fois avec les 3 badges de rôle. `/studios/:id` (Legendary Pictures, réutilise `Filmography`) — fonctionne sans régression.
+- **Découverte pré-existante confirmée en marge :** `Filmography.test.tsx` échouait déjà avant ce correctif (indépendamment) : `useSearchParams()` renvoie `null` dans cet environnement de test (aucun mock/provider Next configuré), ce qui fait planter `parseTitleFilters(null)`. Vérifié en isolant les changements de cette session (`git stash`) : le test échouait déjà à l'identique sur le code déjà commité. Non corrigé ici (hors périmètre de cette modification) — affecte aussi `PersonCard.test.tsx`, `TitleActions.test.tsx`, `TitleRecommendations.test.tsx`, `TitleCard.test.tsx` (même cause probable), à traiter comme un point à part.
 
 ### D. Unifier "Watchlist" et "Suivre" — le bookmark doit refléter la watchlist — ✅ fait (résolu autrement)
 - **Description demandée :** "Watchlist" et "Suivre" doivent devenir la même chose. Concrètement : ajouter un film (pas seulement une série) à la watchlist doit faire apparaître l'icone bookmark sur son affiche (actuellement le bookmark n'est piloté que par le mécanisme "Suivre", cf. bug #30).
@@ -690,22 +714,19 @@
 - **Description demandée :** Ajouter un bouton "⋮" en coin sur les cartes de liste (page `/lists`) ouvrant un menu avec "Modifier la liste" (titre + description) et "Supprimer la liste" (avec confirmation). Ce bouton ne doit **pas** apparaître sur les listes système Watchlist et Favoris (non renommables/supprimables).
 - **Fichiers concernés :** `apps/web/src/components/lists/ListCard.tsx`, `apps/web/src/components/lists/ListDialog.tsx` (probablement réutilisable pour l'édition), `apps/web/src/hooks/api/useUpdateList.ts`/`useDeleteList.ts` (déjà existants), `apps/web/src/components/ui/alert-dialog.tsx` (confirmation de suppression).
 
+### T. Page série : module épisode aligné sur le fonctionnement/format de la page film
+- **Description demandée :**
+  - Le bouton "Marquer comme vu" du module épisode (sur la page série) doit reprendre le fonctionnement de celui de la page film : proposer le dropdown de sélection de date au marquage, et si l'utilisateur veut re-marquer un épisode déjà vu, redemander le dropdown de date plutôt qu'une action directe, avec une option "Supprimer de l'historique" (cf. modification M, qui pose la même règle en général — ceci en est le cas d'application concret sur les épisodes de la page série).
+  - Le module épisode de la page série doit aussi reprendre le même format visuel/structurel que celui de la page film.
+- **Fichiers concernés (pressentis) :** `apps/web/src/components/watches/EpisodeSnapshot.tsx`, `apps/web/src/components/watches/WatchButton.tsx`, `apps/web/src/components/titles/TitleActions.tsx` (référence "page film" à reprendre), `apps/web/src/app/(frontend)/titles/[id]/page.tsx`
+
+### U. Nouveau module accueil "Continuer à regarder"
+- **Description demandée :** Ajouter un module "Continuer à regarder" en tête de la page d'accueil (avant tous les autres modules), listant les séries suivies triées par ordre décroissant de `MAX(date de visionnage du dernier épisode vu, date de sortie du dernier épisode)`. Reprend la structure des autres modules accueil : slider horizontal + "Voir davantage" (cf. `DateCardSlider`, modification J/K).
+- **Fichiers concernés (pressentis) :** `apps/web/src/app/(frontend)/page.tsx`, `apps/web/src/components/common/DateCardSlider.tsx` (réutilisation), nouveau hook `apps/web/src/hooks/api/useContinueWatching.ts`, nouvel endpoint backend agrégeant séries suivies + dernier épisode vu + dernier épisode sorti (`apps/api/src/watches/watches.service.ts` ou `apps/api/src/watches/watches.controller.ts`, à côté de `getCalendar`/`getFollowedSeries`).
+
 ---
 
 ## Bugs à corriger — Header & Navigation
-
-
-### 34. Menu filtre du header à refondre
-- **Symptôme :** Le menu "Filtres" dans le header est un simple dropdown de texte inutile. Il doit contenir des contrôles fonctionnels : dropdown pour genres/région/statut, curseur pour durée et date de sortie, toggle pour vu et watchlist.
-- **Cause racine :** Le menu filtre a été implémenté comme un placeholder avec des `DropdownMenuItem` vides.
-- **Fichiers concernés :** `apps/web/src/components/layout/Header.tsx`
-- **Statut :** **partiellement résolu** (bug #28) — le bouton "Filtres" du header déploie désormais une sidebar droite (`FilterSidebar.tsx`) contenant : dropdown **Genre** (multi-select), dropdown **Région (pays)** (multi-select), curseur **Année de sortie** (range slider double sens), curseur **Note IMDB** (range slider double sens, min ET max). Écrivent tous dans les paramètres d'URL de la page courante.
-- **Reste à faire :**
-  - Dropdown **Statut** (disponible, prévu, etc.)
-  - Curseur (range slider) pour **Durée**
-  - Toggle pour **Dans vu**
-  - Toggle pour **Dans watchlist**
-  - Restreindre l'affichage du menu aux pages recherche/calendrier/watchlist/historique/listes (actuellement affiché sur toutes les pages, y compris titres/épisodes/séries où il ne devrait pas apparaître)
 
 ### 35. URL `?type=film` ou `?type=serie` dans les recommandations cause "The operation was aborted"
 - **Symptôme :** Quand on clique sur un film dans "Titres recommandés", l'URL contient `?type=film` ou `?type=serie` et la page affiche "The operation was aborted". La page charge normalement si on retire le suffixe de l'URL.

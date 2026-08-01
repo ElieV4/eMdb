@@ -1,6 +1,13 @@
 /**
- * Composant d'affichage des crédits avec séparation distribution/équipe technique.
- * Affiche les acteurs et l'équipe technique avec limite de 10 + "voir plus".
+ * Composant d'affichage des crédits d'un titre : liste unique dédupliquée
+ * (une personne n'apparaît qu'une fois même avec plusieurs rôles, ex. acteur
+ * ET réalisateur), avec filtre par rôle multi-sélection en haut (modification C).
+ *
+ * Remplace l'ancien découpage Distribution/Équipe technique : celui-ci
+ * comparait les libellés de rôle stockés en base (français : "Réalisateur",
+ * "Producteur", ...) à une liste `CREW_ROLES` en anglais ("Director",
+ * "Producer", ...), qui ne matchait jamais — tout le monde atterrissait dans
+ * "Distribution".
  */
 
 "use client";
@@ -9,6 +16,7 @@ import { useState } from "react";
 import { CreditGrouped } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 import { PersonBadge } from "@/components/people/PersonBadge";
+import { dedupeGroupedByEntity } from "@/lib/creditGrouping";
 
 interface TitleCreditsSplitProps {
   credits: CreditGrouped;
@@ -16,44 +24,22 @@ interface TitleCreditsSplitProps {
   className?: string;
 }
 
-const CREW_ROLES = [
-  "Director",
-  "Director of Photography",
-  "Writer",
-  "Screenplay",
-  "Original Music Composer",
-  "Composer",
-  "Editor",
-  "Casting",
-  "Executive Producer",
-  "Producer",
-];
+const MAX_VISIBLE = 10;
 
 export function TitleCreditsSplit({
   credits,
-  titleType,
   className,
 }: TitleCreditsSplitProps) {
-  const [showAllActors, setShowAllActors] = useState(false);
-  const [showAllCrew, setShowAllCrew] = useState(false);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [showAll, setShowAll] = useState(false);
 
-  // Séparer les acteurs de l'équipe technique
-  const actorRoles = Object.keys(credits).filter(
-    (role) => !CREW_ROLES.includes(role),
-  );
-  const crewRoles = Object.keys(credits).filter((role) =>
-    CREW_ROLES.includes(role),
+  const allRoles = Object.keys(credits).filter(
+    (role) => (credits[role]?.length ?? 0) > 0,
   );
 
-  // Combiner tous les acteurs
-  const allActors = actorRoles.flatMap((role) => credits[role] ?? []);
-  const displayedActors = showAllActors ? allActors : allActors.slice(0, 10);
+  const deduped = dedupeGroupedByEntity(credits, (item) => item.personne.id);
 
-  // Combiner toute l'équipe technique
-  const allCrew = crewRoles.flatMap((role) => credits[role] ?? []);
-  const displayedCrew = showAllCrew ? allCrew : allCrew.slice(0, 10);
-
-  if (actorRoles.length === 0 && crewRoles.length === 0) {
+  if (allRoles.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-4">
         Aucun crédit disponible pour ce titre.
@@ -61,72 +47,93 @@ export function TitleCreditsSplit({
     );
   }
 
-  return (
-    <div className={cn("space-y-8", className)}>
-      {/* Distribution (Acteurs) */}
-      {allActors.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-3">Distribution</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {displayedActors.map((item) => (
-              <PersonBadge
-                key={item.id}
-                person={{
-                  id: item.personne.id,
-                  nom: item.personne.nom,
-                  photoUrl: item.personne.photo_url ?? undefined,
-                }}
-                role={
-                  titleType === "serie" && item.personnage
-                    ? `${item.personnage} (${item.ordre ?? 0} ép.)`
-                    : item.personnage ?? undefined
-                }
-                size="md"
-              />
-            ))}
-          </div>
-          {allActors.length > 10 && (
-            <button
-              onClick={() => setShowAllActors(!showAllActors)}
-              className="mt-3 text-sm text-primary hover:underline"
-            >
-              {showAllActors
-                ? "Voir moins"
-                : `Voir plus (${allActors.length - 10} autres)`}
-            </button>
-          )}
-        </div>
-      )}
+  const toggleRole = (role: string) => {
+    setSelectedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
+    );
+  };
 
-      {/* Équipe technique */}
-      {allCrew.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-3">Équipe technique</h3>
+  const filtered =
+    selectedRoles.length === 0
+      ? deduped
+      : deduped.filter((entry) =>
+          entry.roleEntries.some((re) => selectedRoles.includes(re.role)),
+        );
+
+  const displayed = showAll ? filtered : filtered.slice(0, MAX_VISIBLE);
+
+  const roleSubtitle = (entry: (typeof deduped)[number]) =>
+    entry.roleEntries
+      .map((re) =>
+        re.role === "Acteur" && re.item.personnage
+          ? `${re.role} (${re.item.personnage})`
+          : re.role,
+      )
+      .join(" • ");
+
+  return (
+    <div className={cn("space-y-4", className)}>
+      <div className="flex flex-wrap gap-1">
+        <button
+          type="button"
+          onClick={() => setSelectedRoles([])}
+          className={cn(
+            "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+            selectedRoles.length === 0
+              ? "bg-primary/20 text-primary"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border",
+          )}
+        >
+          Tout
+        </button>
+        {allRoles.map((role) => (
+          <button
+            key={role}
+            type="button"
+            onClick={() => toggleRole(role)}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+              selectedRoles.includes(role)
+                ? "bg-primary/20 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border",
+            )}
+          >
+            {role}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4">
+          Aucun crédit pour ce filtre.
+        </p>
+      ) : (
+        <>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {displayedCrew.map((item) => (
+            {displayed.map((entry) => (
               <PersonBadge
-                key={item.id}
+                key={entry.entityId}
                 person={{
-                  id: item.personne.id,
-                  nom: item.personne.nom,
-                  photoUrl: item.personne.photo_url ?? undefined,
+                  id: entry.representative.personne.id,
+                  nom: entry.representative.personne.nom,
+                  photoUrl: entry.representative.personne.photo_url ?? undefined,
                 }}
-                role={item.personnage ?? undefined}
+                role={roleSubtitle(entry)}
                 size="md"
               />
             ))}
           </div>
-          {allCrew.length > 10 && (
+          {filtered.length > MAX_VISIBLE && (
             <button
-              onClick={() => setShowAllCrew(!showAllCrew)}
-              className="mt-3 text-sm text-primary hover:underline"
+              onClick={() => setShowAll(!showAll)}
+              className="text-sm text-primary hover:underline"
             >
-              {showAllCrew
+              {showAll
                 ? "Voir moins"
-                : `Voir plus (${allCrew.length - 10} autres)`}
+                : `Voir plus (${filtered.length - MAX_VISIBLE} autres)`}
             </button>
           )}
-        </div>
+        </>
       )}
     </div>
   );

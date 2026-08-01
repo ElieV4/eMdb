@@ -47,10 +47,12 @@ const mockFilmography: FilmographyGrouped = {
 };
 
 describe("Filmography", () => {
-  it("affiche les rôles (groupes)", () => {
+  it("affiche les rôles (filtres + badges)", () => {
     render(<Filmography filmography={mockFilmography} />);
-    expect(screen.getByText("Acteur")).toBeInTheDocument();
-    expect(screen.getByText("Réalisateur")).toBeInTheDocument();
+    // "Acteur"/"Réalisateur" apparaissent à la fois comme bouton de filtre
+    // et comme badge de rôle sur chaque titre (modification C).
+    expect(screen.getAllByText("Acteur").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Réalisateur").length).toBeGreaterThan(0);
   });
 
   it("affiche un message quand la filmographie est vide", () => {
@@ -83,7 +85,7 @@ describe("Filmography", () => {
       ],
     };
     render(<Filmography filmography={filmo} />);
-    expect(screen.getByText("Réalisateur")).toBeInTheDocument();
+    expect(screen.getAllByText("Réalisateur").length).toBeGreaterThan(0);
     expect(screen.queryByText("Acteur")).not.toBeInTheDocument();
   });
 });
