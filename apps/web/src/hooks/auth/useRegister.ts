@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/apiClient";
 import { useAuthStore } from "@/store/authStore";
 import { useCreateList } from "@/hooks/api/useCreateList";
+import { setAuthCookie, setRefreshCookie } from "@/lib/auth/authCookie";
 
 export type RegisterInput = {
   email: string;
@@ -25,13 +26,6 @@ export type RegisterResult = {
     avatarUrl?: string;
   };
 };
-
-/** Set a non-httpOnly cookie for middleware route protection. */
-function setAuthCookie(token: string) {
-  if (typeof document !== "undefined") {
-    document.cookie = `emdb_access_token=${token}; path=/; max-age=900`; // 15 min
-  }
-}
 
 export function useRegister() {
   const queryClient = useQueryClient();
@@ -53,6 +47,7 @@ export function useRegister() {
       setRefreshToken(data.refreshToken);
       setUser(data.user);
       setAuthCookie(data.accessToken);
+      setRefreshCookie(data.refreshToken);
       queryClient.invalidateQueries();
 
       createList.mutate({
