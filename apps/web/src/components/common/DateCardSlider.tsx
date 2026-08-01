@@ -1,15 +1,13 @@
 /**
- * Slider horizontal de `DateCard` avec bouton "Voir davantage" — utilisé par
- * les modules Historique et Calendrier de l'accueil (modification J).
- * Affiche jusqu'à `initialCount` cartes, puis révèle le reste (jusqu'à
- * `maxCount`, déjà chargé) au clic sur "Voir davantage", sans requête
- * supplémentaire.
+ * Slider horizontal de `DateCard` avec carte "Voir davantage" — utilisé par
+ * les modules Historique et Calendrier de l'accueil (modification J, puis
+ * modification N : le "Voir davantage" mène désormais vers la page dédiée
+ * (/history, /calendar) plutôt que de simplement révéler plus de cartes
+ * sur place, pour rester cohérent avec les autres modules de l'accueil).
  */
 
-"use client";
-
-import { useState } from "react";
 import { DateCard } from "./DateCard";
+import { CardSlider } from "./CardSlider";
 
 export type DateCardData = {
   key: string;
@@ -22,16 +20,22 @@ export type DateCardData = {
 
 type DateCardSliderProps = {
   items: DateCardData[];
-  initialCount?: number;
+  previewCount?: number;
+  moreHref?: string;
+  moreLabel?: string;
 };
 
-export function DateCardSlider({ items, initialCount = 20 }: DateCardSliderProps) {
-  const [expanded, setExpanded] = useState(false);
-  const visible = expanded ? items : items.slice(0, initialCount);
-  const hasMore = !expanded && items.length > initialCount;
+export function DateCardSlider({
+  items,
+  previewCount = 10,
+  moreHref,
+  moreLabel,
+}: DateCardSliderProps) {
+  const visible = items.slice(0, previewCount);
+  const hasMore = items.length > previewCount;
 
   return (
-    <div className="flex items-stretch gap-4 overflow-x-auto pb-2 scrollbar-hide">
+    <CardSlider moreHref={hasMore ? moreHref : undefined} moreLabel={moreLabel}>
       {visible.map((item) => (
         <DateCard
           key={item.key}
@@ -42,15 +46,6 @@ export function DateCardSlider({ items, initialCount = 20 }: DateCardSliderProps
           date={item.date}
         />
       ))}
-      {hasMore && (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="shrink-0 w-32 sm:w-36 aspect-[2/3] rounded-lg border border-dashed text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-        >
-          Voir davantage
-        </button>
-      )}
-    </div>
+    </CardSlider>
   );
 }

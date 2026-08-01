@@ -12,6 +12,7 @@ import { Calendar, TrendingUp, Users } from "lucide-react";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { DateCardSlider, DateCardData } from "@/components/common/DateCardSlider";
+import { CardSlider } from "@/components/common/CardSlider";
 import { useAuthStore } from "@/store/authStore";
 import {
   useRecentWatches,
@@ -98,13 +99,13 @@ export default function HomePage() {
   const { data: recentWatches } = useRecentWatches(30, isAuthenticated);
 
   const { data: popularTitles, isLoading: isLoadingPopular } =
-    usePopularTitles(8);
+    usePopularTitles(10);
 
   const { data: calendarEntries, isLoading: isLoadingCalendar } =
     useCalendar(isAuthenticated);
 
   const { data: recommendations, isLoading: isLoadingRecommendations } =
-    useRecommendations(6);
+    useRecommendations(10);
 
   const { data: userLists } = useLists(isAuthenticated);
   const watchlistId = userLists?.find((list) => list.type === "watchlist")?.id;
@@ -212,7 +213,7 @@ export default function HomePage() {
               actionLabel="Voir tout l'historique"
               actionHref="/history"
             >
-              <DateCardSlider items={historyCards} initialCount={20} />
+              <DateCardSlider items={historyCards} moreHref="/history" />
             </DashboardSection>
           )}
 
@@ -233,7 +234,7 @@ export default function HomePage() {
                 ))}
               </div>
             ) : calendarCards.length > 0 ? (
-              <DateCardSlider items={calendarCards} initialCount={20} />
+              <DateCardSlider items={calendarCards} moreHref="/calendar" />
             ) : (
               <p className="text-sm text-muted-foreground py-4">
                 Aucun épisode à venir pour le moment.
@@ -251,18 +252,19 @@ export default function HomePage() {
             actionHref={watchlistItems.length > 0 ? `/watchlist` : undefined}
           >
             {watchlistItems.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {watchlistItems.slice(0, 6).map((title) => (
+              <CardSlider moreHref={watchlistItems.length > 10 ? "/watchlist" : undefined}>
+                {watchlistItems.slice(0, 10).map((title) => (
                   <TitleCard
                     key={title.id}
                     title={titleToSearchResult(title)}
                     compact
+                    className="shrink-0"
                     watched={watchedTitles?.has(title.id)}
                     inWatchlist={watchlistIds.has(title.id)}
                     inFavorites={favoriteIds.has(title.id)}
                   />
                 ))}
-              </div>
+              </CardSlider>
             ) : (
               <p className="text-sm text-muted-foreground py-4">
                 Votre watchlist est vide. Ajoutez des titres à voir !
@@ -275,30 +277,31 @@ export default function HomePage() {
             title="Recommandés"
             subtitle="Suggestions basées sur vos goûts"
             actionLabel="Voir plus"
-            actionHref="/search"
+            actionHref="/recommendations"
           >
             {isLoadingRecommendations ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="flex gap-4 overflow-hidden">
                 {Array.from({ length: 6 }, (_, i) => (
                   <div
                     key={i}
-                    className="aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
+                    className="shrink-0 w-[150px] aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
                   />
                 ))}
               </div>
             ) : recommendations && recommendations.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {recommendations.slice(0, 6).map((title) => (
+              <CardSlider moreHref={recommendations.length > 10 ? "/recommendations" : undefined}>
+                {recommendations.slice(0, 10).map((title) => (
                   <TitleCard
                     key={title.id}
                     title={titleToSearchResult(title)}
                     compact
+                    className="shrink-0"
                     watched={watchedTitles?.has(title.id)}
                     inWatchlist={watchlistIds.has(title.id)}
                     inFavorites={favoriteIds.has(title.id)}
                   />
                 ))}
-              </div>
+              </CardSlider>
             ) : (
               <p className="text-sm text-muted-foreground py-4">
                 Commencez à noter des titres pour recevoir des recommandations.
@@ -317,27 +320,28 @@ export default function HomePage() {
             actionHref="/search"
           >
             {isLoadingPopular ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="flex gap-4 overflow-hidden">
                 {Array.from({ length: 8 }, (_, i) => (
                   <div
                     key={i}
-                    className="aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
+                    className="shrink-0 w-[150px] aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
                   />
                 ))}
               </div>
             ) : popularTitles && popularTitles.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {popularTitles.slice(0, 8).map((title) => (
+              <CardSlider moreHref="/search">
+                {popularTitles.slice(0, 10).map((title) => (
                   <TitleCard
                     key={title.id}
                     title={titleToSearchResult(title)}
                     compact
+                    className="shrink-0"
                     watched={watchedTitles?.has(title.id)}
                     inWatchlist={watchlistIds.has(title.id)}
                     inFavorites={favoriteIds.has(title.id)}
                   />
                 ))}
-              </div>
+              </CardSlider>
             ) : (
               <p className="text-sm text-muted-foreground py-4">
                 Aucun titre populaire trouvé.

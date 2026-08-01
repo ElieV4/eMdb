@@ -726,9 +726,20 @@
     - Sorties
   - Listes
     - Favoris
+    - [nom Liste 1]
+    - [nom Liste 2]
   - Profil
-- **Dépendance :** les sous-items de "Découvrir" supposent la modification G (page Découvrir, pas encore implémentée — décision à prendre sur la source "Attendus").
-- **Fichiers concernés :** `apps/web/src/components/layout/Header.tsx` (menu mobile actuel) et/ou nouveau composant sidebar si la nav bascule d'un header horizontal à une sidebar verticale (implique une refonte de layout plus large).
+- **Statut : ✅ fait**
+- **Fait (1ère passe) :** `Sidebar.tsx` (sidebar verticale fixe desktop + overlay mobile, déjà en place depuis la modif liée au bug #17) restructurée en arborescence : la liste plate `NAV_LINKS` est remplacée par un arbre `NavItem[]` construit par `buildNavTree(userLists)`, rendu par un composant partagé `SidebarNav`. "Listes" > Favoris + listes de l'utilisateur : nouveau — branché sur `useLists()` (déjà utilisé ailleurs, ex. `Header.tsx` pour la sidebar de filtres, mais jamais dans la nav). "Favoris" est la liste spéciale `type: "favoris"` (toujours présente), les listes `type: "custom"` de l'utilisateur suivent, chacune vers `/lists/:id`. La liste `type: "watchlist"` est exclue de cette section (déjà son propre lien sous "Accueil").
+- **Fait (2ème passe, retours utilisateur) :**
+  1. **Hiérarchie visuelle renforcée** : les items de premier niveau (Recherche/Accueil/Découvrir/Listes/Profil) sont maintenant nettement plus imposants (`text-base font-semibold`, icône `h-5 w-5`) que les sous-items (`text-xs font-normal`, pas d'icône) — avant les deux niveaux avaient à peu près la même taille de texte.
+  2. **Mise en page verticale** : `eMDB` fixé tout en haut, l'arbre Recherche→Listes centré verticalement dans l'espace restant (`flex-1 flex flex-col justify-center`), "Profil" fixé tout en bas (plus dans l'arbre lui-même — extrait dans un `NavItem` séparé `profile`, rendu par le même composant `TopLevelLink` que les items parents pour garder un style cohérent).
+  3. **Pages dédiées par module de second niveau** : les ancres de la 1ère passe (`/discover#tendances`, `/#recommandes`) sont remplacées par de vraies pages :
+     - `/discover/[module]` (route dynamique, un seul fichier pour les 4 modules Tendances/Populaires/Attendus/Sorties — `notFound()` si le segment ne correspond à aucune clé de `DISCOVER_MODULES`) : grille complète (plusieurs lignes), `variant="grid"` de `DiscoverModuleSection`.
+     - `/recommendations` (nouvelle page) : mêmes hooks/logique que le module accueil, grille complète, limite portée à 24.
+  4. **Toutes les pages de premier niveau (Accueil, Découvrir) passent leurs modules en une seule ligne scrollable** avec une carte "Voir davantage" en fin de ligne qui mène vers la page dédiée où le contenu peut s'étaler sur plusieurs lignes (au lieu des grilles multi-lignes tronquées à N éléments précédemment) : nouveau composant générique `CardSlider` (ligne flex `overflow-x-auto`, carte de lien optionnelle en fin de rangée), utilisé directement pour Watchlist/Recommandés/Titres populaires (accueil, invités) et par `DateCardSlider` (Historique/Calendrier, désormais un wrapper fin autour de `CardSlider` — le "Voir davantage" navigue vers `/history`/`/calendar` au lieu de simplement révéler plus de cartes sur place comme avant) et par `DiscoverModuleSection` en `variant="row"` (page `/discover`). La carte "Voir davantage" ne s'affiche que s'il y a effectivement plus d'éléments que la rangée n'en montre (pas de lien mort si tout tient déjà sur une ligne).
+- **Fichiers modifiés :** `apps/web/src/components/layout/Sidebar.tsx` (réécrit), `apps/web/src/components/common/CardSlider.tsx` (nouveau), `apps/web/src/components/common/DateCardSlider.tsx` (simplifié, ne gère plus d'état "expanded"), `apps/web/src/components/discover/DiscoverModuleSection.tsx` (nouveau, extrait de `discover/page.tsx`), `apps/web/src/app/(frontend)/discover/page.tsx`, `apps/web/src/app/(frontend)/discover/[module]/page.tsx` (nouveau), `apps/web/src/app/(frontend)/recommendations/page.tsx` (nouveau), `apps/web/src/app/(frontend)/page.tsx`.
+- **Vérification :** `tsc --noEmit` (web) sans nouvelle erreur ; `jest` web : 200/209 (baseline strictement inchangée, aucune régression après les deux passes). Vérifié en direct dans le navigateur (utilisateur connecté avec 2 listes, dont une liste "favoris" et une liste custom "akaka") : arbre complet avec la bonne indentation et le bon contraste de taille (`read_page` + captures), `eMDB` en haut / arbre centré / "Profil" en bas confirmés visuellement, `/discover/tendances` affiche bien une grille multi-lignes (21 titres, 4 colonnes+) accessible depuis le "Voir davantage" de la ligne "Tendances" sur `/discover`, `/recommendations` accessible et affiche l'état vide attendu (hook stub, cohérent avec le module accueil).
 
 ### O. Menu Filtres : remonter le filtre Film/Série/Tout en haut
 - **Description demandée :** Dans la sidebar "Filtres" du header, le filtre de type (Tout/Film/Série) doit être le premier contrôle affiché, avant Statut/Listes/Année/Note/Genre/Pays.
@@ -746,9 +757,14 @@
 - **Description demandée :** Le menu contextuel trois points (modification H — ajouter/retirer watchlist, marquer/retirer vu) doit aussi être disponible sur les vignettes du module Historique (`DateCard`), qui n'a aujourd'hui qu'une croix de suppression directe.
 - **Fichiers concernés :** `apps/web/src/components/common/DateCard.tsx`, `apps/web/src/components/titles/TitleQuickActionsMenu.tsx`, `apps/web/src/app/(frontend)/history/page.tsx`, `apps/web/src/app/(frontend)/page.tsx` (module accueil, même composant `DateCard`).
 
-### S. Listes : bouton trois points "Modifier la liste" / "Supprimer la liste" (absent sur Watchlist/Favoris)
-- **Description demandée :** Ajouter un bouton "⋮" en coin sur les cartes de liste (page `/lists`) ouvrant un menu avec "Modifier la liste" (titre + description) et "Supprimer la liste" (avec confirmation). Ce bouton ne doit **pas** apparaître sur les listes système Watchlist et Favoris (non renommables/supprimables).
-- **Fichiers concernés :** `apps/web/src/components/lists/ListCard.tsx`, `apps/web/src/components/lists/ListDialog.tsx` (probablement réutilisable pour l'édition), `apps/web/src/hooks/api/useUpdateList.ts`/`useDeleteList.ts` (déjà existants), `apps/web/src/components/ui/alert-dialog.tsx` (confirmation de suppression).
+### S. Listes : bouton trois points "Modifier la liste" / "Modifier le contenu" / "Supprimer la liste" (absent sur Watchlist/Favoris)
+- **Description demandée (précisée) :**
+  - Sur `/lists`, ajouter un bouton "⋮" sur chaque carte de liste **personnalisée** ouvrant un dropdown :
+    - "Modifier la liste" > popup formulaire avec nom de liste + description.
+    - "Modifier le contenu" > ouvre la page dédiée à la liste (`/lists/:id`), qui doit permettre de réorganiser les éléments par glisser-déposer (drag and drop) et de les supprimer en un clic.
+    - "Supprimer la liste" > avec confirmation.
+  - Sur la page dédiée de chaque liste (`/lists/:id`), afficher les mêmes trois boutons en haut à droite. Exception : sur les pages Watchlist et Favoris (listes système, non renommables/non supprimables), n'afficher que le bouton "Modifier le contenu".
+- **Fichiers concernés (pressentis) :** `apps/web/src/components/lists/ListCard.tsx`, `apps/web/src/components/lists/ListDialog.tsx` (édition nom/description), `apps/web/src/app/(frontend)/lists/[id]/page.tsx` (boutons en haut à droite + drag and drop du contenu — nouvelle dépendance de réordonnancement à choisir, ainsi qu'un champ d'ordre côté `list_items` si l'ordre doit persister en base), `apps/web/src/hooks/api/useUpdateList.ts`/`useDeleteList.ts` (déjà existants), `apps/web/src/components/ui/alert-dialog.tsx` (confirmation de suppression).
 
 ### T. Page série : module épisode aligné sur le fonctionnement/format de la page film
 - **Description demandée :**
@@ -759,6 +775,14 @@
 ### U. Nouveau module accueil "Continuer à regarder"
 - **Description demandée :** Ajouter un module "Continuer à regarder" en tête de la page d'accueil (avant tous les autres modules), listant les séries suivies triées par ordre décroissant de `MAX(date de visionnage du dernier épisode vu, date de sortie du dernier épisode)`. Reprend la structure des autres modules accueil : slider horizontal + "Voir davantage" (cf. `DateCardSlider`, modification J/K).
 - **Fichiers concernés (pressentis) :** `apps/web/src/app/(frontend)/page.tsx`, `apps/web/src/components/common/DateCardSlider.tsx` (réutilisation), nouveau hook `apps/web/src/hooks/api/useContinueWatching.ts`, nouvel endpoint backend agrégeant séries suivies + dernier épisode vu + dernier épisode sorti (`apps/api/src/watches/watches.service.ts` ou `apps/api/src/watches/watches.controller.ts`, à côté de `getCalendar`/`getFollowedSeries`).
+
+### V. Module "Recommandés pour cette liste", module Favoris du profil en ligne+slider, compteur d'éléments dans l'en-tête des modules liste
+- **Description demandée :**
+  - Sur la page dédiée de chaque liste (`/lists/:id`), ajouter un module classique ligne + slider "Recommandés pour cette liste" (même structure que les autres modules — cf. `CardSlider`, modification N) : un algo se base sur le contenu déjà présent dans la liste pour suggérer d'autres titres similaires (genres/pays/type communs, ou approche de similarité à définir côté backend).
+  - Dans la page Profil, le module "Favoris" doit reprendre la structure classique ligne + slider (au lieu de son affichage actuel).
+  - Dans l'en-tête de chaque module liste (accueil, profil, `/lists`, pages dédiées), afficher le nombre d'éléments entre parenthèses à côté du titre — ex. "Mes favoris (15)".
+- **Dépendance :** s'appuie sur `CardSlider` (modification N) pour l'aspect ligne+slider, et sur la page liste dédiée (modification S) pour l'emplacement du nouveau module "Recommandés pour cette liste".
+- **Fichiers concernés (pressentis) :** `apps/web/src/app/(frontend)/lists/[id]/page.tsx` (nouveau module recommandations), nouveau hook `apps/web/src/hooks/api/useListRecommendations.ts`, nouvel endpoint backend de recommandation par similarité de contenu de liste (`apps/api/src/lists/` ou `apps/api/src/discover/`), `apps/web/src/app/(frontend)/profile/page.tsx` (module Favoris), composants d'en-tête de module à travers l'app (accueil `DashboardSection`, `/lists`, pages dédiées liste) pour le compteur entre parenthèses.
 
 ---
 

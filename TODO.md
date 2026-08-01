@@ -1,60 +1,60 @@
-# Bug #41 (suite) — rafraîchissement silencieux du token expiré
+# Modification N — sidebar de navigation en hiérarchie indentée
 
-Statut : **terminé** (voir `docs/bugs.md` bug #41, section "Suite").
+Statut : **terminé** (voir `docs/bugs.md` modification N, y compris la
+section "2ème passe" pour les retours utilisateur après la 1ère version).
 
 ## Contexte
 
-Après le commit de la modification M et la correction de l'affichage de
-la date inconnue (01-01-1900 visible au lieu du libellé "Date inconnue"),
-l'utilisateur a signalé : "des fois les boutons fonctionnalités
-utilisateurs cessent de fonctionner, et j'ai l'impression que c'est parce
-que l'utilisateur est deco ? pas sur mais dcp change la date, commit sync
-et après gère ce pb".
+Après une première implémentation (arbre indenté avec ancres pour les
+sous-modules sans page dédiée), l'utilisateur a demandé trois affinages :
+1. grossir les items de premier niveau par rapport aux seconds ;
+2. centrer l'arbre Recherche→Listes au milieu de la sidebar, avec eMDB fixé
+   en haut et Profil fixé en bas ;
+3. créer une page dédiée pour chaque module de second niveau qui n'en avait
+   pas encore (Recommandés, Tendances/Populaires/Attendus/Sorties).
 
-## Diagnostic
-
-- Token d'accès JWT : expire après **15 min** (`auth.module.ts`).
-- Refresh token (7j) obtenu au login et stocké dans le store Zustand, mais
-  **jamais utilisé** — `apiFetch` renvoyait juste une erreur sur 401.
-- Aucun hook de mutation n'a de gestion d'erreur dédiée → un 401 après
-  15 min de session ouverte échoue en silence, sans toast ni redirection.
-- `isAuthenticated` du store Zustand n'était jamais réinitialisé sur 401 :
-  l'interface continuait d'afficher un utilisateur connecté.
-- Bug annexe : seul le cookie d'accès (15 min) existait ; le refresh token
-  ne vivait qu'en mémoire, perdu à chaque F5 — même avec un
-  rafraîchissement automatique, la session n'aurait pas survécu à un
-  rechargement passé 15 min.
+Puis, dans la foulée : sur les pages de premier niveau (Accueil, Découvrir),
+chaque module doit s'afficher en une seule ligne scrollable avec une carte
+"Voir davantage" qui mène vers la page dédiée correspondante (où le contenu
+peut, lui, s'étaler sur plusieurs lignes).
 
 ## Steps
 
-- [x] 1. `lib/auth/authCookie.ts` (nouveau) : centralise les cookies
-      d'auth (dupliqués avant dans `useLogin`/`useRegister`/
-      `useAuthBootstrap`), ajoute un cookie `emdb_refresh_token` (7j).
-- [x] 2. `lib/api/apiClient.ts` : sur 401 (hors endpoints auth eux-mêmes),
-      appelle `POST /auth/refresh`, met à jour store + cookies, rejoue la
-      requête une fois. 401 concurrents dédupliqués sur la même promesse
-      de refresh (le refresh token tourne à chaque appel côté backend).
-      Échec du refresh → déconnexion propre (`logout()` + cookies nettoyés).
-- [x] 3. `useAuthBootstrap.ts` : gère aussi "cookie d'accès expiré mais
-      cookie de refresh valide" (rappelle `/auth/refresh` au montage), et
-      réhydrate systématiquement le refresh token dans le store.
-- [x] 4. `useLogout.ts` : nettoie aussi le cookie de refresh (sinon une
-      déconnexion explicite était annulée par `useAuthBootstrap` au
-      chargement suivant).
-- [x] 5. `tsc --noEmit` (web) : aucune erreur. `jest` : 200/209 passent,
-      baseline strictement inchangée (10 suites en échec, préexistantes).
-- [x] 6. Vérifié la séquence complète en conditions réelles (pas
-      seulement via tsc/jest) : requête avec token expiré → 401 → refresh
-      avec le vrai refresh token du cookie → 201 avec nouveau token →
-      requête rejouée → 200. Session confirmée persistante après
-      rechargement complet de page.
-- [x] 7. `docs/bugs.md` bug #41 : section "Suite" ajoutée avec le
-      diagnostic complet et la vérification.
+- [x] 1. Style : items de premier niveau en `text-base font-semibold` +
+      icône `h-5 w-5` ; sous-items en `text-xs font-normal`, sans icône —
+      contraste net entre les deux niveaux.
+- [x] 2. Layout : `eMDB` fixé en haut, arbre centré verticalement
+      (`flex-1 justify-center`), "Profil" extrait de l'arbre et fixé en bas
+      (même composant `TopLevelLink` que les parents, pour un style
+      cohérent).
+- [x] 3. Nouvelles pages dédiées : `/discover/[module]` (route dynamique,
+      un seul fichier pour les 4 modules, `notFound()` si clé inconnue),
+      `/recommendations` (nouvelle page, mêmes hooks que le module accueil).
+      Les hrefs de la sidebar pointent désormais vers ces pages plutôt que
+      vers des ancres.
+- [x] 4. Nouveau composant générique `CardSlider` (ligne unique
+      `overflow-x-auto` + carte "Voir davantage" optionnelle) ; `Watchlist`,
+      `Recommandés` et `Titres populaires` (accueil) migrés de grilles
+      multi-lignes tronquées vers ce slider. `DateCardSlider`
+      (Historique/Calendrier) réécrit en wrapper de `CardSlider` : le "Voir
+      davantage" navigue maintenant vers `/history`/`/calendar` au lieu de
+      simplement révéler plus de cartes sur place. `DiscoverModuleSection`
+      (nouveau, extrait de `discover/page.tsx`) supporte un `variant="row"`
+      (aperçu `/discover`) et `variant="grid"` (pages dédiées).
+- [x] 5. `tsc --noEmit` (web) : aucune nouvelle erreur. `jest` web :
+      200/209, baseline strictement inchangée après les deux passes.
+- [x] 6. Vérifié en direct dans le navigateur : contraste de taille
+      premier/second niveau, mise en page haut/centre/bas, `/discover/tendances`
+      affiche une grille multi-lignes complète, `/recommendations` accessible
+      avec le bon état vide (hook stub).
+- [x] 7. `docs/bugs.md` modification N : section "2ème passe" ajoutée avec
+      le détail complet.
 
 ## Reste du backlog
 
 - `docs/bugs.md` bug #34 (menu filtre header, curseur Durée) : retiré du
   fichier et code annulé sur demande de l'utilisateur.
 - Bugs #46-52 (hors #35, déjà résolu via la modification M) et
-  modifications N-U : non implémentés, en attente de priorisation.
-- Prochaine modification lettrée non faite : **N** (sidebar indentée).
+  modifications O-U : non implémentés, en attente de priorisation.
+- Prochaine modification lettrée non faite : **O** (menu Filtres : remonter
+  le filtre Film/Série/Tout en haut).
