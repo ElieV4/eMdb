@@ -64,7 +64,7 @@ export default function TitleDetailPage({
         <TitleHero title={title} />
 
         {/* Actions utilisateur */}
-        <TitleActions titleId={id} type={title.type} />
+        <TitleActions titleId={id} type={title.type} releaseDate={title.date_sortie} />
 
         {/* Métadonnées */}
         <TitleInfo title={title} />

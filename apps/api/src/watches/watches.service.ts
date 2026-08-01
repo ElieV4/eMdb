@@ -139,25 +139,40 @@ export class WatchesService {
   }
 
   /**
-   * Marque tous les épisodes d'une série comme vus jusqu'à un épisode donné.
+   * Supprime tous les visionnages d'un épisode pour un utilisateur
+   * ("Annuler le visionnage" sur un épisode, modification M — jusqu'ici
+   * aucun endpoint équivalent à `deleteAllWatchesByTitle` n'existait pour
+   * les épisodes, ce qui rendait cette action silencieusement inopérante
+   * sur la page épisode).
+   *
+   * @param episodeId - UUID de l'épisode
+   * @param userId - UUID de l'utilisateur connecté
+   */
+  async deleteAllWatchesByEpisode(episodeId: string, userId: string): Promise<void> {
+    await this.prisma.user_watches.deleteMany({
+      where: { episode_id: episodeId, user_id: userId },
+    });
+  }
+
+  /**
+   * Marque tous les épisodes d'une série comme vus jusqu'à un épisode donné
+   * ("Vu jusqu'ici", modification M).
    *
    * Trouve tous les épisodes du titre dont le numéro de saison est inférieur
    * à celui de l'épisode cible, ou dans la même saison mais avec un numéro
    * d'épisode inférieur ou égal. Crée un visionnage pour chacun.
    *
    * @param userId - UUID de l'utilisateur connecté
-   * @param titleId - UUID du titre (série)
    * @param episodeId - UUID de l'épisode jusqu'auquel marquer comme vu
    * @param dateVue - Date du visionnage (optionnelle, défaut: maintenant)
    * @returns Nombre de visionnages créés
    */
   async createWatchesUntilEpisode(
     userId: string,
-    titleId: string,
     episodeId: string,
     dateVue?: string,
   ): Promise<number> {
-    // Vérifier que l'épisode existe et récupérer sa saison/numéro
+    // Vérifier que l'épisode existe et récupérer sa saison/numéro/titre
     const targetEpisode = await this.prisma.episodes.findUnique({
       where: { id: episodeId },
       select: {
@@ -171,11 +186,7 @@ export class WatchesService {
       throw new NotFoundException('Épisode introuvable.');
     }
 
-    // Vérifier que l'épisode appartient bien au titre
-    if (targetEpisode.seasons.title_id !== titleId) {
-      throw new BadRequestException("Cet épisode n'appartient pas à ce titre.");
-    }
-
+    const titleId = targetEpisode.seasons.title_id;
     const targetSeason = targetEpisode.seasons.numero;
     const targetEpisodeNum = targetEpisode.numero;
     const dateVueValue = dateVue ? new Date(dateVue) : new Date();
@@ -225,10 +236,14 @@ export class WatchesService {
       return 0;
     }
 
+    // title_id reste null sur les visionnages d'épisode (même invariant que
+    // createWatch : jamais les deux à la fois, cf. bug #22/#24 — sinon
+    // useWatchedTitles() marquerait toute la série "vue" dès le premier
+    // "vu jusqu'ici" au lieu de suivre l'avancement épisode par épisode).
     await this.prisma.user_watches.createMany({
       data: newWatches.map((e) => ({
         user_id: userId,
-        title_id: titleId,
+        title_id: null,
         episode_id: e.id,
         date_vue: dateVueValue,
       })),
@@ -252,6 +267,10 @@ export class WatchesService {
     const skip = (page - 1) * limit;
 
     const where: any = { user_id: userId };
+    // Chaque filtre "OR" (title_id, type) est accumulé dans `AND` plutôt que
+    // d'écrire directement `where.OR`, pour rester composable si plusieurs
+    // filtres à base de OR sont actifs en même temps (ex. title_id + type).
+    const andConditions: any[] = [];
 
     if (filters.date_from || filters.date_to) {
       where.date_vue = {};
@@ -260,25 +279,43 @@ export class WatchesService {
     }
 
     if (filters.title_id) {
-      where.title_id = filters.title_id;
+      // Un watch porte soit sur un titre directement (title_id), soit sur un
+      // épisode de ce titre (episode_id, title_id alors null — cf.
+      // createWatch()). Filtrer uniquement sur `title_id` manque donc tous
+      // les visionnages d'épisodes d'une série (modification M : l'historique
+      // d'une série sur TitleActions n'affichait jamais rien, l'essentiel des
+      // visionnages d'une série étant par épisode).
+      andConditions.push({
+        OR: [
+          { title_id: filters.title_id },
+          { episodes: { seasons: { title_id: filters.title_id } } },
+        ],
+      });
+    }
+
+    if (filters.episode_id) {
+      where.episode_id = filters.episode_id;
     }
 
     if (filters.type) {
-      // Un watch porte soit sur un titre directement (title_id, films et
-      // séries "vues" sans épisode précis), soit sur un épisode (episode_id,
-      // title_id alors null) — cf. createWatch(). Filtrer uniquement sur
-      // `titles.type` (relation directe) ignore donc tous les visionnages
-      // d'épisodes, qui sont pourtant l'essentiel des visionnages de séries
-      // (bug #44) : il faut aussi suivre episode → season → title.
+      // Même principe que ci-dessus, appliqué à `titles.type` (bug #44) :
+      // il faut aussi suivre episode → season → title pour ne pas ignorer
+      // les visionnages d'épisodes lors du filtre par type.
       if (filters.type === 'serie') {
-        where.OR = [
-          { titles: { type: 'serie' } },
-          { episodes: { seasons: { titles: { type: 'serie' } } } },
-        ];
+        andConditions.push({
+          OR: [
+            { titles: { type: 'serie' } },
+            { episodes: { seasons: { titles: { type: 'serie' } } } },
+          ],
+        });
       } else {
         // Un épisode appartient toujours à une série, jamais à un film.
         where.titles = { type: 'film' };
       }
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const [data, total] = await Promise.all([

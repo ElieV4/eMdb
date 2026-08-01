@@ -177,6 +177,7 @@ export type WatchFilters = {
   date_from?: string;
   date_to?: string;
   title_id?: string;
+  episode_id?: string;
   page?: number;
   limit?: number;
 };
@@ -352,6 +353,19 @@ export type TitleDetail = {
   seasons: SeasonWithEpisodes[];
 };
 
+/** Épisode tel que renvoyé dans une saison (pas le type `Episode`
+ * camelCase, qui ne correspond pas à la forme réelle de cette réponse —
+ * bug repéré lors de la modification M). */
+export type SeasonEpisodeSummary = {
+  id: string;
+  numero: number;
+  titre?: string | null;
+  synopsis?: string | null;
+  date_sortie?: string | null;
+  duree_minutes?: number | null;
+  image_url?: string | null;
+};
+
 /** Saison avec ses épisodes (GET /titles/:titleId/seasons/:numero) */
 export type SeasonWithEpisodes = {
   id: string;
@@ -359,7 +373,7 @@ export type SeasonWithEpisodes = {
   titre?: string | null;
   date_sortie?: string | null;
   synopsis?: string | null;
-  episodes: Episode[];
+  episodes: SeasonEpisodeSummary[];
 };
 
 /** Épisode détaillé (GET /episodes/:id) — inclut la saison parente */

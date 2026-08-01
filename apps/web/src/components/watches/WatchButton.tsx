@@ -1,195 +1,162 @@
 /**
- * Bouton "Marquer comme vu" avec menu contextuel (clic long).
+ * Bouton "Marquer comme vu" — état machine unifiée (modification M).
  *
- * - Clic simple : marquer comme vu à l'instant.
- * - Clic long (>500ms) : menu avec options :
- *   - Vu maintenant
- *   - Vu à une date personnalisée
- *   - Date inconnue
+ * Clic simple, dans les deux états, ouvre le dropdown (le concept de clic
+ * prolongé pour l'état "non vu" s'est révélé peu fiable à l'usage — retiré
+ * sur retour utilisateur) :
  *
- * État "Vu" :
- * - Affiche "Vu" ou "Vu x3" si plusieurs visionnages
- * - Clic simple : marque "revu" (date actuelle)
- * - Menu : "Revu" avec options, "Annuler le visionnage" (supprime tout)
+ * État "non vu" : dropdown (À l'instant / Jusqu'ici si épisode / À la date
+ * de sortie / Autre date... / Date inconnue).
  *
- * Phase 4.1 — Watches
+ * État "vu" (ou "vu xN") : dropdown avec
+ *   - "Revoir" (sous-menu, mêmes options que ci-dessus, libellés "Revu")
+ *   - "Gérer l'historique de visionnage" (ouvre HistoryDialog)
+ *   - "Annuler le visionnage" (confirmation puis suppression de tous les
+ *     visionnages de ce titre/épisode)
  */
 
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useCreateWatch } from "@/hooks/api/useCreateWatch";
+import { useDeleteWatch } from "@/hooks/api/useDeleteWatch";
+import { useDeleteAllWatches } from "@/hooks/api/useDeleteAllWatches";
+import { useDeleteAllWatchesByEpisode } from "@/hooks/api/useDeleteAllWatchesByEpisode";
+import { useMarkWatchedUntilEpisode } from "@/hooks/api/useMarkWatchedUntilEpisode";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Check,
-  Clock,
-  CalendarClock,
-  HelpCircle,
-  Trash2,
-  Eye,
-} from "lucide-react";
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { WatchDateMenuItems } from "./WatchDateMenuItems";
+import { WatchDatePickerDialog } from "./WatchDatePickerDialog";
+import { HistoryDialog, HistoryDialogWatch } from "./HistoryDialog";
+import { Check, Eye, RotateCcw, History as HistoryIcon, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveWatchDateVue, WatchDateSelection } from "@/lib/watchDates";
 
 type WatchButtonProps = {
   titleId?: string;
   episodeId?: string;
+  /** Date de sortie du titre/épisode — active l'option "à la date de sortie". */
+  releaseDate?: string | null;
+  /** Visionnages existants de CE titre/épisode (pas ceux d'autres titres). */
+  watches?: HistoryDialogWatch[];
   className?: string;
-  onWatchSuccess?: () => void;
-  watched?: boolean;
-  watchCount?: number;
-  onDeleteAll?: () => void;
+  /** Appelé après toute mutation réussie (marquer/revoir/jusqu'ici/annuler). */
+  onChanged?: () => void;
 };
-
-type WatchAction = "now" | "custom" | "unknown" | "unwatch";
 
 export function WatchButton({
   titleId,
   episodeId,
+  releaseDate,
+  watches = [],
   className,
-  onWatchSuccess,
-  watched = false,
-  watchCount = 0,
-  onDeleteAll,
+  onChanged,
 }: WatchButtonProps) {
-  const [open, setOpen] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const createWatch = useCreateWatch();
+  const watched = watches.length > 0;
+  const watchCount = watches.length;
 
-  const handleClick = useCallback(() => {
-    if (open) return;
-    if (watched) {
-      // Revu maintenant
+  const [open, setOpen] = useState(false);
+  const [datePicker, setDatePicker] = useState<{ open: boolean; labelPrefix: "Vu" | "Revu" }>({
+    open: false,
+    labelPrefix: "Vu",
+  });
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  const createWatch = useCreateWatch();
+  const deleteWatch = useDeleteWatch();
+  const deleteAllByTitle = useDeleteAllWatches();
+  const deleteAllByEpisode = useDeleteAllWatchesByEpisode();
+  const markUntilHere = useMarkWatchedUntilEpisode();
+
+  const finishMutation = useCallback(() => {
+    setOpen(false);
+    onChanged?.();
+  }, [onChanged]);
+
+  const performMark = useCallback(
+    (dateVue: string | undefined) => {
       createWatch.mutate(
         {
           title_id: episodeId ? undefined : titleId,
           episode_id: episodeId,
-          date_vue: new Date().toISOString(),
+          date_vue: dateVue,
         },
-        {
-          onSuccess: () => {
-            setOpen(false);
-            onWatchSuccess?.();
-          },
-        },
+        { onSuccess: finishMutation },
       );
-      return;
-    }
-    createWatch.mutate(
-      {
-        title_id: episodeId ? undefined : titleId,
-        episode_id: episodeId,
-        date_vue: undefined,
-      },
-      {
-        onSuccess: () => {
-          setOpen(false);
-          onWatchSuccess?.();
-        },
-      },
-    );
-  }, [createWatch, episodeId, onWatchSuccess, open, titleId, watched]);
-
-  const handleLongPressStart = useCallback(() => {
-    pressTimer.current = setTimeout(() => {
-      setOpen(true);
-    }, 500);
-  }, []);
-
-  const handleLongPressEnd = useCallback(() => {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  }, []);
-
-  // Le déclencheur du menu (Base UI) ouvre le menu sur un simple clic par
-  // défaut, ce qui entre en conflit avec le clic simple = action / clic long
-  // = menu voulu ici. On ignore ses demandes d'ouverture (seul le clic long
-  // ci-dessus ouvre le menu, via setOpen direct) et on n'honore que les
-  // demandes de fermeture (Échap, clic extérieur, sélection d'un item).
-  const handleOpenChange = useCallback((next: boolean) => {
-    if (!next) setOpen(false);
-  }, []);
-
-  const handleSelect = useCallback(
-    (action: WatchAction) => {
-      let date_vue: string | undefined;
-
-      if (action === "now") {
-        date_vue = new Date().toISOString();
-      } else if (action === "custom") {
-        const selected = window.prompt(
-          "Date du visionnage (YYYY-MM-DD) :",
-          new Date().toISOString().split("T")[0],
-        );
-        if (selected) date_vue = new Date(selected).toISOString();
-      } else if (action === "unwatch") {
-        setConfirmOpen(true);
-        return;
-      } else {
-        date_vue = undefined;
-      }
-
-      if (date_vue !== undefined || action === "unknown") {
-        createWatch.mutate(
-          {
-            title_id: episodeId ? undefined : titleId,
-            episode_id: episodeId,
-            date_vue,
-          },
-          {
-            onSuccess: () => {
-              setOpen(false);
-              onWatchSuccess?.();
-            },
-          },
-        );
-      }
     },
-    [createWatch, episodeId, onWatchSuccess, titleId],
+    [createWatch, episodeId, titleId, finishMutation],
   );
 
-  const handleConfirmDelete = useCallback(() => {
-    setConfirmOpen(false);
-    setOpen(false);
-    onDeleteAll?.();
-  }, [onDeleteAll]);
+  const handleSelect = useCallback(
+    (selection: WatchDateSelection, labelPrefix: "Vu" | "Revu") => {
+      if (selection.type === "until-here") {
+        if (!episodeId) return;
+        markUntilHere.mutate({ episode_id: episodeId }, { onSuccess: finishMutation });
+        return;
+      }
+      if (selection.type === "custom") {
+        setOpen(false);
+        setDatePicker({ open: true, labelPrefix });
+        return;
+      }
+      performMark(resolveWatchDateVue(selection, releaseDate));
+    },
+    [episodeId, markUntilHere, finishMutation, performMark, releaseDate],
+  );
+
+  const handleConfirmDeleteAll = useCallback(() => {
+    const onSuccess = () => {
+      setConfirmDeleteOpen(false);
+      finishMutation();
+    };
+    if (episodeId) {
+      deleteAllByEpisode.mutate(episodeId, { onSuccess });
+    } else if (titleId) {
+      deleteAllByTitle.mutate(titleId, { onSuccess });
+    }
+  }, [episodeId, titleId, deleteAllByEpisode, deleteAllByTitle, finishMutation]);
+
+  const handleDeleteOne = useCallback(
+    (watchId: string) => {
+      deleteWatch.mutate(watchId, { onSuccess: () => onChanged?.() });
+    },
+    [deleteWatch, onChanged],
+  );
 
   return (
     <>
-      <DropdownMenu open={open} onOpenChange={handleOpenChange}>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
         {/* `render` fusionne le déclencheur du menu sur CE bouton au lieu
             d'imbriquer un <button> dans un autre <button> (HTML invalide qui
-            empêchait le clic de marquer comme vu, bug #45). */}
+            empêchait le clic de marquer comme vu, bug #45). Clic simple
+            ouvre le dropdown dans les deux états (comportement natif Base
+            UI) — le clic prolongé initialement prévu pour l'état "non vu"
+            s'est révélé peu fiable à l'usage. */}
         <DropdownMenuTrigger
           render={
             <Button
-              className={cn(
-                className,
-                watched && "bg-primary text-primary-foreground",
-              )}
-              onMouseDown={handleLongPressStart}
-              onMouseUp={handleLongPressEnd}
-              onMouseLeave={handleLongPressEnd}
-              onTouchStart={handleLongPressStart}
-              onTouchEnd={handleLongPressEnd}
-              onClick={handleClick}
+              className={cn(className, watched && "bg-primary text-primary-foreground")}
             >
               {watched ? (
                 <>
@@ -207,56 +174,42 @@ export function WatchButton({
         />
         <DropdownMenuContent align="end">
           {!watched ? (
-            <>
-              <DropdownMenuItem
-                onClick={() => handleSelect("now")}
-                className="cursor-pointer"
-              >
-                <Clock className="mr-2 h-4 w-4" />
-                <span>À l'instant</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleSelect("custom")}
-                className="cursor-pointer"
-              >
-                <CalendarClock className="mr-2 h-4 w-4" />
-                <span>Autre date...</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleSelect("unknown")}
-                className="cursor-pointer"
-              >
-                <HelpCircle className="mr-2 h-4 w-4" />
-                <span>Date inconnue</span>
-              </DropdownMenuItem>
-            </>
+            <WatchDateMenuItems
+              labelPrefix="Vu"
+              releaseDate={releaseDate}
+              showUntilHere={!!episodeId}
+              onSelect={(selection) => handleSelect(selection, "Vu")}
+            />
           ) : (
             <>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  <span>Revoir</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent>
+                    <WatchDateMenuItems
+                      labelPrefix="Revu"
+                      releaseDate={releaseDate}
+                      showUntilHere={!!episodeId}
+                      onSelect={(selection) => handleSelect(selection, "Revu")}
+                    />
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
               <DropdownMenuItem
-                onClick={() => handleSelect("now")}
+                onClick={() => setHistoryOpen(true)}
                 className="cursor-pointer"
               >
-                <Clock className="mr-2 h-4 w-4" />
-                <span>Revu à l'instant</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleSelect("custom")}
-                className="cursor-pointer"
-              >
-                <CalendarClock className="mr-2 h-4 w-4" />
-                <span>Revu autre date...</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleSelect("unknown")}
-                className="cursor-pointer"
-              >
-                <HelpCircle className="mr-2 h-4 w-4" />
-                <span>Revu date inconnue</span>
+                <HistoryIcon className="mr-2 h-4 w-4" />
+                <span>Gérer l&apos;historique de visionnage</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => handleSelect("unwatch")}
-                className="cursor-pointer text-destructive"
+                onClick={() => setConfirmDeleteOpen(true)}
+                variant="destructive"
+                className="cursor-pointer"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 <span>Annuler le visionnage</span>
@@ -266,25 +219,37 @@ export function WatchButton({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer l'annulation</DialogTitle>
-            <DialogDescription>
-              Êtes-vous sûr de vouloir supprimer tous les visionnages de ce
-              titre&nbsp;?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-              Annuler
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmDelete}>
-              Supprimer tout
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <WatchDatePickerDialog
+        open={datePicker.open}
+        onOpenChange={(next) => setDatePicker((prev) => ({ ...prev, open: next }))}
+        title={`${datePicker.labelPrefix} à une date...`}
+        onConfirm={(dateIso) => performMark(dateIso)}
+      />
+
+      <HistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        watches={watches}
+        onDelete={handleDeleteOne}
+      />
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annuler le visionnage ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tous les visionnages enregistrés pour{" "}
+              {episodeId ? "cet épisode" : "ce titre"} seront supprimés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleConfirmDeleteAll}>
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

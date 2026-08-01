@@ -9,12 +9,13 @@ import { PaginationResult, UserWatch, WatchFilters } from "@/lib/types/api";
 
 type WatchesResponse = PaginationResult<UserWatch>;
 
-export function useWatches(filters?: WatchFilters) {
+export function useWatches(filters?: WatchFilters, options?: { enabled?: boolean }) {
   const params = new URLSearchParams();
   if (filters?.type) params.set("type", filters.type);
   if (filters?.date_from) params.set("date_from", filters.date_from);
   if (filters?.date_to) params.set("date_to", filters.date_to);
   if (filters?.title_id) params.set("title_id", filters.title_id);
+  if (filters?.episode_id) params.set("episode_id", filters.episode_id);
   if (filters?.page) params.set("page", String(filters.page));
   if (filters?.limit) params.set("limit", String(filters.limit));
 
@@ -24,5 +25,6 @@ export function useWatches(filters?: WatchFilters) {
     queryKey: ["watches", filters],
     queryFn: () => apiFetch<WatchesResponse>(`/watches${qs ? `?${qs}` : ""}`),
     staleTime: 2 * 60 * 1000, // 2 min
+    enabled: options?.enabled,
   });
 }

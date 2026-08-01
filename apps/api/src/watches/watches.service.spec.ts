@@ -242,9 +242,39 @@ describe('WatchesService', () => {
       expect(prismaServiceMock.user_watches.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: [
-              { titles: { type: 'serie' } },
-              { episodes: { seasons: { titles: { type: 'serie' } } } },
+            AND: [
+              {
+                OR: [
+                  { titles: { type: 'serie' } },
+                  { episodes: { seasons: { titles: { type: 'serie' } } } },
+                ],
+              },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('filtre par title_id : inclut aussi les visionnages par épisode de cette série (modification M)', async () => {
+      // Même problème que le filtre type : un visionnage d'épisode a
+      // title_id = null, filtrer uniquement sur `title_id` manquait tous les
+      // épisodes d'une série (historique de TitleActions toujours vide pour
+      // les séries).
+      prismaServiceMock.user_watches.findMany.mockResolvedValue([]);
+      prismaServiceMock.user_watches.count.mockResolvedValue(0);
+
+      await service.listWatches(userId, { title_id: titleId });
+
+      expect(prismaServiceMock.user_watches.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: [
+              {
+                OR: [
+                  { title_id: titleId },
+                  { episodes: { seasons: { title_id: titleId } } },
+                ],
+              },
             ],
           }),
         }),

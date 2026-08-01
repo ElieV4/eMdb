@@ -29,11 +29,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Check, Heart, ListPlus, History, Trash2, Loader2 } from "lucide-react";
+import { Check, Heart, ListPlus, History, Loader2 } from "lucide-react";
 import { WatchButton } from "@/components/watches/WatchButton";
+import { HistoryDialog } from "@/components/watches/HistoryDialog";
 import { FollowButton } from "@/components/watches/FollowButton";
 import { RatingInput } from "@/components/ratings/RatingInput";
 import { useUserFollows } from "@/hooks/api/useUserFollows";
@@ -43,85 +43,19 @@ import { useRemoveListItem } from "@/hooks/api/useRemoveListItem";
 import { useCreateList } from "@/hooks/api/useCreateList";
 import { useUpsertRating } from "@/hooks/api/useUpsertRating";
 import { useDeleteWatch } from "@/hooks/api/useDeleteWatch";
-import { useDeleteAllWatches } from "@/hooks/api/useDeleteAllWatches";
 import { useTitleRatingsSummary } from "@/hooks/api/useTitleRatingsSummary";
 import { useWatches } from "@/hooks/api/useWatches";
-import { UserWatch } from "@/lib/types/api";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 
 type TitleActionsProps = {
   titleId: string;
   type: "film" | "serie";
+  releaseDate?: string | null;
   className?: string;
 };
 
-type WatchEntry = UserWatch;
-
-function WatchHistoryDialog({
-  open,
-  onOpenChange,
-  watches,
-  onDelete,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  watches: WatchEntry[];
-  onDelete: (watchId: string) => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Historique de visionnage</DialogTitle>
-          <DialogDescription>
-            Visionnages enregistrés pour ce titre.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="max-h-80 overflow-y-auto space-y-2">
-          {watches.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Aucun visionnage pour ce titre.
-            </p>
-          )}
-          {watches.map((watch: WatchEntry) => (
-            <div
-              key={watch.id}
-              className="flex items-center justify-between rounded-md border p-2"
-            >
-              <div>
-                <p className="text-sm font-medium">
-                  {watch.episodes
-                    ? `Épisode ${watch.episodes.numero}${watch.episodes.titre ? ` - ${watch.episodes.titre}` : ""}`
-                    : watch.titles?.titre_vf ||
-                      watch.titles?.titre_vo ||
-                      "Titre"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(watch.date_vue).toLocaleString("fr-FR")}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onDelete(watch.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Fermer
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export function TitleActions({ titleId, type, className }: TitleActionsProps) {
+export function TitleActions({ titleId, type, releaseDate, className }: TitleActionsProps) {
   const { isAuthenticated } = useAuthStore();
   const { data: follows } = useUserFollows();
   const { data: userLists } = useUserLists(titleId);
@@ -133,11 +67,7 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
   const createList = useCreateList();
   const upsertRating = useUpsertRating();
   const deleteWatch = useDeleteWatch();
-  const deleteAllWatches = useDeleteAllWatches();
-
   const watches = watchesData?.items ?? [];
-  const watchCount = watches.length;
-  const isWatched = watches.length > 0;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [showCreateList, setShowCreateList] = useState(false);
@@ -187,20 +117,12 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
     }
   };
 
-  const handleWatchSuccess = () => {
+  const handleWatchChanged = () => {
     queryClient.invalidateQueries({ queryKey: ["watches"], exact: false });
   };
 
   const handleUnwatch = async (watchId: string) => {
     await deleteWatch.mutateAsync(watchId);
-  };
-
-  const handleDeleteAll = () => {
-    deleteAllWatches.mutate(titleId, {
-      onSuccess: () => {
-        handleWatchSuccess();
-      },
-    });
   };
 
   const handleToggleFavorite = async () => {
@@ -219,10 +141,9 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
         {type === "film" && (
           <WatchButton
             titleId={titleId}
-            onWatchSuccess={handleWatchSuccess}
-            watched={isWatched}
-            watchCount={watchCount}
-            onDeleteAll={handleDeleteAll}
+            releaseDate={releaseDate}
+            watches={watches}
+            onChanged={handleWatchChanged}
           />
         )}
         {type === "serie" && (
@@ -325,7 +246,7 @@ export function TitleActions({ titleId, type, className }: TitleActionsProps) {
       </div>
 
       {/* Dialog historique */}
-      <WatchHistoryDialog
+      <HistoryDialog
         open={historyOpen}
         onOpenChange={setHistoryOpen}
         watches={watches}

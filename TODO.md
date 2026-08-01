@@ -1,72 +1,92 @@
-# Modification G — Nouvelle page "Découvrir"
+# Modification M — Unifier le bouton "marquer comme vu" et le menu ⋮
 
-Statut : **terminé** (voir `docs/bugs.md` modification G).
+Statut : **terminé** (voir `docs/bugs.md` modification M).
 
 ## Contexte
 
-Après la modification C (commit `020e96b`), l'utilisateur a demandé
-d'enchaîner sur la première modification lettrée non faite du document.
-Dans l'ordre : D, E, F sont déjà faites ; G était la première non faite,
-avec un point explicitement laissé "à trancher" (source de données pour le
-module "Attendus").
-
-## Décision prise (sans repasser par l'utilisateur)
-
-Le document proposait déjà lui-même l'algo de repli à utiliser si aucune
-donnée TMDB directe n'existe pour "Attendus" : "titres non sortis triés par
-popularité TMDB décroissante". Cette proposition étant déjà une réponse
-concrète et implémentable (pas une vraie fourche de design ouverte),
-implémenté directement plutôt que de reposer la question.
-
-Décision structurante prise en implémentant : les 4 modules interrogent
-TMDB **en direct** (trending/discover), pas la base locale — à la
-différence de "Titres populaires" sur l'accueil qui ne liste que les
-titres déjà importés. Cohérent avec l'objectif "découverte" : faire
-apparaître du contenu externe, importé à la demande au clic (mécanisme
-déjà en place, `GET /titles/tmdb/:tmdbId`).
+Après la modification G (commit `c24fed6`), l'utilisateur a demandé
+d'enchaîner sur M, avec une précision détaillée de l'état machine attendue
+pour le bouton "marquer comme vu" et le menu ⋮ (dropdown de dates identique
+aux deux endroits, "vu jusqu'ici" pour les épisodes, favoris/suivre dans le
+menu ⋮, historique de visionnage géré depuis les deux).
 
 ## Steps
 
-- [x] 1. Repéré dans `@emdb/tmdb-client` : `getTrending`, `getDiscoverMovie`,
-      `getDiscoverTv` existaient déjà (jamais utilisés côté API) — aucun
-      nouveau client TMDB nécessaire.
-- [x] 2. Backend `apps/api/src/discover/` (nouveau module) :
-      `GET /discover/:module?limit=` (`tendances|populaires|attendus|sorties`).
-      Mapping unifié des champs movie/tv (noms différents : `title`/`name`,
-      `release_date`/`first_air_date`) + détection `local`/`local_id` par
-      lookup batch sur `tmdb_id` (même principe que `TitlesService.searchTitles`).
-- [x] 3. Frontend : `hooks/api/useDiscover.ts` + page
-      `app/(frontend)/discover/page.tsx` (4 sections, réutilise `TitleCard`
-      sans modification — `TitleSearchResult` portait déjà `dateSortie`/
-      `note`, simplement jamais peuplés par le mapper de recherche
-      existant). Lien "Découvrir" ajouté à la nav du header.
-- [x] 4. `tsc --noEmit` (web + api) : aucune erreur. `jest` (web + api) :
-      baseline strictement inchangée (196/207 web, 175/181 api — mêmes
-      échecs pré-existants qu'avant cette session).
-- [x] 5. Vérifié en navigateur avec de vraies données TMDB : les 4 modules
-      chargent (Tendances : Spider-Man Brand New Day, House of the
-      Dragon... / Attendus : Avengers Doomsday, Dune Part Three... /
-      Sorties : ajusté `vote_count.gte` de 1 à 50 en cours de route — sans
-      ce seuil, "Sorties" remontait des titres obscurs à une seule note
-      parfaite plutôt que de vraies sorties grand public).
-- [x] 6. Cliqué sur un titre non-local ("Supergirl") → import déclenché.
-      Le premier clic déclenche le bug #35 déjà documenté ("signal is
-      aborted", même route `/titles/tmdb/:id?type=` que "Titres
-      recommandés") — hors périmètre de cette modification, non corrigé
-      ici. Un rechargement confirme l'import réussi (fiche complète,
-      studios, distribution dédupliquée). Retour sur `/discover` : la carte
-      pointe désormais vers l'id local, confirmant la détection `local`.
-- [x] 7. `docs/bugs.md` modification G mise à jour : "✅ fait", décision
-      documentée, fichiers modifiés, vérification manuelle.
+- [x] 1. Recherche préalable (agent) : cartographie de `WatchButton`,
+      `TitleQuickActionsMenu`, `EpisodeSnapshot`, endpoints watches
+      existants (dont `createWatchesUntilEpisode` — déjà écrit côté
+      service mais jamais exposé), absence de tout composant date-picker
+      (seul `window.prompt()` existait), 3 implémentations dupliquées du
+      dialog historique.
+- [x] 2. Backend : `POST /watches/until-episode`, `DELETE
+      /watches/episode/:episodeId`, filtre `episode_id` sur `GET /watches`.
+      Corrigé au passage un bug latent de `createWatchesUntilEpisode` qui
+      posait `title_id` ET `episode_id` sur les visionnages en masse
+      (aurait marqué toute la série "vue" dès le premier "vu jusqu'ici").
+- [x] 3. Frontend : composants partagés `watchDates.ts`,
+      `WatchDateMenuItems.tsx`, `WatchDatePickerDialog.tsx` (vrai sélecteur
+      de date, remplace `window.prompt`), `HistoryDialog.tsx` (dédup de 3
+      implémentations). `WatchButton.tsx` et `TitleQuickActionsMenu.tsx`
+      réécrits sur l'état machine demandée.
+- [x] 4. `tsc --noEmit` (web + api) : aucune erreur. Suite jest : baseline
+      inchangée.
+- [x] 5. **Retour utilisateur après premier passage** (test manuel réel,
+      pas juste automatisé) — 4 bugs signalés : clic prolongé peu fiable,
+      bouton "vu" qui "freeze" sans rien afficher (page film, page saison,
+      page épisode), bouton "Listes" qui "freeze" (page film et série),
+      historique vide pour une série.
+- [x] 6. Diagnostic en conditions réelles (navigateur, pas de synthétique) :
+      - Clic prolongé → remplacé par clic simple partout (design plus
+        simple et plus robuste, la distinction clic simple/long n'apportait
+        pas grand-chose de toute façon).
+      - "Freeze" → **`Button` ne forwardait pas les refs** (pas de
+        `React.forwardRef`, requis en React 18). Le menu s'ouvrait bien
+        (présent dans le DOM, `data-open`) mais son `Positioner` n'avait
+        aucune ancre valide et le rendait à `(0,0)`, hors champ — invisible.
+        Bug latent préexistant (affectait déjà "Listes" avant cette
+        session), resté caché tant que les actions directes évitaient
+        d'ouvrir un menu positionné. Un seul fix (`button.tsx`) a réglé
+        WatchButton ET TitleActions "Listes" ET TitleQuickActionsMenu.
+      - Historique série vide → `listWatches()` ne filtrait `title_id` que
+        sur les visionnages portés directement par le titre, jamais ceux de
+        ses épisodes (`title_id: null` par construction). Corrigé par un
+        `OR` sur `episodes.seasons.title_id`, même principe que le bug #44.
+      - Bonus trouvé en marge : `/series/[id]/page.tsx` n'avait **pas** la
+        directive `"use client"` — page entièrement cassée
+        (`useQuery is not a function`, RSC), bug préexistant jamais
+        remarqué faute d'avoir testé cette route précise. Explique une
+        partie du rapport "Listes ne marche pas" sur la page série (la page
+        plantait avant même d'afficher le bouton).
+- [x] 7. Bug supplémentaire trouvé en testant la page recherche (signalé en
+      cours de route par l'utilisateur) : icônes/menu ⋮ inopérants sur les
+      résultats non-locaux (`id` = tmdb_id en chaîne, pas un vrai UUID →
+      400 sur toute mutation). Corrigé par import à la demande
+      (`useGetOrImportTitle`, timeout 120s — sinon abandon à 10s, même
+      cause que le bug #27/#35 ; corrigé au passage sur
+      `TmdbTitleImportPage` aussi, cause probable du bug #35 lui-même).
+- [x] 8. Re-vérifié chaque correction en direct dans le navigateur (pas
+      seulement via `tsc`/`jest`) : `/titles/:id`, `/episodes/:id`,
+      `/series/:id`, module saisons développé — dropdowns bien positionnés
+      et fonctionnels dans les 4 contextes, historique série peuplé, page
+      série charge sans erreur, import à la demande confirmé de bout en
+      bout sur la recherche.
+- [x] 9. Tests mis à jour : `WatchButton.test.tsx` réécrit pour la nouvelle
+      API (`watches` au lieu de `watched`/`watchCount`) et le nouveau
+      comportement (clic simple ouvre le dropdown) — teste maintenant la
+      vraie interaction plutôt qu'un cas skippé. `watches.service.spec.ts` :
+      2 nouveaux cas (title_id inclut les épisodes, until-episode).
+      Suite complète : web 200/209 passent, api 176/182 passent — même
+      baseline qu'avant cette session (mêmes suites en échec, préexistantes
+      et sans rapport).
+- [x] 10. `docs/bugs.md` modification M mise à jour : "✅ fait", détail
+       complet des 5 bugs trouvés et corrigés, fichiers modifiés,
+       vérification manuelle.
 
 ## Reste du backlog
 
-- Bug #35 (`?type=` cause "operation aborted") : reconfirmé, affecte
-  maintenant aussi "Découvrir" en plus de "Titres recommandés" — toujours
-  non corrigé.
 - `docs/bugs.md` bug #34 (menu filtre header, curseur Durée) : retiré du
-  fichier et code annulé sur demande de l'utilisateur — à reprendre
-  éventuellement plus tard sous une forme mieux comprise.
-- Bugs #46-52 et modifications M-U : non implémentés, en attente de
-  priorisation ("on reviendra sur les bugs plus tard").
-- Prochaine modification lettrée non faite après G : **M**.
+  fichier et code annulé sur demande de l'utilisateur.
+- Bugs #46-52 (hors #35, résolu ici a priori) et modifications N-U : non
+  implémentés, en attente de priorisation.
+- Prochaine modification lettrée non faite après M : **N** (sidebar
+  indentée).

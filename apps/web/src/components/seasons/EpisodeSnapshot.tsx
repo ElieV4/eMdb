@@ -9,9 +9,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useSeason } from "@/hooks/api/useSeason";
 import { useWatches } from "@/hooks/api/useWatches";
-import { useDeleteWatch } from "@/hooks/api/useDeleteWatch";
 import { cn } from "@/lib/utils";
 import { WatchButton } from "@/components/watches/WatchButton";
+import { HistoryDialogWatch } from "@/components/watches/HistoryDialog";
 import { useAuthStore } from "@/store/authStore";
 import Link from "next/link";
 
@@ -39,38 +39,31 @@ export function EpisodeSnapshot({
     isError,
   } = useSeason(titleId, seasonNumber);
 
-  // Fetch all watches to determine which episodes are watched
+  // Fetch all watches to determine which episodes are watched — un seul
+  // appel pour toute la saison plutôt qu'un par épisode (le nombre
+  // d'épisodes rend un fetch par bouton coûteux).
   const { data: watchesData } = useWatches({
     limit: 100,
   });
-  const deleteWatch = useDeleteWatch();
 
   const episodeList = seasonData?.episodes ?? [];
   const allWatches = watchesData?.items ?? [];
 
-  // Build a map of episode_id -> watches array
-  const episodeWatchMap = new Map<string, string[]>();
+  // Regroupe les visionnages par épisode (id + date, pour HistoryDialog).
+  const episodeWatchMap = new Map<string, HistoryDialogWatch[]>();
   for (const watch of allWatches) {
     if (watch.episode_id) {
       const existing = episodeWatchMap.get(watch.episode_id) ?? [];
-      existing.push(watch.id);
+      existing.push({ id: watch.id, date_vue: watch.date_vue });
       episodeWatchMap.set(watch.episode_id, existing);
     }
   }
 
-  const handleWatchSuccess = async () => {
-    await queryClient.invalidateQueries({
-      queryKey: ["watches"],
-      exact: false,
-    });
-  };
-
-  const handleDeleteAll = async (episodeId: string) => {
-    const watchIds = episodeWatchMap.get(episodeId) ?? [];
-    for (const watchId of watchIds) {
-      await deleteWatch.mutateAsync(watchId);
-    }
-    // Invalidate after all deletions
+  // "Vu jusqu'ici" (modification M) doit aussi cocher les épisodes
+  // précédents de cette même liste : simple invalidation du cache partagé
+  // `["watches"]", déjà fait par chaque mutation watch — le re-fetch qui
+  // suit met à jour `episodeWatchMap` ci-dessus pour tous les boutons.
+  const handleWatchChanged = async () => {
     await queryClient.invalidateQueries({
       queryKey: ["watches"],
       exact: false,
@@ -96,9 +89,7 @@ export function EpisodeSnapshot({
   return (
     <div className={cn("space-y-2", className)}>
       {episodeList.map((episode) => {
-        const watchIds = episodeWatchMap.get(episode.id) ?? [];
-        const watchCount = watchIds.length;
-        const isWatched = watchCount > 0;
+        const episodeWatches = episodeWatchMap.get(episode.id) ?? [];
         return (
           <div
             key={episode.id}
@@ -121,10 +112,9 @@ export function EpisodeSnapshot({
               {isAuthenticated && (
                 <WatchButton
                   episodeId={episode.id}
-                  onWatchSuccess={handleWatchSuccess}
-                  watched={isWatched}
-                  watchCount={watchCount}
-                  onDeleteAll={() => handleDeleteAll(episode.id)}
+                  releaseDate={episode.date_sortie}
+                  watches={episodeWatches}
+                  onChanged={handleWatchChanged}
                 />
               )}
             </div>

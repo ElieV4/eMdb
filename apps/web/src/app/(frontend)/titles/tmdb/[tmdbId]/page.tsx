@@ -23,8 +23,13 @@ export default function TmdbTitleImportPage({
   useEffect(() => {
     const importTitle = async () => {
       try {
+        // Import complet côté serveur (credits inclus), potentiellement long —
+        // le timeout par défaut de 10s d'apiFetch abortait la requête avant la
+        // fin ("signal is aborted"), cause probable du bug #35. Même fix que
+        // useRefreshFilmography (bug #27) et useGetOrImportTitle (modification M).
         const data = await apiFetch<{ id: string }>(
           `/titles/tmdb/${encodeURIComponent(tmdbId)}?type=${encodeURIComponent(type)}`,
+          { timeoutMs: 120_000 },
         );
 
         const localId = data?.id;

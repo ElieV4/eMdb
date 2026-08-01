@@ -16,6 +16,7 @@ import { WatchesService } from './watches.service';
 import { CreateWatchDto } from './dto/create-watch.dto';
 import { ListWatchesFilterDto } from './dto/list-watches-filter.dto';
 import { FollowSerieDto } from './dto/follow-serie.dto';
+import { MarkWatchedUntilEpisodeDto } from './dto/mark-watched-until-episode.dto';
 
 /**
  * Contrôleur du module watches (Phase 4.1).
@@ -24,6 +25,9 @@ import { FollowSerieDto } from './dto/follow-serie.dto';
  *
  * Endpoints :
  * - POST   /watches                  — marquer vu (titre ou épisode)
+ * - POST   /watches/until-episode    — "vu jusqu'ici" (modification M)
+ * - DELETE /watches/title/:titleId   — supprimer tous les visionnages d'un titre
+ * - DELETE /watches/episode/:episodeId — supprimer tous les visionnages d'un épisode
  * - DELETE /watches/:id              — supprimer un visionnage
  * - GET    /watches                  — liste paginée des visionnages
  * - GET    /titles/:titleId/progress — progression série (fn_progress_serie)
@@ -47,6 +51,24 @@ export class WatchesController {
   }
 
   /**
+   * POST /watches/until-episode
+   * "Vu jusqu'ici" (modification M) : marque comme vus tous les épisodes
+   * non encore vus de la série jusqu'à `episode_id` inclus.
+   */
+  @Post('watches/until-episode')
+  async markWatchedUntilEpisode(
+    @CurrentUser() user: any,
+    @Body() dto: MarkWatchedUntilEpisodeDto,
+  ) {
+    const count = await this.watchesService.createWatchesUntilEpisode(
+      user.id,
+      dto.episode_id,
+      dto.date_vue ? dto.date_vue.toISOString() : undefined,
+    );
+    return { count };
+  }
+
+  /**
    * DELETE /watches/title/:titleId
    * Supprime tous les visionnages d'un titre pour l'utilisateur connecté.
    */
@@ -54,6 +76,19 @@ export class WatchesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteAllWatchesByTitle(@CurrentUser() user: any, @Param('titleId') titleId: string): Promise<void> {
     await this.watchesService.deleteAllWatchesByTitle(titleId, user.id);
+  }
+
+  /**
+   * DELETE /watches/episode/:episodeId
+   * Supprime tous les visionnages d'un épisode pour l'utilisateur connecté.
+   */
+  @Delete('watches/episode/:episodeId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteAllWatchesByEpisode(
+    @CurrentUser() user: any,
+    @Param('episodeId') episodeId: string,
+  ): Promise<void> {
+    await this.watchesService.deleteAllWatchesByEpisode(episodeId, user.id);
   }
 
   /**

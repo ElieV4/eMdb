@@ -26,7 +26,8 @@ export function EpisodeCard({
   isWatched = false,
   className,
 }: EpisodeCardProps) {
-  const { numero, titre, date_sortie, duree_minutes, image_url } = episode;
+  const { numero, date_sortie, duree_minutes, image_url } = episode;
+  const titre = episode.titre || `Épisode ${numero}`;
   const year = date_sortie ? new Date(date_sortie).getFullYear() : null;
 
   return (

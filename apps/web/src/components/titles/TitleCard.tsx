@@ -64,7 +64,12 @@ export function TitleCard({
           rendu en frère, positionné par-dessus. */}
       <TitleQuickActionsMenu
         titleId={id}
+        tmdbId={title.tmdbId}
+        type={type}
+        local={local}
+        releaseDate={dateSortie}
         inWatchlist={inWatchlist}
+        inFavorites={inFavorites}
         watched={watched}
         className="absolute top-2 right-2 z-30"
       />
@@ -168,7 +173,12 @@ export function TitleCardHorizontal({
           rendu hors du <Link> ci-dessous, cf. TitleCard. */}
       <TitleQuickActionsMenu
         titleId={id}
+        tmdbId={title.tmdbId}
+        type={type}
+        local={local}
+        releaseDate={dateSortie}
         inWatchlist={inWatchlist}
+        inFavorites={inFavorites}
         watched={watched}
         className="absolute top-1 left-[52px] z-30"
       />

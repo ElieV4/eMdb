@@ -24,6 +24,10 @@ export class ListWatchesFilterDto {
   title_id?: string;
 
   @IsOptional()
+  @IsUUID()
+  episode_id?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

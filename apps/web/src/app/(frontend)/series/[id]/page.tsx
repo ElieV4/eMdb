@@ -6,6 +6,8 @@
  * Correspondance backend : Phase 3 - Pages de détail
  */
 
+"use client";
+
 import { notFound } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { TitleHero } from "@/components/titles/TitleHero";
@@ -62,7 +64,7 @@ export default function SeriesDetailPage({
         <TitleHero title={title} />
 
         {/* Actions utilisateur */}
-        <TitleActions titleId={id} type={title.type} />
+        <TitleActions titleId={id} type={title.type} releaseDate={title.date_sortie} />
 
         {/* Métadonnées */}
         <TitleInfo title={title} />

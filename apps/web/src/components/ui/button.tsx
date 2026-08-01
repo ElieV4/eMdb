@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { cva, type VariantProps } from "class-variance-authority";
 
@@ -40,19 +41,27 @@ const buttonVariants = cva(
   },
 );
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+// `React.forwardRef` est nécessaire (React 18 : `ref` n'est pas une prop
+// standard des function components) — sans ça, `render={<Button/>}` dans un
+// `MenuTrigger`/`DropdownMenuTrigger` (WatchButton, TitleActions, ...) ne
+// peut pas récupérer le nœud DOM réel du bouton. Le menu s'ouvrait quand
+// même, mais son `Positioner` n'avait aucune ancre valide et le rendait à
+// (0,0) — invisible en haut à gauche de l'écran, d'où l'impression que "le
+// bouton ne marche pas" / "freeze la navigation" (le menu était bien ouvert,
+// juste hors champ).
+const Button = React.forwardRef<
+  HTMLButtonElement,
+  ButtonPrimitive.Props & VariantProps<typeof buttonVariants>
+>(({ className, variant = "default", size = "default", ...props }, ref) => {
   return (
     <ButtonPrimitive
+      ref={ref}
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
   );
-}
+});
+Button.displayName = "Button";
 
 export { Button, buttonVariants };

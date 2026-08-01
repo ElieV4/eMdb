@@ -13,7 +13,7 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 export type EpisodeRowItem = {
   id: string;
   numero: number;
-  titre: string;
+  titre?: string | null;
   synopsis?: string | null;
   date_sortie?: string | null;
   duree_minutes?: number | null;
@@ -35,7 +35,8 @@ export function EpisodeRow({
   isWatched = false,
   className,
 }: EpisodeRowProps) {
-  const { numero, titre, date_sortie, duree_minutes, image_url } = episode;
+  const { numero, date_sortie, duree_minutes, image_url } = episode;
+  const titre = episode.titre || `Épisode ${numero}`;
   const year = date_sortie ? new Date(date_sortie).getFullYear() : null;
   const dateStr = date_sortie
     ? new Date(date_sortie).toLocaleDateString("fr-FR")
