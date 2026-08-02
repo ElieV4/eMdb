@@ -15,6 +15,7 @@ import { usePerson } from "@/hooks/api/usePeople";
 import { usePersonFilmography } from "@/hooks/api/usePeople";
 import { usePersonRecommendations } from "@/hooks/api/usePersonRecommendations";
 import { useRefreshFilmography } from "@/hooks/api/useRefreshFilmography";
+import { RefreshDataButton } from "@/components/common/RefreshDataButton";
 import {
   FilmographyGrouped,
   PersonRecommendation,
@@ -72,7 +73,14 @@ export default function PersonDetailPage({
 
         {/* Filmographie */}
         <section>
-          <h2 className="text-2xl font-bold mb-4">Filmographie</h2>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h2 className="text-2xl font-bold">Filmographie</h2>
+            <RefreshDataButton
+              onRefresh={() => refreshFilmography.mutate()}
+              isPending={refreshFilmography.isPending}
+              isError={refreshFilmography.isError}
+            />
+          </div>
           {isFilmographyLoading ? (
             <LoadingSpinner className="h-6 w-6" />
           ) : isFilmographyError || !filmography ? (

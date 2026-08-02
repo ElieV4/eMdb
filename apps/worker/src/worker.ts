@@ -39,7 +39,12 @@ const MATERIALIZED_VIEWS = [
 ];
 
 export function buildRedisConnection(redisUrl: string) {
-  return new Redis(redisUrl);
+  // BullMQ exige `maxRetriesPerRequest: null` sur la connexion utilisée par
+  // un `Worker` (commandes bloquantes) — sans ça, toute création de Worker
+  // (import/cron/recommendations/trakt-import) échouait immédiatement au
+  // démarrage ("Your redis options maxRetriesPerRequest must be null"),
+  // ce qui rendait `apps/worker` non démarrable en pratique.
+  return new Redis(redisUrl, { maxRetriesPerRequest: null });
 }
 
 export function getWeeklyResyncRange() {

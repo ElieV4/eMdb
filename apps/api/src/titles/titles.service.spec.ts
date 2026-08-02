@@ -14,11 +14,10 @@ jest.mock('@emdb/tmdb-client', () => ({
 
 jest.mock('@emdb/tmdb-sync', () => ({
   importTitleByTmdbId: jest.fn(),
-  refreshTitleData: jest.fn(),
 }));
 
 import { getMovieRecommendations, getMovieSimilar } from '@emdb/tmdb-client';
-import { importTitleByTmdbId, refreshTitleData } from '@emdb/tmdb-sync';
+import { importTitleByTmdbId } from '@emdb/tmdb-sync';
 
 const prismaServiceMock = {
   titles: {
@@ -174,14 +173,14 @@ describe('TitlesService', () => {
   });
 
   describe('refreshTitle', () => {
-    it('appelle refreshTitleData si le titre a un tmdb_id', async () => {
-      const mockTitle = { id: '1', tmdb_id: 123 };
+    it('appelle importTitleByTmdbId (casting inclus) si le titre a un tmdb_id', async () => {
+      const mockTitle = { id: '1', tmdb_id: 123, type: 'film' };
       prismaServiceMock.titles.findUnique.mockResolvedValue(mockTitle);
-      (refreshTitleData as jest.Mock).mockResolvedValue({ id: '1', titre_vo: 'Refreshed' });
+      (importTitleByTmdbId as jest.Mock).mockResolvedValue({ id: '1', titre_vo: 'Refreshed' });
 
       const result = await service.refreshTitle('1');
 
-      expect(refreshTitleData).toHaveBeenCalledWith('1');
+      expect(importTitleByTmdbId).toHaveBeenCalledWith(123, 'film', { withCredits: true });
       expect(result.titre_vo).toBe('Refreshed');
     });
 

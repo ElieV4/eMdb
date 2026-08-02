@@ -17,6 +17,7 @@ import { RatingsModule } from './ratings/ratings.module';
 import { ListsModule } from './lists/lists.module';
 import { RecommenderModule } from './recommender/recommender.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ImportModule } from './import/import.module';
 import * as path from 'node:path';
 
 @Module({
@@ -41,6 +42,7 @@ import * as path from 'node:path';
     ListsModule,
     RecommenderModule,
     NotificationsModule,
+    ImportModule,
   ],
   controllers: [AppController],
 })

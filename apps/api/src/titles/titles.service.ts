@@ -10,7 +10,7 @@ import {
   searchTv,
   TmdbSearchResult,
 } from '@emdb/tmdb-client';
-import { importTitleByTmdbId, refreshTitleData } from '@emdb/tmdb-sync';
+import { importTitleByTmdbId } from '@emdb/tmdb-sync';
 
 /**
  * Résultat fusionné d'une recherche TMDB + résultats locaux.
@@ -429,10 +429,13 @@ export class TitlesService {
   }
 
   /**
-   * Rafraîchit les données d'un titre depuis TMDB.
+   * Rafraîchit les données d'un titre depuis TMDB, casting inclus.
    *
-   * Appelle tmdb-sync.refreshTitleData (note, statut, next_episode, etc.)
-   * sans ré-importer les credits.
+   * Appelle tmdb-sync.importTitleByTmdbId (mêmes upserts qu'un import
+   * initial : genres/pays/studios/credits, + saisons/épisodes pour une
+   * série) plutôt que refreshTitleData, qui ne ré-importe pas les credits —
+   * nécessaire pour les titres importés sans casting (ex. backfill Trakt en
+   * masse) : c'est le seul moyen de les compléter après coup depuis l'UI.
    *
    * @param id - UUID du titre
    * @returns Le titre mis à jour
@@ -440,7 +443,7 @@ export class TitlesService {
   async refreshTitle(id: string) {
     const title = await this.prisma.titles.findUnique({
       where: { id },
-      select: { id: true, tmdb_id: true },
+      select: { id: true, tmdb_id: true, type: true },
     });
 
     if (!title) {
@@ -451,7 +454,7 @@ export class TitlesService {
       throw new BadRequestException("Le titre n'a pas de tmdb_id, impossible de rafraîchir.");
     }
 
-    return refreshTitleData(id);
+    return importTitleByTmdbId(title.tmdb_id, title.type as 'film' | 'serie', { withCredits: true });
   }
 
   /**

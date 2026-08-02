@@ -1,16 +1,26 @@
-const fs = require('fs');
 const path = require('path');
-const { PrismaClient } = require('@prisma/client');
+// Doit être chargé AVANT `require('@emdb/db')` : ce package charge lui aussi
+// le .env racine, mais son chemin relatif (`__dirname/../../.env`) suppose
+// une exécution depuis les sources TS ; une fois résolu via son build
+// compilé (`dist/index.js`, un niveau plus profond), ce chemin pointe à côté
+// de la racine et DATABASE_URL/TMDB_API_KEY restent vides. Charger le .env
+// ici en premier le rend inoffensif (dotenv ne réécrit jamais une variable
+// déjà définie).
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
+
+const fs = require('fs');
+const { prisma } = require('@emdb/db');
+const { importTitleByTmdbId, importSeasonsForSerie } = require('@emdb/tmdb-sync');
 
 const TRAKT_EXPORT_DIR = 'C:\\Users\\Elie\\Downloads\\trakt-export-emdb';
 const USER_EMAIL = 'elie.vincent4@gmail.com';
-const DATABASE_URL = 'postgresql://emdb:emdb@localhost:5432/emdb';
-
-const prisma = new PrismaClient({
-  datasources: {
-    db: { url: DATABASE_URL },
-  },
-});
+// bug : beaucoup de titres de l'export Trakt n'existaient pas encore dans le
+// catalogue local -> déclenche désormais leur import TMDB à la volée au lieu
+// de se contenter de les ignorer (cf. findOrImportTitle ci-dessous).
+// Casting non importé ici (rafraîchissable ensuite titre par titre via le
+// bouton "Actualiser") : sur ~1000 titres, l'import du casting représenterait
+// à lui seul plusieurs dizaines de milliers d'appels TMDB.
+const IMPORT_WITH_CREDITS = false;
 
 async function loadJson(fileName) {
   const filePath = path.join(TRAKT_EXPORT_DIR, fileName);
@@ -26,30 +36,93 @@ async function loadJson(fileName) {
   }
 }
 
-async function findTitleByTmdb(tmdbId) {
-  return prisma.titles.findUnique({
+// Cache mémoire pour ce run : un même film/série peut apparaître des
+// dizaines de fois entre l'historique, les notes et les listes — évite de
+// refaire un lookup (voire un import TMDB) à chaque occurrence.
+const titleCache = new Map();
+// Séries déjà "topped up" (saisons/épisodes resynchronisés) durant ce run —
+// évite de rappeler importSeasonsForSerie() pour chaque épisode manquant
+// d'une même série déjà traitée.
+const toppedUpShows = new Set();
+
+let importedCount = 0;
+let importFailCount = 0;
+
+/**
+ * Cherche un titre par tmdb_id ; s'il n'existe pas encore localement,
+ * déclenche son import TMDB (même chemin que l'appli — genres/pays/studios/
+ * saisons+épisodes pour les séries) avant de continuer. C'est ça qui
+ * manquait : l'ancienne version se contentait d'un `findUnique` et ignorait
+ * silencieusement tout titre absent du catalogue local.
+ */
+async function findOrImportTitle(tmdbId, type) {
+  const cacheKey = `${type}:${tmdbId}`;
+  if (titleCache.has(cacheKey)) return titleCache.get(cacheKey);
+
+  let title = await prisma.titles.findUnique({
     where: { tmdb_id: tmdbId },
-    select: { id: true, type: true },
+    select: { id: true, type: true, tmdb_id: true },
   });
+
+  if (!title) {
+    try {
+      title = await importTitleByTmdbId(tmdbId, type, { withCredits: IMPORT_WITH_CREDITS });
+      importedCount++;
+      if (importedCount % 25 === 0) {
+        console.log(`  ... ${importedCount} titres importés depuis TMDB jusqu'ici`);
+      }
+    } catch (e) {
+      console.warn(`  Import TMDB échoué pour tmdb=${tmdbId} (${type}): ${e.message}`);
+      importFailCount++;
+      titleCache.set(cacheKey, null);
+      return null;
+    }
+  }
+
+  titleCache.set(cacheKey, title);
+  return title;
 }
 
 async function findEpisodeByTmdb(showTmdbId, seasonNumber, episodeNumber) {
-  const title = await findTitleByTmdb(showTmdbId);
+  const title = await findOrImportTitle(showTmdbId, 'serie');
   if (!title || title.type !== 'serie') return null;
 
-  const season = await prisma.seasons.findFirst({
+  let season = await prisma.seasons.findFirst({
     where: { title_id: title.id, numero: seasonNumber },
     select: { id: true },
   });
-  if (!season) return null;
 
-  const episode = await prisma.episodes.findFirst({
-    where: { season_id: season.id, numero: episodeNumber },
-    select: { id: true },
-  });
-  if (!episode) return null;
+  let episode = season
+    ? await prisma.episodes.findFirst({
+        where: { season_id: season.id, numero: episodeNumber },
+        select: { id: true },
+      })
+    : null;
 
-  return episode.id;
+  // Saison/épisode absent alors que la série existe déjà localement :
+  // souvent une série importée avant que cet épisode n'ait été (re)synchro
+  // -> une seule resynchro par série et par run, puis on retente.
+  if (!episode && !toppedUpShows.has(title.id)) {
+    toppedUpShows.add(title.id);
+    try {
+      await importSeasonsForSerie(title.id);
+    } catch (e) {
+      console.warn(`  Resynchro saisons échouée pour titre=${title.id}: ${e.message}`);
+      return null;
+    }
+    season = await prisma.seasons.findFirst({
+      where: { title_id: title.id, numero: seasonNumber },
+      select: { id: true },
+    });
+    episode = season
+      ? await prisma.episodes.findFirst({
+          where: { season_id: season.id, numero: episodeNumber },
+          select: { id: true },
+        })
+      : null;
+  }
+
+  return episode?.id ?? null;
 }
 
 async function importWatches(userId) {
@@ -74,21 +147,7 @@ async function importWatches(userId) {
       if (item.type === 'movie') continue;
 
       try {
-        if (item.type === 'movie') {
-          const tmdbId = item.movie?.ids?.tmdb;
-          if (!tmdbId) { skipCount++; continue; }
-          const title = await findTitleByTmdb(tmdbId);
-          if (!title) { skipCount++; continue; }
-          await prisma.user_watches.create({
-            data: {
-              user_id: userId,
-              title_id: title.id,
-              episode_id: null,
-              date_vue: item.watched_at ? new Date(item.watched_at) : new Date(),
-            },
-          });
-          watchCount++;
-        } else if (item.type === 'episode') {
+        if (item.type === 'episode') {
           const showTmdbId = item.show?.ids?.tmdb;
           const seasonNumber = item.episode?.season;
           const episodeNumber = item.episode?.number;
@@ -110,7 +169,7 @@ async function importWatches(userId) {
         } else if (item.type === 'show') {
           const tmdbId = item.show?.ids?.tmdb;
           if (!tmdbId) { skipCount++; continue; }
-          const title = await findTitleByTmdb(tmdbId);
+          const title = await findOrImportTitle(tmdbId, 'serie');
           if (!title) { skipCount++; continue; }
           await prisma.user_watches.create({
             data: {
@@ -151,7 +210,7 @@ async function importRatings(userId) {
         if (type === 'movie') {
           const tmdbId = item.movie?.ids?.tmdb;
           if (!tmdbId) { skipCount++; continue; }
-          const title = await findTitleByTmdb(tmdbId);
+          const title = await findOrImportTitle(tmdbId, 'film');
           if (!title) { skipCount++; continue; }
           await prisma.user_ratings.upsert({
             where: {
@@ -173,7 +232,7 @@ async function importRatings(userId) {
         } else if (type === 'show') {
           const tmdbId = item.show?.ids?.tmdb;
           if (!tmdbId) { skipCount++; continue; }
-          const title = await findTitleByTmdb(tmdbId);
+          const title = await findOrImportTitle(tmdbId, 'serie');
           if (!title) { skipCount++; continue; }
           await prisma.user_ratings.upsert({
             where: {
@@ -223,7 +282,7 @@ async function importRatings(userId) {
           const showTmdbId = item.show?.ids?.tmdb;
           const seasonNumber = item.season?.number;
           if (!showTmdbId || seasonNumber == null) { skipCount++; continue; }
-          const title = await findTitleByTmdb(showTmdbId);
+          const title = await findOrImportTitle(showTmdbId, 'serie');
           if (!title) { skipCount++; continue; }
           const season = await prisma.seasons.findFirst({
             where: { title_id: title.id, numero: seasonNumber },
@@ -293,17 +352,23 @@ async function importList(userId, listName, type, fileName) {
   for (const item of data) {
     try {
       let tmdbId = null;
+      let itemType = 'film';
       if (item.movie?.ids?.tmdb) {
         tmdbId = item.movie.ids.tmdb;
+        itemType = 'film';
       } else if (item.show?.ids?.tmdb) {
         tmdbId = item.show.ids.tmdb;
+        itemType = 'serie';
       } else if (item.episode?.ids?.tmdb) {
-        tmdbId = item.episode.ids.tmdb;
+        // Pas de type fiable pour un item "episode" isolé dans une liste :
+        // on retombe sur le show parent s'il est présent, sinon on saute.
+        tmdbId = item.show?.ids?.tmdb ?? null;
+        itemType = 'serie';
       }
 
       if (!tmdbId) { skipCount++; continue; }
 
-      const title = await findTitleByTmdb(tmdbId);
+      const title = await findOrImportTitle(tmdbId, itemType);
       if (!title) { skipCount++; continue; }
 
       await prisma.list_items.upsert({
@@ -339,7 +404,7 @@ async function importWatchedMovies(userId) {
       try {
         const tmdbId = item.movie?.ids?.tmdb;
         if (!tmdbId) { skipCount++; continue; }
-        const title = await findTitleByTmdb(tmdbId);
+        const title = await findOrImportTitle(tmdbId, 'film');
         if (!title) { skipCount++; continue; }
         const watchDate = item.last_watched_at ? new Date(item.last_watched_at) : new Date();
         await prisma.user_watches.create({
@@ -374,6 +439,7 @@ async function main() {
 
   const userId = user.id;
   console.log(`Importing Trakt data for user ${USER_EMAIL} (${userId})`);
+  console.log(`Import TMDB avec casting: ${IMPORT_WITH_CREDITS}`);
 
   await importWatches(userId);
   await importWatchedMovies(userId);
@@ -383,7 +449,7 @@ async function main() {
   await importList(userId, 'Collection shows', 'collection', 'collection-shows.json');
   await importList(userId, 'Collection episodes', 'collection', 'collection-episodes.json');
 
-  console.log('Import completed.');
+  console.log(`Import completed. ${importedCount} nouveaux titres importés depuis TMDB, ${importFailCount} échecs d'import.`);
 }
 
 main()

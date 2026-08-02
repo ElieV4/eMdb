@@ -9,6 +9,7 @@ import {
   ensureRepeatableCronJobs,
 } from './worker';
 import { createRecommendationsWorker } from './recommendations.worker';
+import { createTraktImportWorker } from './trakt-import.worker';
 import { scheduleMonthlyRecs } from './cron';
 
 async function main() {
@@ -19,11 +20,12 @@ async function main() {
   createImportWorker(redisUrl);
   createCronWorker(redisUrl);
   createRecommendationsWorker(redisUrl);
+  createTraktImportWorker(redisUrl);
 
   await ensureRepeatableCronJobs(cronQueue);
   await scheduleMonthlyRecs(redisUrl);
 
-  console.log('[worker] BullMQ démarré : queues tmdb-import, tmdb-cron et recommendations actives');
+  console.log('[worker] BullMQ démarré : queues tmdb-import, tmdb-cron, recommendations et trakt-import actives');
 }
 
 main().catch((error) => {

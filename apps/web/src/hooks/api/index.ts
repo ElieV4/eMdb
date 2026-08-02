@@ -92,3 +92,13 @@ export { useListMembership } from "./useListMembership";
 
 // Bug 27 — Rafraîchissement filmographie TMDB
 export { useRefreshFilmography } from "./useRefreshFilmography";
+
+// Bug #55/#56 — Import depuis Trakt (page Profil)
+export {
+  useUploadTraktExport,
+  useTraktImportStatus,
+  type TraktImportStartResponse,
+  type TraktImportProgress,
+  type TraktImportResult,
+  type TraktImportStatus,
+} from "./useImportTrakt";

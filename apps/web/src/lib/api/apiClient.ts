@@ -24,7 +24,8 @@ import {
   clearRefreshCookie,
 } from "@/lib/auth/authCookie";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 type RefreshResult = {
   accessToken: string;

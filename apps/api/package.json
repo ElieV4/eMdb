@@ -26,6 +26,8 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.4.1",
     "@nestjs/swagger": "^7.4.0",
+    "@types/adm-zip": "^0.5.8",
+    "adm-zip": "^0.6.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.81.0",
     "class-transformer": "^0.5.1",

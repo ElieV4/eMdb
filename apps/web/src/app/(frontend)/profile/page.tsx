@@ -2,13 +2,14 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { User, Bell, BarChart3, LogOut } from "lucide-react";
+import { User, Bell, BarChart3, LogOut, Upload } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useLogout } from "@/hooks/auth/useLogout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DatavizSection } from "@/components/dataviz/DatavizSection";
 import { AdminRefreshButton } from "@/components/admin/AdminRefreshButton";
+import { TraktImportButton } from "@/components/profile/TraktImportButton";
 
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuthStore();
@@ -101,6 +102,19 @@ export default function ProfilePage() {
               prochainement.
             </p>
           </div>
+        </section>
+
+        {/* Import Trakt (bug #55/#56) */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Upload className="h-5 w-5 text-primary" />
+            Import
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Importez votre historique de visionnage, vos notes et votre
+            watchlist depuis un export Trakt (.zip).
+          </p>
+          <TraktImportButton />
         </section>
       </div>
     </div>
