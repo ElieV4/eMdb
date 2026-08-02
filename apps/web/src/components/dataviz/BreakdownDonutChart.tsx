@@ -1,57 +1,46 @@
 /**
- * Graphique en camembert pour les données groupées par animation
- * (animation vs live-action) — Phase 6.
+ * Donut chart des valeurs par catégorie du groupement sélectionné —
+ * modification W, 8ème passe (menu unifié : une seule série).
  */
 
 "use client";
 
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  Legend,
-} from "recharts";
-import { AnimationChartDatum } from "@/lib/dataviz/types";
-import { ANIMATION_PALETTE } from "./ChartColors";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+import { DatavizChartDatum } from "@/lib/dataviz/types";
+import { BAR_PALETTE } from "./ChartColors";
 import { ChartTooltip } from "./ChartTooltip";
 
-type AnimationPieChartProps = {
-  data: AnimationChartDatum[];
+type BreakdownDonutChartProps = {
+  data: DatavizChartDatum[];
   valueLabel: string;
   valueFormatter?: (value: number) => string;
 };
 
-export function AnimationPieChart({
+export function BreakdownDonutChart({
   data,
   valueLabel,
   valueFormatter,
-}: AnimationPieChartProps) {
-  const total = data.reduce((sum, d) => sum + d.value, 0);
+}: BreakdownDonutChartProps) {
+  const chartData = data.map((d) => ({ name: d.category, value: d.value }));
+  const total = chartData.reduce((sum, d) => sum + d.value, 0);
 
   return (
-    <div className="h-64 w-full">
+    <div className="h-80 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
-            data={data}
+            data={chartData}
             dataKey="value"
             nameKey="name"
-            innerRadius={50}
-            outerRadius={90}
+            innerRadius={60}
+            outerRadius={100}
             paddingAngle={2}
             strokeWidth={0}
-            label={({ name, percent }) =>
-              `${name} (${Math.round((percent ?? 0) * 100)}%)`
-            }
+            label={({ name, percent }) => `${name} (${Math.round((percent ?? 0) * 100)}%)`}
             labelLine={false}
           >
-            {data.map((_, index) => (
-              <Cell
-                key={index}
-                fill={ANIMATION_PALETTE[index % ANIMATION_PALETTE.length]}
-              />
+            {chartData.map((_, index) => (
+              <Cell key={index} fill={BAR_PALETTE[index % BAR_PALETTE.length]} />
             ))}
           </Pie>
           <Tooltip content={<ChartTooltip valueFormatter={valueFormatter} />} />

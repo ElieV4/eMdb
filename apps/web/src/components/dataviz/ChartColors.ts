@@ -43,6 +43,29 @@ export const ANIMATION_PALETTE = [
   CHART_COLORS.info,
 ] as const;
 
+/**
+ * Palette divergente (rouge → gris neutre → bleu) — utilisée pour l'axe
+ * "Légende" des barcharts/linechart dataviz quand il est actif (≠
+ * "Aucune"). `BAR_PALETTE` place `primary`/`primaryHover` (deux rouges
+ * quasi identiques) côte à côte : sur une légende à plusieurs séries, les
+ * deux premiers segments/lignes se confondent visuellement (retour
+ * utilisateur — "même couleur tout le temps"). Cette palette écarte
+ * chaque teinte de la suivante (rouge → orange → rose pâle → gris → bleu
+ * pâle → bleu → bleu foncé) pour rester distinguable même sur les
+ * premiers slots.
+ */
+export const DIVERGING_PALETTE = [
+  "#b2182b",
+  "#d6604d",
+  "#f4a582",
+  "#fddbc7",
+  "#9e9e9e",
+  "#d1e5f0",
+  "#92c5de",
+  "#4393c3",
+  "#2166ac",
+] as const;
+
 /** Couleur du texte secondaire (axes, légendes). */
 export const AXIS_COLOR = "#b0b0b0";
 

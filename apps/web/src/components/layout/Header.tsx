@@ -14,6 +14,11 @@
  * `FilterSidebar.tsx`). L'icône profil (avec son dropdown Profil/
  * Déconnexion) a été retirée : la déconnexion se fait désormais depuis un
  * bouton dédié sur la page Profil elle-même.
+ * Retour utilisateur (dataviz) : le filtre header (genre/pays/année/note/
+ * listes) est retiré de la page Profil — la page n'a plus de contenu qui le
+ * consomme (la section Favoris n'est plus filtrable ainsi, et les visuels
+ * dataviz ont chacun leur propre filtre dans leur menu "⋮", cf.
+ * `DatavizFilterFields.tsx`).
  */
 
 "use client";
@@ -122,6 +127,10 @@ export function Header() {
   // Le filtre "Date de visionnage" n'a de sens que sur l'historique (seule
   // page où chaque entrée porte une date de visionnage individuelle).
   const isHistoryPage = pathname === "/history";
+  // La page Profil n'a plus de contenu consommant le filtre header (retour
+  // utilisateur) : Favoris n'est plus filtrable ainsi, et les visuels
+  // dataviz ont leur propre filtre dans leur menu "⋮".
+  const isProfilePage = pathname === "/profile";
 
   // Filtrer les tabs selon la page
   const visibleTabs = isSearchPage
@@ -234,25 +243,28 @@ export function Header() {
             le panneau "Filtres" est ouvert (le filtre par type y migre
             alors en premier contrôle, cf. FilterSidebar). */}
         <div className="hidden lg:flex items-center justify-center gap-1">
-          {!filterSidebarOpen && (
+          {!filterSidebarOpen && !isProfilePage && (
             <TypeFilterTabs tabs={visibleTabs} active={rawTypeTab} onChange={setTypeFilter} />
           )}
         </div>
 
         {/* Actions droite */}
         <div className="flex items-center justify-end gap-2">
-          {/* Bouton "Filtres" — déploie la sidebar droite */}
-          <button
-            onClick={() => setFilterSidebarOpen((v) => !v)}
-            className={`hidden lg:flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              filterSidebarOpen || hasActiveTitleFilters(filters)
-                ? "bg-primary/20 text-primary"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent"
-            }`}
-          >
-            <Filter className="h-3.5 w-3.5" />
-            <span>Filtres</span>
-          </button>
+          {/* Bouton "Filtres" — déploie la sidebar droite (absent sur
+              Profil, cf. isProfilePage) */}
+          {!isProfilePage && (
+            <button
+              onClick={() => setFilterSidebarOpen((v) => !v)}
+              className={`hidden lg:flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                filterSidebarOpen || hasActiveTitleFilters(filters)
+                  ? "bg-primary/20 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
+            >
+              <Filter className="h-3.5 w-3.5" />
+              <span>Filtres</span>
+            </button>
+          )}
 
           {/* Menu hamburger mobile */}
           <Button
@@ -272,7 +284,7 @@ export function Header() {
       </div>
 
       <FilterSidebar
-        open={filterSidebarOpen}
+        open={filterSidebarOpen && !isProfilePage}
         onClose={() => setFilterSidebarOpen(false)}
         filters={filters}
         typeTabs={visibleTabs}
@@ -304,16 +316,18 @@ export function Header() {
       {/* Menu navigation mobile */}
       {menuOpen && (
         <nav className="border-t px-4 py-2 lg:hidden bg-background/95 backdrop-blur">
-          {/* Filtres centraux en mobile */}
-          <TypeFilterTabs
-            tabs={visibleTabs}
-            active={rawTypeTab}
-            onChange={(id) => {
-              setTypeFilter(id);
-              setMenuOpen(false);
-            }}
-            className="overflow-x-auto pb-3 mb-3 border-b flex-nowrap"
-          />
+          {/* Filtres centraux en mobile (absents sur Profil) */}
+          {!isProfilePage && (
+            <TypeFilterTabs
+              tabs={visibleTabs}
+              active={rawTypeTab}
+              onChange={(id) => {
+                setTypeFilter(id);
+                setMenuOpen(false);
+              }}
+              className="overflow-x-auto pb-3 mb-3 border-b flex-nowrap"
+            />
+          )}
 
           {/* Liens de navigation */}
           <div className="space-y-1">

@@ -173,3 +173,12 @@ export function useTitleCountries() {
     staleTime: 60 * 60 * 1000,
   });
 }
+
+/** Filtre "Studio" du module dataviz (modification W, 8ème passe). */
+export function useTitleStudios() {
+  return useQuery({
+    queryKey: ["titles", "studios"],
+    queryFn: () => apiFetch<{ id: string; nom: string }[]>("/titles/studios"),
+    staleTime: 60 * 60 * 1000,
+  });
+}

@@ -153,6 +153,17 @@ export class TitlesService {
   }
 
   /**
+   * Liste de référence de tous les studios (public), pour les menus de
+   * filtre (nouveau filtre "Studio" du module dataviz).
+   */
+  async listStudios() {
+    return this.prisma.studios.findMany({
+      select: { id: true, nom: true },
+      orderBy: { nom: 'asc' },
+    });
+  }
+
+  /**
    * "Get or import" : cherche un titre par tmdb_id, sinon déclenche l'import.
    *
    * @param tmdbId - ID TMDB du titre

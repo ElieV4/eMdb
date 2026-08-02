@@ -25,7 +25,7 @@ export class TitlesController {
   }
 
   /**
-   * GET /titles/genres, GET /titles/countries
+   * GET /titles/genres, GET /titles/countries, GET /titles/studios
    * Liste de référence (public) pour les menus de filtre.
    * Placés avant `:id` pour ne pas être interceptés par ce paramètre générique.
    */
@@ -37,6 +37,11 @@ export class TitlesController {
   @Get('countries')
   async listCountries() {
     return this.titlesService.listCountries();
+  }
+
+  @Get('studios')
+  async listStudios() {
+    return this.titlesService.listStudios();
   }
 
   @Get('tmdb/:tmdbId')

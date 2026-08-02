@@ -212,4 +212,375 @@ describe('DatavizService', () => {
       expect(mockService.orderBy('invalid_col; DROP TABLE users;')).toBe('');
     });
   });
+
+  describe('sérialisation BigInt (bug #54)', () => {
+    // SUM()/COUNT(*) sur les vues matérialisées reviennent en `bigint` JS
+    // depuis le driver Postgres — JSON.stringify (réponse Express) ne sait
+    // pas les sérialiser et faisait échouer tous les endpoints dataviz en
+    // 500 avant ce correctif.
+    it('convertit les colonnes bigint (minutes, nb_items) en Number', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { user_id: userId, periode_semaine: new Date('2024-01-01'), minutes: 120n },
+      ]);
+
+      const result = await service.getWatchTime(userId, {
+        groupBy: 'period',
+      } as WatchTimeQueryDto);
+
+      expect(result).toEqual([
+        { user_id: userId, periode_semaine: new Date('2024-01-01'), minutes: 120 },
+      ]);
+      expect(typeof (result[0] as any).minutes).toBe('number');
+    });
+
+    it('convertit nb_items (COUNT) en Number', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { user_id: userId, genre_id: 'genre-uuid', nb_items: 7n },
+      ]);
+
+      const result = await service.getWatchCount(userId, {
+        groupBy: 'genre',
+      } as WatchCountQueryDto);
+
+      expect(typeof (result[0] as any).nb_items).toBe('number');
+      expect((result[0] as any).nb_items).toBe(7);
+    });
+  });
+
+  // GET /dataviz/query — menu unifié métrique/agrégation/groupement/filtres
+  // (modification W, 8ème passe), remplace summary/breakdown/by-year.
+  describe('query (modification W, menu unifié)', () => {
+    const base = { metric: 'duration', aggregation: 'sum', groupBy: 'none' } as const;
+
+    it('groupBy=none : une seule requête SQL, total=null', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { category_id: null, category: 'Total', value: 451n },
+      ]);
+
+      const result = await service.query(userId, base as any);
+
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ total: null, rows: [{ category_id: null, category: 'Total', value: 451 }] });
+    });
+
+    it("groupBy != none : deux requêtes (répartition + total via groupBy forcé à 'none')", async () => {
+      mockPrismaService.$queryRawUnsafe
+        .mockResolvedValueOnce([{ category_id: 'g1', category: 'Action', value: 100n }])
+        .mockResolvedValueOnce([{ category_id: null, category: 'Total', value: 451n }]);
+
+      const result = await service.query(userId, { ...base, groupBy: 'genre' } as any);
+
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledTimes(2);
+      expect(result.rows).toEqual([{ category_id: 'g1', category: 'Action', value: 100 }]);
+      expect(result.total).toBe(451);
+      // La 2ème requête (total) ne doit pas joindre title_genres — groupBy forcé à 'none'.
+      const totalSql = mockPrismaService.$queryRawUnsafe.mock.calls[1][0] as string;
+      expect(totalSql).not.toContain('title_genres');
+    });
+
+    it("convertit les 'value' NUMERIC renvoyées en chaîne par pg (AVG/ROUND/note_imdb) en Number", async () => {
+      // AVG()/ROUND() et les colonnes DECIMAL (note_imdb) reviennent en
+      // NUMERIC PostgreSQL, que le driver pg renvoie en chaîne par défaut
+      // (pas en Number, contrairement au bigint déjà géré par queryRaw) —
+      // sans conversion, le frontend plante sur value.toFixed(...).
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { category_id: null, category: 'Total', value: '6.45' },
+      ]);
+
+      const result = await service.query(userId, { metric: 'note', aggregation: 'avg', groupBy: 'none' } as any);
+
+      expect(result.rows).toEqual([{ category_id: null, category: 'Total', value: 6.45 }]);
+      expect(typeof result.rows[0].value).toBe('number');
+    });
+
+    it("préserve 'value' = null (évolution sans période précédente) sans le coercer en 0", async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([{ category_id: null, category: 'Total', value: null }]);
+
+      const result = await service.query(userId, { metric: 'duration', aggregation: 'evolution', groupBy: 'none' } as any);
+
+      expect(result.rows).toEqual([{ category_id: null, category: 'Total', value: null }]);
+    });
+
+    describe('legendBy ("Légende", 2ème axe de répartition)', () => {
+      it('groupBy=genre + legendBy=mediaType : jointure genre + colonnes series_id/series alignées sur t.type', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'genre', legendBy: 'mediaType' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain('JOIN title_genres tg ON tg.title_id = t.id');
+        expect(sql).toContain("(CASE WHEN t.type = 'film' THEN 'Film' ELSE 'Série' END) AS series");
+        expect(sql).toContain('GROUP BY g.id, g.nom, t.type');
+      });
+
+      it('groupBy=genre + legendBy=genre (même groupement des deux côtés) : alias distincts, sans collision', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'genre', legendBy: 'genre' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain('JOIN title_genres tg ON tg.title_id = t.id JOIN genres g ON g.id = tg.genre_id');
+        expect(sql).toContain('JOIN title_genres tg2 ON tg2.title_id = t.id JOIN genres g2 ON g2.id = tg2.genre_id');
+        expect(sql).toContain('g2.id::TEXT AS series_id, g2.nom AS series');
+      });
+
+      it('legendBy=none (ou absent) : aucune colonne series ajoutée', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'genre', legendBy: 'none' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).not.toContain('AS series');
+      });
+
+      it('groupBy=studio + legendBy=country : légende jointe à l\'intérieur de la CTE watch_studio, repli "Autre" toujours basé sur le studio seul', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'studio', legendBy: 'country' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain('JOIN title_countries tc2 ON tc2.title_id = t.id JOIN countries c2 ON c2.id = tc2.country_id');
+        expect(sql).toContain('c2.id::TEXT AS series_id, c2.nom AS series');
+        expect(sql).toContain('nb_titres <= 1');
+        expect(sql).toContain('GROUP BY category_id, category, ws.series_id, ws.series');
+      });
+
+      it("ignoré pour evolution/note+avg/watches+titres restreint (n'ajoute aucune colonne series)", async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { metric: 'duration', aggregation: 'evolution', groupBy: 'genre', legendBy: 'country' } as any);
+        let sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).not.toContain('AS series');
+
+        jest.clearAllMocks();
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+        await service.query(userId, { metric: 'note', aggregation: 'avg', groupBy: 'genre', legendBy: 'country' } as any);
+        sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).not.toContain('AS series');
+
+        jest.clearAllMocks();
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+        await service.query(userId, { metric: 'watches', aggregation: 'avg', groupBy: 'none', legendBy: 'country' } as any);
+        sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).not.toContain('AS series');
+      });
+    });
+
+    it('groupBy=genre : jointure title_genres/genres', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { ...base, groupBy: 'genre' } as any);
+
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining('JOIN title_genres tg ON tg.title_id = t.id'),
+      );
+    });
+
+    it('groupBy=country : jointure title_countries/countries', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { ...base, groupBy: 'country' } as any);
+
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining('JOIN title_countries tc ON tc.title_id = t.id'),
+      );
+    });
+
+    it('groupBy=period : date_trunc sur la granularité demandée (défaut month)', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { ...base, groupBy: 'period' } as any);
+
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining("date_trunc('month', uw.date_vue)"),
+      );
+    });
+
+    it('groupBy=mediaType : catégories Film/Série, group par t.type', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { ...base, groupBy: 'mediaType' } as any);
+
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining("CASE WHEN t.type = 'film' THEN 'Film' ELSE 'Série' END"),
+      );
+    });
+
+    it("groupBy=studio : repli 'Autre' pour les studios à un seul titre distinct", async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { category_id: null, category: 'Autre', value: 50n },
+        { category_id: 'studio-uuid', category: 'Big Studio', value: 200n },
+      ]);
+
+      const result = await service.query(userId, { ...base, groupBy: 'studio' } as any);
+
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('nb_titres <= 1'));
+      expect(result.rows).toEqual([
+        { category_id: null, category: 'Autre', value: 50 },
+        { category_id: 'studio-uuid', category: 'Big Studio', value: 200 },
+      ]);
+    });
+
+    it('metric=duration : sum/min/max/avg sur la durée', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { ...base, aggregation: 'min' } as any);
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining('MIN(COALESCE(e.duree_minutes, t.duree_minutes, 0))'),
+      );
+
+      await service.query(userId, { ...base, aggregation: 'avg' } as any);
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining('AVG(COALESCE(e.duree_minutes, t.duree_minutes, 0))'),
+      );
+    });
+
+    it('metric=watches : count = COUNT(*), distinctCount = COUNT(DISTINCT t.id)', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { metric: 'watches', aggregation: 'count', groupBy: 'none' } as any);
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('COUNT(*) AS value'));
+
+      await service.query(userId, { metric: 'watches', aggregation: 'distinctCount', groupBy: 'none' } as any);
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining('COUNT(DISTINCT t.id) AS value'),
+      );
+    });
+
+    it('metric=titles : count et distinctCount identiques (COUNT(DISTINCT t.id))', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { metric: 'titles', aggregation: 'count', groupBy: 'none' } as any);
+      const countSql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+
+      jest.clearAllMocks();
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+      await service.query(userId, { metric: 'titles', aggregation: 'distinctCount', groupBy: 'none' } as any);
+      const distinctCountSql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+
+      expect(countSql).toContain('COUNT(DISTINCT t.id) AS value');
+      expect(distinctCountSql).toContain('COUNT(DISTINCT t.id) AS value');
+    });
+
+    it('metric=note : count/min/max directement sur t.note_imdb', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { metric: 'note', aggregation: 'max', groupBy: 'none' } as any);
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining('MAX(t.note_imdb) AS value'),
+      );
+    });
+
+    it('metric=note, aggregation=avg : dédoublonné par titre avant la moyenne', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { metric: 'note', aggregation: 'avg', groupBy: 'none' } as any);
+
+      const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+      expect(sql).toContain('SELECT DISTINCT');
+      expect(sql).toContain('AVG(note_imdb) AS value');
+    });
+
+    it('watches/titles + min/max/avg : groupement ignoré, bucketé par période puis agrégé (ex Stats perso)', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([{ value: 12n }]);
+
+      const result = await service.query(userId, {
+        metric: 'watches',
+        aggregation: 'avg',
+        groupBy: 'genre',
+      } as any);
+
+      const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+      expect(sql).not.toContain('title_genres');
+      expect(sql).toContain('WITH buckets AS');
+      expect(sql).toContain('AVG(cnt) AS value');
+      // groupBy est ignoré par ce chemin (bucketé par période, pas par catégorie) : le
+      // "total" (recalculé avec groupBy forcé à 'none') retombe donc sur la même valeur.
+      expect(result.total).toBe(12);
+      expect(result.rows).toEqual([{ category_id: null, category: 'Total', value: 12 }]);
+    });
+
+    it('watches/titles + evolution : compare les 2 derniers buckets de période, % arrondi', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([{ value: 19.4 }]);
+
+      const result = await service.query(userId, {
+        metric: 'titles',
+        aggregation: 'evolution',
+        groupBy: 'none',
+      } as any);
+
+      const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+      expect(sql).toContain('ROW_NUMBER() OVER (ORDER BY bucket DESC)');
+      expect(result.rows).toEqual([{ category_id: null, category: 'Total', value: 19.4 }]);
+    });
+
+    it('duration/note + evolution : évolution par catégorie via fenêtrage (PARTITION BY)', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { category_id: 'g1', category: 'Action', value: 12.5 },
+      ]);
+
+      const result = await service.query(userId, {
+        metric: 'duration',
+        aggregation: 'evolution',
+        groupBy: 'genre',
+      } as any);
+
+      const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+      expect(sql).toContain('PARTITION BY category_id, category ORDER BY bucket DESC');
+      expect(sql).toContain('JOIN title_genres tg ON tg.title_id = t.id');
+      expect(result.rows).toEqual([{ category_id: 'g1', category: 'Action', value: 12.5 }]);
+    });
+
+    it('filtre mediaType (distinct du groupement) : AND t.type = \'film\'', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { ...base, mediaType: 'film' } as any);
+
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining("AND t.type = 'film'"),
+      );
+    });
+
+    it('filtre "Année de visionnage" (watchedYearMin/Max)', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { ...base, watchedYearMin: 2023, watchedYearMax: 2025 } as any);
+
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining('AND EXTRACT(YEAR FROM uw.date_vue) BETWEEN 2023 AND 2025'),
+      );
+    });
+
+    it('filtre studioIds (nouveau, distinct du groupement studio) : EXISTS sur title_studios', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, { ...base, studioIds: ['studio-1'] } as any);
+
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "EXISTS (SELECT 1 FROM title_studios tsf WHERE tsf.title_id = t.id AND tsf.studio_id IN ('studio-1'::UUID))",
+        ),
+      );
+    });
+
+    it('filtres genre/pays/listes/année de sortie/note IMDB (hérités de DatavizFilterQueryDto)', async () => {
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+      await service.query(userId, {
+        ...base,
+        genreIds: ['genre-1'],
+        countryIds: ['country-1'],
+        listIds: ['list-1'],
+        releaseYearMin: 2000,
+        noteImdbMax: 9,
+      } as any);
+
+      const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+      expect(sql).toContain("EXISTS (SELECT 1 FROM title_genres tgf WHERE tgf.title_id = t.id AND tgf.genre_id IN ('genre-1'::UUID))");
+      expect(sql).toContain("EXISTS (SELECT 1 FROM title_countries tcf WHERE tcf.title_id = t.id AND tcf.country_id IN ('country-1'::UUID))");
+      expect(sql).toContain("EXISTS (SELECT 1 FROM list_items lif WHERE lif.title_id = t.id AND lif.list_id IN ('list-1'::UUID))");
+      expect(sql).toContain('EXTRACT(YEAR FROM t.date_sortie) >= 2000');
+      expect(sql).toContain('t.note_imdb <= 9');
+    });
+  });
 });

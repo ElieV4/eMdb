@@ -1,8 +1,10 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 @Catch()
 export class PrismaExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(PrismaExceptionFilter.name);
+
   catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
@@ -43,6 +45,13 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       });
       return;
     }
+
+    // Toute exception non reconnue ci-dessus finissait en 500 générique sans
+    // aucune trace serveur — impossible à diagnostiquer depuis les logs.
+    this.logger.error(
+      `Erreur non gérée sur ${request.method} ${request.url} : ${exception?.message ?? exception}`,
+      exception?.stack,
+    );
 
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,

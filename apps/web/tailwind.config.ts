@@ -36,6 +36,14 @@ const config: Config = {
           DEFAULT: designTokens.colors.danger.DEFAULT,
           foreground: "#ffffff",
         },
+        card: {
+          DEFAULT: designTokens.colors.surface.DEFAULT,
+          foreground: designTokens.colors.text.primary.DEFAULT,
+        },
+        popover: {
+          DEFAULT: designTokens.colors.surface.DEFAULT,
+          foreground: designTokens.colors.text.primary.DEFAULT,
+        },
         border: designTokens.colors.border.DEFAULT,
         ring: designTokens.colors.border.focus,
       },
