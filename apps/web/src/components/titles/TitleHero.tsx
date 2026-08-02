@@ -4,8 +4,9 @@
  */
 
 import Image from "next/image";
+import Link from "next/link";
 import { Star } from "lucide-react";
-import { TitleDetail } from "@/lib/types/api";
+import { CreditGrouped, TitleDetail } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 import { TitlePoster } from "./TitlePoster";
 
@@ -13,10 +14,12 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
 interface TitleHeroProps {
   title: TitleDetail;
+  /** Optionnel : sert à afficher "Réalisé par" (bug #36) sans bloquer le rendu du hero si absent/en cours de chargement. */
+  credits?: CreditGrouped;
   className?: string;
 }
 
-export function TitleHero({ title, className }: TitleHeroProps) {
+export function TitleHero({ title, credits, className }: TitleHeroProps) {
   const {
     titre_vo,
     titre_vf,
@@ -26,7 +29,13 @@ export function TitleHero({ title, className }: TitleHeroProps) {
     affiche_url,
     backdrop_url,
     statut,
+    tmdb_id,
   } = title;
+
+  const directors = credits?.["Réalisateur"] ?? [];
+  const tmdbUrl = tmdb_id
+    ? `https://www.themoviedb.org/${type === "film" ? "movie" : "tv"}/${tmdb_id}`
+    : null;
 
   const year = date_sortie ? new Date(date_sortie).getFullYear() : null;
   const displayTitle = titre_vf && titre_vf !== titre_vo ? titre_vo : titre_vo;
@@ -101,10 +110,38 @@ export function TitleHero({ title, className }: TitleHeroProps) {
             </span>
           </div>
 
+          {directors.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Réalisé par{" "}
+              {directors.map((director, index) => (
+                <span key={director.id}>
+                  {index > 0 && ", "}
+                  <Link
+                    href={`/people/${director.personne.id}`}
+                    className="text-foreground hover:underline"
+                  >
+                    {director.personne.nom}
+                  </Link>
+                </span>
+              ))}
+            </p>
+          )}
+
           {title.synopsis && (
             <p className="text-sm text-muted-foreground line-clamp-3">
               {title.synopsis}
             </p>
+          )}
+
+          {tmdbUrl && (
+            <a
+              href={tmdbUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-sm text-primary hover:underline"
+            >
+              Voir sur TMDB
+            </a>
           )}
         </div>
       </div>

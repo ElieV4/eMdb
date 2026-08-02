@@ -17,7 +17,10 @@ interface PersonHeroProps {
 }
 
 export function PersonHero({ person, className }: PersonHeroProps) {
-  const { nom, photo_url, bio, genre, date_naissance, countries } = person;
+  const { nom, photo_url, bio, genre, date_naissance, countries, tmdb_id } =
+    person;
+
+  const tmdbUrl = tmdb_id ? `https://www.themoviedb.org/person/${tmdb_id}` : null;
 
   const imageSrc = photo_url
     ? `${TMDB_IMAGE_BASE_URL}/w500${photo_url}`
@@ -83,16 +86,29 @@ export function PersonHero({ person, className }: PersonHeroProps) {
           <p className="text-sm text-muted-foreground line-clamp-4">{bio}</p>
         )}
 
-        {person.wiki_url && (
-          <a
-            href={person.wiki_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline"
-          >
-            Voir la page Wikipedia
-          </a>
-        )}
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          {person.wiki_url && (
+            <a
+              href={person.wiki_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline"
+            >
+              Voir la page Wikipedia
+            </a>
+          )}
+
+          {tmdbUrl && (
+            <a
+              href={tmdbUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline"
+            >
+              Voir sur TMDB
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -65,7 +65,7 @@ export default function TitleDetailPage({
     <div className="container mx-auto max-w-5xl px-4 py-8">
       <div className="space-y-10">
         {/* Hero */}
-        <TitleHero title={title} />
+        <TitleHero title={title} credits={credits} />
 
         {/* Actions utilisateur */}
         <TitleActions titleId={id} type={title.type} releaseDate={title.date_sortie} />

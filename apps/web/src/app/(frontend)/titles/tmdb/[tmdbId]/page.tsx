@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,6 +16,10 @@ export default function TmdbTitleImportPage({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  // Le double-appel React StrictMode (dev) relançait sinon l'import en
+  // parallèle deux fois — inoffensif mais double le nombre d'appels TMDB
+  // pendant l'import (déjà coûteux pour un titre au casting nombreux, bug #35).
+  const startedFor = useRef<string | null>(null);
 
   const tmdbId = params.tmdbId;
   const type = searchParams.type || "film";
@@ -27,6 +31,9 @@ export default function TmdbTitleImportPage({
         // le timeout par défaut de 10s d'apiFetch abortait la requête avant la
         // fin ("signal is aborted"), cause probable du bug #35. Même fix que
         // useRefreshFilmography (bug #27) et useGetOrImportTitle (modification M).
+        // Le vrai correctif du bug #35 est côté backend (importPersonByTmdbId
+        // ne re-fetchait jamais les personnes déjà connues localement) ; ce
+        // timeout élevé reste une marge de sécurité pour les cas encore lents.
         const data = await apiFetch<{ id: string }>(
           `/titles/tmdb/${encodeURIComponent(tmdbId)}?type=${encodeURIComponent(type)}`,
           { timeoutMs: 120_000 },
@@ -48,7 +55,8 @@ export default function TmdbTitleImportPage({
       }
     };
 
-    if (tmdbId) {
+    if (tmdbId && startedFor.current !== tmdbId) {
+      startedFor.current = tmdbId;
       importTitle();
     }
   }, [tmdbId, type, router]);

@@ -108,8 +108,21 @@ async function createSyncLog(params: {
 }
 
 export async function importPersonByTmdbId(tmdbId: number) {
-  const tmdbPerson = await getPersonDetails(tmdbId);
-  const externalIds = await getPersonExternalIds(tmdbId);
+  // Court-circuit si la personne existe déjà localement — sans ça, importer
+  // un titre au casting/équipe nombreux (parfois 100+ credits) déclenchait
+  // 2 appels TMDB (+ Wikidata) PAR personne, même pour des personnes déjà
+  // connues, ce qui pouvait dépasser n'importe quel timeout client (bug
+  // #35 : "The operation was aborted" sur les recommandations non-locales).
+  // `refreshPersonData` reste le chemin dédié pour forcer un vrai refresh.
+  const existing = await prisma.people.findUnique({ where: { tmdb_id: tmdbId } });
+  if (existing) {
+    return existing;
+  }
+
+  const [tmdbPerson, externalIds] = await Promise.all([
+    getPersonDetails(tmdbId),
+    getPersonExternalIds(tmdbId),
+  ]);
   const { wikidata_id } = mapTmdbPersonExternalIds(externalIds);
   const wikiUrl = wikidata_id ? await getWikipediaUrlFromWikidataId(wikidata_id) : null;
 
@@ -301,28 +314,36 @@ export async function importTitleByTmdbId(
     if (withCredits && tmdbData.credits) {
       console.log('[importTitleByTmdbId] credits', tmdbId, tmdbData.credits?.cast?.length, tmdbData.credits?.crew?.length);
       const creditInserts = mapTmdbCredits(tmdbData.credits, title.id, null);
-      for (const credit of creditInserts) {
-        const person = await importPersonByTmdbId(credit.tmdb_person_id);
-        const roleId = await ensureRoleId(credit.role, credit.role_libelle);
-        try {
-          await prisma.credits.create({
-            data: {
-              title_id: title.id,
-              person_id: person.id,
-              episode_id: null,
-              role_id: roleId,
-              personnage: credit.personnage,
-              ordre: credit.ordre,
-              source: 'tmdb',
-            },
-          });
-        } catch (error: any) {
-          if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
-            continue;
+      // En parallèle plutôt qu'un `for` séquentiel — un titre à l'équipe
+      // nombreuse (100+ credits) pouvait sinon dépasser n'importe quel
+      // timeout client rien qu'en attendant chaque personne l'une après
+      // l'autre (bug #35). Le `RateLimiter` de tmdb-client sérialise déjà
+      // les vrais appels réseau à leur cadence configurée, donc paralléliser
+      // ici ne fait que mieux utiliser ce quota au lieu de le sous-exploiter.
+      await Promise.all(
+        creditInserts.map(async (credit) => {
+          const person = await importPersonByTmdbId(credit.tmdb_person_id);
+          const roleId = await ensureRoleId(credit.role, credit.role_libelle);
+          try {
+            await prisma.credits.create({
+              data: {
+                title_id: title.id,
+                person_id: person.id,
+                episode_id: null,
+                role_id: roleId,
+                personnage: credit.personnage,
+                ordre: credit.ordre,
+                source: 'tmdb',
+              },
+            });
+          } catch (error: any) {
+            if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
+              return;
+            }
+            throw error;
           }
-          throw error;
-        }
-      }
+        }),
+      );
     }
 
     if (type === 'serie') {

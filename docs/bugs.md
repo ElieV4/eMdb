@@ -632,6 +632,29 @@
 - **Fichiers modifiés/créés :** `apps/worker/src/trakt-import.worker.ts`, `apps/worker/src/index.ts`, `apps/api/src/import/{import.config,import.service,import.controller,import.module}.ts`, `apps/api/src/app.module.ts`, `apps/web/src/hooks/api/useImportTrakt.ts` (+ `index.ts`), `apps/web/src/components/profile/TraktImportButton.tsx`, `apps/web/src/app/(frontend)/profile/page.tsx`, `apps/web/src/lib/api/apiClient.ts` (export de `API_BASE_URL`), `apps/api/package.json` (`adm-zip`).
 - **Vérification :** `tsc --noEmit` (api + web + worker*) sans nouvelle erreur (*`apps/worker` a une limitation `rootDir` préexistante et non liée qui empêche `tsc --noEmit` direct sur cet app — vérifié via `jest` à la place, comme pour le reste de ce module). `jest` api 206/210, web 200/209, worker 7/7 — baselines inchangées. Vérifié en direct dans le navigateur : bouton présent en bas de Profil, popup avec barre de progression fonctionnelle (testé avec un mini export Trakt synthétique puis avec l'export réel complet de l'utilisateur via `POST /import/trakt` — résultats identiques au script original, voir bug #57).
 
+### 35. URL `?type=film` ou `?type=serie` dans les recommandations cause "The operation was aborted" — ✅ corrigé
+- **Symptôme :** En cliquant sur un titre recommandé non local (`/titles/tmdb/:tmdbId?type=...`), la page reste bloquée sur son spinner puis affiche "The operation was aborted" (timeout `AbortController` côté client), alors que côté serveur l'import finit par réussir bien plus tard, orphelin.
+- **Cause racine réelle :** un timeout client de 120s avait déjà été posé (`useGetOrImportTitle`, `TmdbTitleImportPage`) sans jamais corriger le vrai problème — reproduit en direct : `importPersonByTmdbId()` (`packages/tmdb-sync/src/index.ts:110`) **re-fetchait TMDB (`getPersonDetails` + `getPersonExternalIds` + Wikidata) pour CHAQUE credit d'un titre, même pour des personnes déjà connues en base**, contrairement à tous les autres chemins d'import du projet (titres, personnes via `people.service.ts`) qui vérifient l'existence locale avant d'appeler TMDB. Un titre au casting/équipe nombreux (observé : 280 credits, 147 credits) déclenchait donc jusqu'à 2 appels TMDB par personne × des centaines de personnes, sérialisés un par un dans une boucle `for`, largement au-delà de n'importe quel timeout côté client. Bug annexe trouvé en même temps : React StrictMode (dev) invoquait deux fois l'effet d'import de `TmdbTitleImportPage`, doublant inutilement la charge TMDB.
+- **Correction :**
+  - `importPersonByTmdbId()` vérifie désormais l'existence locale (`prisma.people.findUnique({ where: { tmdb_id } })`) avant tout appel TMDB, et retourne directement la personne si déjà connue — `refreshPersonData()` reste le chemin dédié pour forcer un vrai refresh.
+  - La boucle de credits de `importTitleByTmdbId()` (et les deux appels `getPersonDetails`/`getPersonExternalIds` internes à `importPersonByTmdbId`) sont passés de séquentiel (`for` + `await`) à parallèle (`Promise.all`) — le `RateLimiter` de `tmdb-client` sérialise déjà les vrais appels réseau à leur cadence configurée (40 req/10s), donc paralléliser ne fait que mieux utiliser ce quota au lieu de le sous-exploiter avec des `await` inutilement bloquants entre personnes indépendantes.
+  - `TmdbTitleImportPage` garde désormais un `useRef` du `tmdbId` déjà lancé pour ignorer un second déclenchement StrictMode.
+- **Fichiers modifiés :** `packages/tmdb-sync/src/index.ts` (`importPersonByTmdbId`, boucle credits de `importTitleByTmdbId`), `apps/web/src/app/(frontend)/titles/tmdb/[tmdbId]/page.tsx`.
+- **Vérification :** `tsc --noEmit` (web + api + tmdb-sync) sans nouvelle erreur. `jest` tmdb-sync 18/18, api 206/210, web 200/209 — baselines inchangées. Vérifié en direct dans le navigateur avec 3 titres recommandés non-locaux jamais importés : un titre à 280 puis 147 credits (avant redémarrage du serveur avec le correctif) confirmait le blocage ; après redémarrage, un titre à 72 credits (100% nouvelles personnes) s'est importé et a redirigé vers sa page locale en ~16s (aucun credit déjà en cache ne pouvait bénéficier du court-circuit — uniquement de la parallélisation), sans doublon de logs `[importTitleByTmdbId] start` (confirmant le fix StrictMode).
+
+### 36. Page titre : pas de lien direct vers la fiche du réalisateur — ✅ corrigé
+- **Symptôme :** Sur la page titre, impossible de savoir rapidement qui a réalisé le film/la série sans parcourir toute la liste "Distribution & Équipe".
+- **Cause racine :** `TitleHero.tsx` n'affichait que titre/année/note/statut/synopsis, aucune référence au réalisateur — alors que `GET /titles/:id/credits` (`credits.service.ts`) groupe déjà les credits par libellé de rôle français, `"Réalisateur"` inclus ; il suffisait de le lire côté frontend, aucun changement backend nécessaire.
+- **Correction :** `TitleHero` accepte désormais un prop `credits` optionnel (passé depuis `titles/[id]/page.tsx`, déjà chargé via `useTitleCredits`) et affiche "Réalisé par [nom]" (lien vers `/people/:id`, plusieurs réalisateurs séparés par virgule) quand `credits["Réalisateur"]` est non vide.
+- **Fichiers modifiés :** `apps/web/src/components/titles/TitleHero.tsx`, `apps/web/src/app/(frontend)/titles/[id]/page.tsx`.
+- **Vérification :** `tsc --noEmit` (web) sans nouvelle erreur. Vérifié en direct dans le navigateur sur plusieurs titres (ex. "A Minecraft Movie" → "Réalisé par Jared Hess", "The Legend of Ochi" → "Réalisé par Isaiah Saxon"), lien vers la page personne confirmé fonctionnel.
+
+### 37. Page titre / people : pas de lien vers la fiche TMDB — ✅ corrigé
+- **Symptôme :** Aucun lien externe vers la fiche TMDB (themoviedb.org) sur les pages titre et personne, alors que `tmdb_id` est disponible et déjà utilisé pour construire les URLs d'images.
+- **Correction :** Lien "Voir sur TMDB" ajouté dans `TitleHero` (`https://www.themoviedb.org/movie|tv/:tmdb_id` selon `type`) et dans `PersonHero` (`https://www.themoviedb.org/person/:tmdb_id`, à côté du lien Wikipedia existant) — masqué si `tmdb_id` est absent.
+- **Fichiers modifiés :** `apps/web/src/components/titles/TitleHero.tsx`, `apps/web/src/components/people/PersonHero.tsx`.
+- **Vérification :** `tsc --noEmit` (web) sans nouvelle erreur. Vérifié en direct dans le navigateur sur page titre et page personne, lien "Voir sur TMDB" présent et pointant vers la bonne URL dans les deux cas.
+
 ### 26. Page épisode : actions utilisateur manquantes (marquer vu, historique, rating)
 - **Symptôme :** La page de détail d'un épisode (`/episodes/:id`) n'affichait pas les boutons "Marquer comme vu", "Historique de visionnage" et "Rating".
 - **Cause racine :** La page `apps/web/src/app/episodes/[id]/page.tsx` ne contenait que le header et les crédits, sans section d'actions utilisateur.
@@ -943,37 +966,7 @@
 
 ---
 
-## Bugs à corriger — Header & Navigation
-
-### 35. URL `?type=film` ou `?type=serie` dans les recommandations cause "The operation was aborted"
-- **Symptôme :** Quand on clique sur un film dans "Titres recommandés", l'URL contient `?type=film` ou `?type=serie` et la page affiche "The operation was aborted". La page charge normalement si on retire le suffixe de l'URL.
-- **Cause racine :** Le paramètre `type` dans l'URL n'est pas géré correctement par la page de détail du titre. La page `/titles/[id]` ne sait pas traiter `?type=film` et cela cause une erreur de requête.
-- **Fichiers concernés :** `apps/web/src/app/(frontend)/titles/[id]/page.tsx`, `apps/web/src/lib/types/api.ts`
-- **Correction proposée :**
-  - Nettoyer le paramètre `type` de l'URL avant de faire les appels API
-  - Ou gérer le paramètre `type` dans la page de détail pour déterminer le type de contenu
-  - Vérifier la fonction `titleRecommendationToSearchResult()` qui génère ces URLs
-- **Reconfirmé par l'utilisateur** (toujours non corrigé à ce jour) — cliquer sur un titre recommandé produit toujours "The operation was aborted" via le suffixe `?type=`.
-
----
-
 ## Bugs à corriger — Page Titre
-
-### 36. Page titre : pas de lien direct vers la fiche du réalisateur
-- **Symptôme :** Sur la page titre, impossible de savoir rapidement qui a réalisé le film/la série sans parcourir toute la liste "Distribution & Équipe".
-- **Cause racine :** `TitleHero.tsx` n'affiche que titre/année/note/statut/synopsis, aucune référence au réalisateur. Le nom du réalisateur n'apparaît que noyé dans la liste de credits — qui elle-même ne sépare pas correctement distribution et équipe technique (cf. modification C : `CREW_ROLES` compare des jobs anglais à des libellés de rôle en français, la comparaison ne matche jamais).
-- **Fichiers concernés :** `apps/web/src/components/titles/TitleHero.tsx`, `apps/web/src/app/(frontend)/titles/[id]/page.tsx`, `apps/api/src/titles/titles.service.ts` (ou `credits.service.ts`) pour exposer le réalisateur séparément
-- **Correction proposée :**
-  - Exposer le(s) réalisateur(s) séparément dans la réponse `GET /titles/:id` (ou via un appel dédié)
-  - Afficher "Réalisé par [nom]" dans `TitleHero`, en lien cliquable vers `/people/:id`
-
-### 37. Page titre / people : pas de lien vers la fiche TMDB
-- **Symptôme :** Aucun lien externe vers la fiche TMDB (themoviedb.org) sur les pages titre et personne, alors que `tmdb_id` est disponible et déjà utilisé pour construire les URLs d'images.
-- **Cause racine :** `TitleHero.tsx` et `PersonHero.tsx` n'exploitent `tmdb_id`/`TMDB_IMAGE_BASE_URL` que pour les images, jamais pour un lien externe vers la fiche TMDB elle-même.
-- **Fichiers concernés :** `apps/web/src/components/titles/TitleHero.tsx`, `apps/web/src/components/people/PersonHero.tsx`
-- **Correction proposée :**
-  - Ajouter un lien "Voir sur TMDB" vers `https://www.themoviedb.org/movie/:tmdb_id` (ou `/tv/:tmdb_id` selon le type) sur la page titre, et `https://www.themoviedb.org/person/:tmdb_id` sur la page personne
-  - N'afficher le lien que si `tmdb_id` est défini (titres/personnes sans tmdb_id restent supportés)
 
 ### 38. Distribution & Équipe : casting incomplet quand le titre arrive via "titres recommandés"
 - **Symptôme :** En cliquant sur un titre recommandé non local (URL `/titles/tmdb/:tmdbId`), la page titre peut afficher un casting très incomplet — parfois seulement une ou deux personnes déjà présentes en base, jamais la distribution complète.
