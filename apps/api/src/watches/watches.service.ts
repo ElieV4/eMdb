@@ -531,13 +531,36 @@ export class WatchesService {
 
     const titleIds = followedSeries.map((follow) => follow.title_id);
 
+    // Exclure les séries de la watchlist marquées "à jour" ou "abandonnée"
+    // (elles ne doivent plus apparaître dans "Continuer à regarder").
+    const watchlist = await this.prisma.user_lists.findFirst({
+      where: { user_id: userId, type: 'watchlist' },
+      select: { id: true },
+    });
+    let excludedTitleIds = new Set<string>();
+    if (watchlist) {
+      const excludedItems = await this.prisma.list_items.findMany({
+        where: {
+          list_id: watchlist.id,
+          title_id: { in: titleIds },
+          statut: { in: ['a_jour', 'abandonnee'] },
+        },
+        select: { title_id: true },
+      });
+      excludedTitleIds = new Set(excludedItems.map((item) => item.title_id));
+    }
+    const activeTitleIds = titleIds.filter((id) => !excludedTitleIds.has(id));
+    if (activeTitleIds.length === 0) {
+      return [];
+    }
+
     // Triés par saison puis numéro : le premier épisode non vu rencontré
     // pour une série donnée, dans cet ordre, est son prochain épisode à
     // voir (ordre de visionnage naturel, pas l'ordre de sortie — un
     // épisode spécial "saison 0" antérieur à la sortie ne doit pas
     // perturber la progression narrative).
     const episodes = await this.prisma.episodes.findMany({
-      where: { seasons: { title_id: { in: titleIds } } },
+      where: { seasons: { title_id: { in: activeTitleIds } } },
       select: {
         id: true,
         numero: true,

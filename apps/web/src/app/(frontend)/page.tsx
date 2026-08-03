@@ -118,7 +118,7 @@ export default function HomePage() {
   // le détail de la liste watchlist pour avoir ses items complets.
   const { data: watchlistDetail } = useList(watchlistId ?? "");
   const { data: watchedTitles } = useWatchedTitles();
-  const { watchlistIds, favoriteIds } = useListMembership();
+  const { watchlistIds, favoriteIds, watchlistStatuses } = useListMembership();
 
   const listIdsByTitle = buildListIdsByTitle(userLists);
   const watchlistItems = (watchlistDetail?.items ?? []).filter((item) =>
@@ -256,6 +256,7 @@ export default function HomePage() {
                       entry={entry}
                       inWatchlist={watchlistIds.has(entry.title_id)}
                       inFavorites={favoriteIds.has(entry.title_id)}
+                      watchlistStatus={watchlistStatuses.get(entry.title_id)}
                     />
                   ))}
                 </CardSlider>

@@ -141,6 +141,8 @@ export type ListItemFilterMeta = {
   note: number | null;
   genreIds: string[];
   countryIds: string[];
+  /** Statut de progression dans la watchlist : "en_cours" (défaut), "a_jour", "abandonnee". */
+  statut?: "en_cours" | "a_jour" | "abandonnee";
 };
 
 export type UserList = {
@@ -285,7 +287,14 @@ export type ListDetail = {
   type: "watchlist" | "favoris" | "custom";
   description: string | null;
   created_at: string;
-  items: Array<Title & { addedAt: string; position: number | null }>;
+  items: Array<
+    Title & {
+      addedAt: string;
+      position: number | null;
+      /** Statut de progression dans la watchlist : "en_cours" (défaut), "a_jour", "abandonnee". */
+      statut?: "en_cours" | "a_jour" | "abandonnee";
+    }
+  >;
   // GET /lists/:id ne renvoie pas encore les partages — non implémenté côté backend.
   shares?: Array<{
     shared_with_user_id: string;

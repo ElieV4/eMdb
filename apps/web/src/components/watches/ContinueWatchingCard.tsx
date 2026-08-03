@@ -25,6 +25,8 @@ type ContinueWatchingCardProps = {
   entry: ContinueWatchingEntry;
   inWatchlist?: boolean;
   inFavorites?: boolean;
+  /** Statut de progression dans la watchlist ("en_cours" / "a_jour" / "abandonnee"). */
+  watchlistStatus?: "en_cours" | "a_jour" | "abandonnee";
   className?: string;
 };
 
@@ -32,6 +34,7 @@ export function ContinueWatchingCard({
   entry,
   inWatchlist = false,
   inFavorites = false,
+  watchlistStatus,
   className,
 }: ContinueWatchingCardProps) {
   const title = entry.titre_vf || entry.titre_vo;
@@ -89,6 +92,7 @@ export function ContinueWatchingCard({
         inWatchlist={inWatchlist}
         inFavorites={inFavorites}
         watched={false}
+        watchlistStatus={watchlistStatus}
         className="absolute top-1.5 right-1.5 z-30"
       />
 

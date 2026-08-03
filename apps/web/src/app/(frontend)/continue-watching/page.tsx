@@ -21,7 +21,7 @@ import { AlertCircle } from "lucide-react";
 export default function ContinueWatchingPage() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const { data: entries, isLoading, error } = useContinueWatching(isAuthenticated);
-  const { watchlistIds, favoriteIds } = useListMembership();
+  const { watchlistIds, favoriteIds, watchlistStatuses } = useListMembership();
 
   if (isAuthLoading) {
     return (
@@ -80,6 +80,7 @@ export default function ContinueWatchingPage() {
                 entry={entry}
                 inWatchlist={watchlistIds.has(entry.title_id)}
                 inFavorites={favoriteIds.has(entry.title_id)}
+                watchlistStatus={watchlistStatuses.get(entry.title_id)}
               />
             ))}
           </div>

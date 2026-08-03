@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
+import { UpdateItemStatusDto } from './dto/update-item-status.dto';
 import { ReorderDto } from './dto/reorder.dto';
 import { ShareListDto } from './dto/share-list.dto';
 
@@ -168,6 +169,7 @@ export class ListsService {
         },
         list_items: {
           select: {
+            statut: true,
             titles: {
               select: {
                 id: true,
@@ -193,6 +195,7 @@ export class ListsService {
         note: item.titles.note_imdb ? Number(item.titles.note_imdb) : null,
         genreIds: item.titles.title_genres.map((g) => g.genre_id),
         countryIds: item.titles.title_countries.map((c) => c.country_id),
+        statut: (item as any).statut,
       })),
     }));
   }
@@ -286,6 +289,7 @@ export class ListsService {
         pays: item.titles.title_countries.map((tc) => tc.countries),
         addedAt: item.added_at,
         position: item.position,
+        statut: (item as any).statut,
       })),
     };
   }
@@ -452,6 +456,40 @@ export class ListsService {
       where: {
         list_id_title_id: { list_id: listId, title_id: titleId },
       },
+    });
+  }
+
+  /**
+   * PATCH /lists/:listId/items/:titleId/statut
+   * Met à jour le statut de progression d'un item de la watchlist
+   * ("en_cours" / "a_jour" / "abandonnee").
+   * Accessible au propriétaire ou à un utilisateur avec permission 'edition'.
+   *
+   * @param listId - UUID de la liste
+   * @param userId - UUID de l'utilisateur connecté
+   * @param titleId - UUID du titre
+   * @param dto - Nouveau statut
+   */
+  async updateItemStatus(listId: string, userId: string, titleId: string, dto: UpdateItemStatusDto) {
+    // Vérifier l'accès édition
+    await this.checkListAccess(listId, userId, true);
+
+    // Vérifier que l'item existe dans la liste
+    const item = await this.prisma.list_items.findUnique({
+      where: {
+        list_id_title_id: { list_id: listId, title_id: titleId },
+      },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Cet item ne fait pas partie de la liste.');
+    }
+
+    return this.prisma.list_items.update({
+      where: {
+        list_id_title_id: { list_id: listId, title_id: titleId },
+      },
+      data: { statut: dto.statut } as any,
     });
   }
 

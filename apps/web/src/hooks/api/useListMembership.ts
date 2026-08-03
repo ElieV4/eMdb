@@ -26,9 +26,19 @@ export function useListMembership() {
     return new Set((favoris?.items ?? []).map((item) => item.titleId));
   }, [favoris]);
 
+  /** Map title_id → statut de progression dans la watchlist ("en_cours" / "a_jour" / "abandonnee"). */
+  const watchlistStatuses = useMemo(() => {
+    const map = new Map<string, "en_cours" | "a_jour" | "abandonnee">();
+    for (const item of watchlist?.items ?? []) {
+      if (item.statut) map.set(item.titleId, item.statut);
+    }
+    return map;
+  }, [watchlist]);
+
   return {
     watchlistIds,
     favoriteIds,
+    watchlistStatuses,
     watchlistId: watchlist?.id,
     favorisId: favoris?.id,
     isLoading,

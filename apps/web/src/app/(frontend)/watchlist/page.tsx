@@ -21,6 +21,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   parseTitleFilters,
   titleMatchesFilters,
@@ -62,18 +63,28 @@ export default function WatchlistPage() {
   const filters = parseTitleFilters(searchParams);
   const isLoading = isListsLoading || (!!watchlistId && isDetailLoading);
 
+  // Filtre de progression de la watchlist : "tous" (défaut), "a_jour",
+  // "en_cours", "abandonnee" — sélectionner une option retire les films
+  // (le statut de progression ne s'applique qu'aux séries).
+  const progressionFilter = searchParams.get("progression") ?? "tous";
+
   // Calculés avant tout retour anticipé : `useProgressiveReveal` contient
   // des hooks React, qui doivent être appelés inconditionnellement à
   // chaque rendu (règle des hooks) — impossible de le faire après les
   // `if (...) return` d'authentification ci-dessous.
   const listIdsByTitle = buildListIdsByTitle(lists);
   const items = watchlist?.items ?? [];
-  const filteredItems = items.filter((item) =>
-    titleMatchesFilters(
+  const filteredItems = items.filter((item) => {
+    if (!titleMatchesFilters(
       toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
       filters,
-    ),
-  );
+    )) return false;
+    if (progressionFilter === "tous") return true;
+    // Les films n'ont pas de statut de progression — retirés quand un
+    // filtre de progression est actif.
+    if (item.type === "film") return false;
+    return (item.statut ?? "en_cours") === progressionFilter;
+  });
   const { visibleItems, sentinelRef } = useProgressiveReveal(filteredItems, 24);
 
   if (isAuthLoading) {
@@ -103,6 +114,39 @@ export default function WatchlistPage() {
           <p className="text-sm text-muted-foreground mt-1">
             Films et séries à voir
           </p>
+        </div>
+
+        {/* Filtres de progression — sélectionner une option retire les films */}
+        <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
+          {[
+            { value: "tous", label: "Tous" },
+            { value: "a_jour", label: "À jour" },
+            { value: "en_cours", label: "En cours" },
+            { value: "abandonnee", label: "Abandonnée" },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                if (option.value === "tous") {
+                  params.delete("progression");
+                } else {
+                  params.set("progression", option.value);
+                }
+                const qs = params.toString();
+                window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+              }}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                progressionFilter === option.value
+                  ? "bg-primary text-white"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
 
         {isLoading ? (
@@ -138,6 +182,7 @@ export default function WatchlistPage() {
                   watched={watchedTitles?.has(title.id)}
                   inWatchlist={watchlistIds.has(title.id)}
                   inFavorites={favoriteIds.has(title.id)}
+                  watchlistStatus={title.statut}
                 />
               ))}
             </div>

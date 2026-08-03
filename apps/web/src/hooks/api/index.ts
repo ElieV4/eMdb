@@ -90,6 +90,7 @@ export { useRemoveItem } from "./useRemoveItem";
 export { useAddListItem } from "./useAddListItem";
 export { useRemoveListItem } from "./useRemoveListItem";
 export { useReorderItems } from "./useReorderItems";
+export { useUpdateListItemStatus, type WatchlistItemStatus } from "./useUpdateListItemStatus";
 export { useShares } from "./useShares";
 export { useShareList } from "./useShareList";
 export { useRemoveShare } from "./useRemoveShare";

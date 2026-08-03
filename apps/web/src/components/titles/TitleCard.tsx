@@ -19,6 +19,8 @@ interface TitleCardProps {
   watched?: boolean;
   inWatchlist?: boolean;
   inFavorites?: boolean;
+  /** Statut de progression dans la watchlist ("en_cours" / "a_jour" / "abandonnee"). */
+  watchlistStatus?: "en_cours" | "a_jour" | "abandonnee";
 }
 
 export function TitleCard({
@@ -29,6 +31,7 @@ export function TitleCard({
   watched = false,
   inWatchlist = false,
   inFavorites = false,
+  watchlistStatus,
 }: TitleCardProps) {
   const {
     id,
@@ -72,6 +75,7 @@ export function TitleCard({
         inWatchlist={inWatchlist}
         inFavorites={inFavorites}
         watched={watched}
+        watchlistStatus={watchlistStatus}
         className="absolute top-2 right-2 z-30"
       />
       {/* Mini bouton "marquer comme vu" — sous le coin bas droit de
@@ -159,6 +163,7 @@ export function TitleCardHorizontal({
   watched = false,
   inWatchlist = false,
   inFavorites = false,
+  watchlistStatus,
 }: Omit<TitleCardProps, "compact">) {
   const {
     id,
@@ -189,6 +194,7 @@ export function TitleCardHorizontal({
         inWatchlist={inWatchlist}
         inFavorites={inFavorites}
         watched={watched}
+        watchlistStatus={watchlistStatus}
         className="absolute top-1 left-[52px] z-30"
       />
       <Link

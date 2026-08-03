@@ -22,6 +22,8 @@ import {
   History as HistoryIcon,
   Check,
   Trash2,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,6 +50,7 @@ import { WatchDateMenuItems } from "@/components/watches/WatchDateMenuItems";
 import { WatchDatePickerDialog } from "@/components/watches/WatchDatePickerDialog";
 import { HistoryDialog } from "@/components/watches/HistoryDialog";
 import { useListMembership } from "@/hooks/api/useListMembership";
+import { useUpdateListItemStatus, WatchlistItemStatus } from "@/hooks/api/useUpdateListItemStatus";
 import { useAddItem } from "@/hooks/api/useAddItem";
 import { useRemoveItem } from "@/hooks/api/useRemoveItem";
 import { useCreateWatch } from "@/hooks/api/useCreateWatch";
@@ -73,6 +76,8 @@ type TitleQuickActionsMenuProps = {
   inWatchlist?: boolean;
   inFavorites?: boolean;
   watched?: boolean;
+  /** Statut de progression dans la watchlist ("en_cours" / "a_jour" / "abandonnee"). */
+  watchlistStatus?: WatchlistItemStatus;
   className?: string;
 };
 
@@ -86,6 +91,7 @@ export function TitleQuickActionsMenu({
   inWatchlist = false,
   inFavorites = false,
   watched = false,
+  watchlistStatus,
   className,
 }: TitleQuickActionsMenuProps) {
   const isEpisode = !!episodeId;
@@ -100,6 +106,7 @@ export function TitleQuickActionsMenu({
   const { watchlistId, favorisId } = useListMembership();
   const addItem = useAddItem();
   const removeItem = useRemoveItem();
+  const updateItemStatus = useUpdateListItemStatus();
   const createWatch = useCreateWatch();
   const deleteWatch = useDeleteWatch();
   const deleteAllByTitle = useDeleteAllWatches();
@@ -144,6 +151,13 @@ export function TitleQuickActionsMenu({
     const resolvedId = await resolveTitleId();
     if (!resolvedId) return;
     addItem.mutate({ listId: favorisId, data: { title_id: resolvedId } });
+  };
+
+  const setWatchlistStatus = async (statut: WatchlistItemStatus) => {
+    if (!watchlistId) return;
+    const resolvedId = await resolveTitleId();
+    if (!resolvedId) return;
+    updateItemStatus.mutate({ listId: watchlistId, titleId: resolvedId, statut });
   };
 
   const finish = () => setOpen(false);
@@ -233,6 +247,28 @@ export function TitleQuickActionsMenu({
             </DropdownMenuItem>
           )}
           {(!isEpisode && (watchlistId || favorisId)) && <DropdownMenuSeparator />}
+
+          {/* Abandonner / reprendre une série de la watchlist */}
+          {!isEpisode && type === "serie" && inWatchlist && watchlistId && (
+            <DropdownMenuItem
+              onClick={() =>
+                setWatchlistStatus(watchlistStatus === "abandonnee" ? "en_cours" : "abandonnee")
+              }
+              className="cursor-pointer"
+            >
+              {watchlistStatus === "abandonnee" ? (
+                <>
+                  <ArchiveRestore className="mr-2 h-4 w-4" />
+                  Reprendre la série
+                </>
+              ) : (
+                <>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Abandonner la série
+                </>
+              )}
+            </DropdownMenuItem>
+          )}
 
           {watched ? (
             <DropdownMenuItem

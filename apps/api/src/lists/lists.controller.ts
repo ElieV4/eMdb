@@ -16,6 +16,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ListsService } from './lists.service';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
+import { UpdateItemStatusDto } from './dto/update-item-status.dto';
 import { AddItemDto } from './dto/add-item.dto';
 import { ReorderDto } from './dto/reorder.dto';
 import { ShareListDto } from './dto/share-list.dto';
@@ -131,6 +132,21 @@ export class ListsController {
     @Param('titleId') titleId: string,
   ): Promise<void> {
     await this.listsService.removeItem(listId, user.id, titleId);
+  }
+
+  /**
+   * PATCH /lists/:listId/items/:titleId/statut
+   * Met à jour le statut de progression d'un item de la watchlist
+   * ("en_cours" / "a_jour" / "abandonnee").
+   */
+  @Patch('lists/:listId/items/:titleId/statut')
+  async updateItemStatus(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('titleId') titleId: string,
+    @Body() dto: UpdateItemStatusDto,
+  ) {
+    return this.listsService.updateItemStatus(listId, user.id, titleId, dto);
   }
 
   /**
