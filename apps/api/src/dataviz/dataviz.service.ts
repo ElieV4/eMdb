@@ -460,11 +460,8 @@ export class DatavizService {
 
   /**
    * Morceaux de requête pour un groupement (id/libellé/jointure/GROUP BY/
-   * ORDER BY) — partagés par `rowsStandard`/`rowsStudioStandard` (axe
-   * "Groupement" ET axe "Légende")/`rowsEvolution`/`rowsNoteAvg`. `studio`
-   * y est en version "simple" (sans le repli "Autre" des studios à un seul
-   * titre) — le repli complet n'existe que dans `rowsStudioStandard` pour
-   * son propre axe "Groupement" (`aliasSuffix` vide).
+   * ORDER BY) — partagés par `rowsStandard`/`rowsTop20`/`rowsEvolution`/
+   * `rowsNoteAvg` (axe "Groupement" ET axe "Légende").
    *
    * `aliasSuffix` évite les collisions d'alias SQL quand cette méthode est
    * appelée deux fois dans la même requête (axe "Groupement" avec suffixe
@@ -649,9 +646,6 @@ export class DatavizService {
     if (dto.metric === 'note' && dto.aggregation === 'avg') {
       return this.rowsNoteAvg(userId, dto);
     }
-    if (dto.groupBy === 'studio') {
-      return this.rowsStudioStandard(userId, dto);
-    }
     return this.rowsStandard(userId, dto);
   }
 
@@ -690,73 +684,18 @@ export class DatavizService {
   }
 
   /**
-   * Groupement `studio` — chemin standard uniquement (count/distinctCount/
-   * sum/min/max) : repli des studios à un seul titre distinct dans une
-   * catégorie "Autre" (comportement hérité de la 1ère version du module).
-   * Supporte un axe "Légende" optionnel (`dto.legendBy`), joint à
-   * l'intérieur de la CTE `watch_studio` où `t`/`uw` restent en scope — le
-   * repli "Autre" reste basé sur le studio seul, indépendant de la légende.
-   */
-  private async rowsStudioStandard(userId: string, dto: DatavizQueryDto): Promise<DatavizRow[]> {
-    const granularity = dto.granularity ?? 'month';
-    const legend = dto.legendBy && dto.legendBy !== 'none' ? this.categoryPieces(dto.legendBy, granularity, '2') : null;
-    const val = this.valueAggExpr(dto.metric, dto.aggregation, {
-      idCol: 'ws.title_id',
-      minutesCol: 'ws.minutes',
-      noteCol: 'ws.note_imdb',
-    });
-    const where = this.buildWhere(userId, dto, 't');
-    const legendCteSelect = legend ? `, ${legend.categoryIdExpr} AS series_id, ${legend.categoryExpr} AS series` : '';
-    const legendSelect = legend ? ', ws.series_id, ws.series' : '';
-    const legendGroupBy = legend ? ', ws.series_id, ws.series' : '';
-    const sql = `
-      WITH watch_studio AS (
-        SELECT
-          t.id AS title_id,
-          t.type,
-          t.note_imdb,
-          ${this.durationExpr} AS minutes,
-          st.id AS studio_id,
-          st.nom AS studio_nom${legendCteSelect}
-        FROM user_watches uw
-        LEFT JOIN episodes e ON e.id = uw.episode_id
-        LEFT JOIN seasons s ON s.id = e.season_id
-        JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
-        JOIN title_studios ts ON ts.title_id = t.id
-        JOIN studios st ON st.id = ts.studio_id
-        ${legend?.joinSql ?? ''}
-        WHERE ${where}
-      ),
-      studio_counts AS (
-        SELECT studio_id, COUNT(DISTINCT title_id) AS nb_titres
-        FROM watch_studio
-        GROUP BY studio_id
-      )
-      SELECT
-        CASE WHEN sc.nb_titres <= 1 THEN NULL ELSE ws.studio_id::TEXT END AS category_id,
-        CASE WHEN sc.nb_titres <= 1 THEN 'Autre' ELSE ws.studio_nom END AS category${legendSelect},
-        ${val} AS value
-      FROM watch_studio ws
-      JOIN studio_counts sc ON sc.studio_id = ws.studio_id
-      GROUP BY category_id, category${legendGroupBy}
-      ORDER BY value DESC
-    `;
-    return this.queryRaw<DatavizRow>(sql);
-  }
-
-  /**
-   * Groupements "top 20" (`title`/`actor`/`director`) : classement des
-   * titres/acteurs/réalisateurs les plus regardés, toujours trié par valeur
-   * décroissante et plafonné à 20 lignes — jamais l'intégralité de la
-   * catégorie (contrairement à genre/pays/studio, dont la cardinalité reste
-   * raisonnable). Supporte un axe "Légende" restreint à `mediaType`
-   * (film/série) — les autres groupements de légende (genre/pays/studio/
-   * period) n'ont pas de sens pour un classement top 20 (fan-out excessif
-   * ou redondant avec le classement lui-même). Restreint à `duration`+`sum`
-   * ou `watches`/`titles`+`count`/`distinctCount` : les autres combinaisons
-   * (note, min/max/avg/evolution) n'ont pas de sens pour un classement —
-   * validé ici en plus du frontend (défense en profondeur, l'API ne doit
-   * pas dépendre uniquement du menu).
+   * Groupements "top 20" (`title`/`actor`/`director`/`studio`) : classement
+   * des titres/acteurs/réalisateurs/studios les plus regardés, toujours
+   * trié par valeur décroissante et plafonné à 20 lignes — jamais
+   * l'intégralité de la catégorie (contrairement à genre/pays, dont la
+   * cardinalité reste raisonnable). Supporte un axe "Légende" restreint à
+   * `mediaType` (film/série) — les autres groupements de légende
+   * (genre/pays/studio/period) n'ont pas de sens pour un classement top 20
+   * (fan-out excessif ou redondant avec le classement lui-même). Restreint
+   * à `duration`+`sum` ou `watches`/`titles`+`count`/`distinctCount` : les
+   * autres combinaisons (note, min/max/avg/evolution) n'ont pas de sens
+   * pour un classement — validé ici en plus du frontend (défense en
+   * profondeur, l'API ne doit pas dépendre uniquement du menu).
    */
   private async rowsTop20(userId: string, dto: DatavizQueryDto): Promise<DatavizRow[]> {
     const validCombo =

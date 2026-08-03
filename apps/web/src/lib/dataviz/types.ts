@@ -26,7 +26,7 @@ export type DatavizMediaType = "film" | "serie";
  * "Légende" (hors scope). Restreints à `duration`+`sum` ou `watches`/
  * `titles`+`count`/`distinctCount` : voir `isTop20GroupByAllowed`.
  */
-export const TOP20_GROUP_BYS: DatavizGroupBy[] = ["title", "actor", "director"];
+export const TOP20_GROUP_BYS: DatavizGroupBy[] = ["title", "actor", "director", "studio"];
 
 export function isTop20GroupByAllowed(metric: DatavizMetric, aggregation: DatavizAggregation): boolean {
   return (

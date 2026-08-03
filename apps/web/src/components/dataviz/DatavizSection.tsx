@@ -42,29 +42,24 @@ export function DatavizSection() {
           chartType="grouped-bar"
           defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "monthOfYear" }}
         />
-        <ConfigurableBreakdownChart chartType="stacked-bar" defaultConfig={defaultVisualConfig("titles", "count", "genre")} />
-        <ConfigurableBreakdownChart
-          chartType="grouped-bar"
-          defaultConfig={{ ...defaultVisualConfig("titles", "distinctCount", "director"), legendBy: "mediaType" }}
-        />
-        <ConfigurableBreakdownChart
-          chartType="grouped-bar"
-          defaultConfig={{ ...defaultVisualConfig("titles", "distinctCount", "actor"), legendBy: "mediaType" }}
+        <ConfigurableBreakdownChart 
+          chartType="stacked-bar" 
+          defaultConfig={{ ...defaultVisualConfig("titles", "count", "genre"), legendBy: "mediaType"}} 
         />
         <ConfigurableBreakdownChart
           chartType="donut"
-          defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "weekday" }}
+          defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "weekday", legendBy: "mediaType"  }}
         />
         <ConfigurableLineChart
-          defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "quarter" }}
+          defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "quarter", legendBy: "mediaType" }}
         />
         <ConfigurableBreakdownChart
-          chartType="grouped-bar"
+          chartType="stacked-bar"
           defaultConfig={{ ...defaultVisualConfig("titles", "distinctCount", "director"), legendBy: "mediaType" }}
         />
         <ConfigurableBreakdownChart
-          chartType="grouped-bar"
-          defaultConfig={{ ...defaultVisualConfig("titles", "distinctCount", "actor"), legendBy: "mediaType" }}
+          chartType="stacked-bar"
+          defaultConfig={{ ...defaultVisualConfig("duration", "sum", "actor"), legendBy: "mediaType"}}
         />
       </div>
     </div>

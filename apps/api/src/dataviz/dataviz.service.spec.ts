@@ -335,16 +335,14 @@ describe('DatavizService', () => {
         expect(sql).not.toContain('AS series');
       });
 
-      it('groupBy=studio + legendBy=country : légende jointe à l\'intérieur de la CTE watch_studio, repli "Autre" toujours basé sur le studio seul', async () => {
+      it('groupBy=studio + legendBy=country : légende non-mediaType ignorée pour top 20 (aucune colonne series)', async () => {
         mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
 
         await service.query(userId, { ...base, groupBy: 'studio', legendBy: 'country' } as any);
 
         const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
-        expect(sql).toContain('JOIN title_countries tc2 ON tc2.title_id = t.id JOIN countries c2 ON c2.id = tc2.country_id');
-        expect(sql).toContain('c2.id::TEXT AS series_id, c2.nom AS series');
-        expect(sql).toContain('nb_titres <= 1');
-        expect(sql).toContain('GROUP BY category_id, category, ws.series_id, ws.series');
+        expect(sql).not.toContain('AS series');
+        expect(sql).not.toContain('title_countries');
       });
 
       it("ignoré pour evolution/note+avg/watches+titres restreint (n'ajoute aucune colonne series)", async () => {
@@ -408,19 +406,19 @@ describe('DatavizService', () => {
       );
     });
 
-    it("groupBy=studio : repli 'Autre' pour les studios à un seul titre distinct", async () => {
+    it('groupBy=studio : traité comme top 20 (jointure title_studios/studios, trié par valeur, plafonné à 20)', async () => {
       mockPrismaService.$queryRawUnsafe.mockResolvedValue([
-        { category_id: null, category: 'Autre', value: 50n },
         { category_id: 'studio-uuid', category: 'Big Studio', value: 200n },
       ]);
 
       const result = await service.query(userId, { ...base, groupBy: 'studio' } as any);
 
-      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('nb_titres <= 1'));
-      expect(result.rows).toEqual([
-        { category_id: null, category: 'Autre', value: 50 },
-        { category_id: 'studio-uuid', category: 'Big Studio', value: 200 },
-      ]);
+      const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+      expect(sql).toContain('JOIN title_studios ts ON ts.title_id = t.id');
+      expect(sql).toContain('JOIN studios st ON st.id = ts.studio_id');
+      expect(sql).toContain('ORDER BY value DESC');
+      expect(sql).toContain('LIMIT 20');
+      expect(result.rows).toEqual([{ category_id: 'studio-uuid', category: 'Big Studio', value: 200 }]);
     });
 
     it('metric=duration : sum/min/max/avg sur la durée', async () => {

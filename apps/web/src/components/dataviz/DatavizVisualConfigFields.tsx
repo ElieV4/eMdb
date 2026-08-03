@@ -68,15 +68,15 @@ const GROUP_BY_OPTIONS: { value: DatavizGroupBy; label: string }[] = [
   { value: "period", label: "Période" },
   { value: "genre", label: "Genre" },
   { value: "country", label: "Pays" },
-  { value: "studio", label: "Studio" },
-  { value: "title", label: "Titre (top 20)" },
   { value: "actor", label: "Acteur (top 20)" },
   { value: "director", label: "Réalisateur (top 20)" },
+  { value: "studio", label: "Studio (top 20)" },
+  { value: "title", label: "Titre (top 20)" }
 ];
 
 const RESTRICTED_GROUP_BY_OPTIONS = GROUP_BY_OPTIONS.filter((o) => o.value === "none" || o.value === "period");
 
-const TOP20_GROUP_BY_VALUES: DatavizGroupBy[] = ["title", "actor", "director"];
+const TOP20_GROUP_BY_VALUES: DatavizGroupBy[] = ["title", "actor", "director", "studio"];
 
 // "Légende" : mêmes groupements, mais "none" se lit "Aucune" (pas "Tout") —
 // jamais les groupements "top 20" (titre/acteur/réalisateur, hors scope

@@ -48,7 +48,7 @@ export type DatavizGroupBy =
 export type DatavizMediaType = 'film' | 'serie';
 
 /** Groupements "top 20" — cf. note ci-dessus. */
-export const TOP20_GROUP_BYS: DatavizGroupBy[] = ['title', 'actor', 'director'];
+export const TOP20_GROUP_BYS: DatavizGroupBy[] = ['title', 'actor', 'director', 'studio'];
 
 export const ALLOWED_AGGREGATIONS: Record<DatavizMetric, DatavizAggregation[]> = {
   duration: ['sum', 'min', 'max', 'avg', 'evolution'],
