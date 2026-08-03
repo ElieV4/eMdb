@@ -236,30 +236,46 @@ async function fetchJson<T>(url: string): Promise<T> {
   throw lastError ?? new Error('TMDB request failed after retries');
 }
 
-export async function searchMovie(query: string, year?: number): Promise<TmdbSearchResult[]> {
+export type TmdbSearchPage = {
+  results: TmdbSearchResult[];
+  totalResults: number;
+};
+
+export async function searchMovie(
+  query: string,
+  year?: number,
+  page?: number,
+): Promise<TmdbSearchPage> {
   const url = buildUrl('/search/movie', {
     query,
     year,
+    page,
   });
-  const data = await fetchJson<{ results: TmdbSearchResult[] }>(url);
-  return data.results;
+  const data = await fetchJson<{ results: TmdbSearchResult[]; total_results: number }>(url);
+  return { results: data.results, totalResults: data.total_results };
 }
 
-export async function searchTv(query: string, year?: number): Promise<TmdbSearchResult[]> {
+export async function searchTv(
+  query: string,
+  year?: number,
+  page?: number,
+): Promise<TmdbSearchPage> {
   const url = buildUrl('/search/tv', {
     query,
     first_air_date_year: year,
+    page,
   });
-  const data = await fetchJson<{ results: TmdbSearchResult[] }>(url);
-  return data.results;
+  const data = await fetchJson<{ results: TmdbSearchResult[]; total_results: number }>(url);
+  return { results: data.results, totalResults: data.total_results };
 }
 
-export async function searchPerson(query: string): Promise<TmdbSearchResult[]> {
+export async function searchPerson(query: string, page?: number): Promise<TmdbSearchPage> {
   const url = buildUrl('/search/person', {
     query,
+    page,
   });
-  const data = await fetchJson<{ results: TmdbSearchResult[] }>(url);
-  return data.results;
+  const data = await fetchJson<{ results: TmdbSearchResult[]; total_results: number }>(url);
+  return { results: data.results, totalResults: data.total_results };
 }
 
 export async function searchMulti(query: string): Promise<TmdbSearchResult[]> {
@@ -393,8 +409,9 @@ export async function getCollectionDetails(collectionId: number): Promise<any> {
 export async function getTrending(
   mediaType: 'movie' | 'tv' | 'person',
   timeWindow: 'day' | 'week',
+  page?: number,
 ): Promise<any> {
-  const url = buildUrl(`/trending/${mediaType}/${timeWindow}`);
+  const url = buildUrl(`/trending/${mediaType}/${timeWindow}`, { page });
   return fetchJson<any>(url);
 }
 

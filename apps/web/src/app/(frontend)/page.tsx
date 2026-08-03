@@ -242,9 +242,15 @@ export default function HomePage() {
           ) : (
             continueWatching &&
             continueWatching.length > 0 && (
-              <DashboardSection title="Continuer à regarder">
-                <CardSlider>
-                  {continueWatching.map((entry) => (
+              <DashboardSection
+                title={`Continuer à regarder (${continueWatching.length})`}
+                actionLabel={continueWatching.length > 10 ? "Voir plus" : undefined}
+                actionHref={continueWatching.length > 10 ? "/continue-watching" : undefined}
+              >
+                <CardSlider
+                  moreHref={continueWatching.length > 10 ? "/continue-watching" : undefined}
+                >
+                  {continueWatching.slice(0, 10).map((entry) => (
                     <ContinueWatchingCard
                       key={entry.title_id}
                       entry={entry}
@@ -259,7 +265,7 @@ export default function HomePage() {
 
           {/* Watchlist — juste après "Continuer à regarder" (retour utilisateur) */}
           <DashboardSection
-            title="Watchlist"
+            title={`Watchlist (${watchlistItems.length})`}
             subtitle="Films et séries à voir"
             actionLabel={
               watchlistItems.length > 0 ? "Voir la watchlist" : undefined
@@ -287,45 +293,9 @@ export default function HomePage() {
             )}
           </DashboardSection>
 
-          {/* Historique */}
-          {historyCards.length > 0 && (
-            <DashboardSection
-              title="Historique"
-              actionLabel="Voir tout l'historique"
-              actionHref="/history"
-            >
-              <DateCardSlider items={historyCards} moreHref="/history" />
-            </DashboardSection>
-          )}
-
-          {/* Calendrier */}
-          <DashboardSection
-            title="Calendrier"
-            subtitle="Épisodes à venir de vos séries suivies"
-            actionLabel="Voir le calendrier complet"
-            actionHref="/calendar"
-          >
-            {isLoadingCalendar ? (
-              <div className="flex gap-4 overflow-hidden">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="shrink-0 w-32 sm:w-36 aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
-                  />
-                ))}
-              </div>
-            ) : calendarCards.length > 0 ? (
-              <DateCardSlider items={calendarCards} moreHref="/calendar" />
-            ) : (
-              <p className="text-sm text-muted-foreground py-4">
-                Aucun épisode à venir pour le moment.
-              </p>
-            )}
-          </DashboardSection>
-
           {/* Recommandés */}
           <DashboardSection
-            title="Recommandés"
+            title={`Recommandés (${filteredRecommendations.length})`}
             subtitle="Suggestions basées sur vos goûts"
             actionLabel="Voir plus"
             actionHref="/recommendations"
@@ -361,6 +331,42 @@ export default function HomePage() {
               </p>
             )}
           </DashboardSection>
+
+          {/* Calendrier — en bas de page, juste au-dessus de Historique (retour utilisateur) */}
+          <DashboardSection
+            title={`Calendrier (${calendarCards.length})`}
+            subtitle="Épisodes à venir de vos séries suivies"
+            actionLabel="Voir le calendrier complet"
+            actionHref="/calendar"
+          >
+            {isLoadingCalendar ? (
+              <div className="flex gap-4 overflow-hidden">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="shrink-0 w-32 sm:w-36 aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : calendarCards.length > 0 ? (
+              <DateCardSlider items={calendarCards} moreHref="/calendar" />
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">
+                Aucun épisode à venir pour le moment.
+              </p>
+            )}
+          </DashboardSection>
+
+          {/* Historique — sous Calendrier, tout en bas de page (retour utilisateur) */}
+          {historyCards.length > 0 && (
+            <DashboardSection
+              title={`Historique (${historyCards.length})`}
+              actionLabel="Voir tout l'historique"
+              actionHref="/history"
+            >
+              <DateCardSlider items={historyCards} moreHref="/history" />
+            </DashboardSection>
+          )}
         </div>
       ) : (
         /* Dashboard pour invités */

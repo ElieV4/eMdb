@@ -98,6 +98,11 @@ export default function HistoryPage() {
   }
 
   const allWatches = data?.pages.flatMap((page) => page.items) ?? [];
+  // Total réel côté backend (respecte le filtre type, appliqué serveur) —
+  // pas seulement ce qui a déjà été chargé par le scroll infini. Les
+  // filtres listes/statut/année étant appliqués côté client, ce total peut
+  // différer du compte affiché une fois ces filtres actifs.
+  const totalWatches = data?.pages[0]?.total ?? 0;
 
   // Filtre "Listes", "vu / tout / non vu" et "Date de visionnage" (menu
   // filtres, modification O) : appliqués côté client, les visionnages
@@ -137,7 +142,7 @@ export default function HistoryPage() {
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Historique</h1>
+          <h1 className="text-2xl font-bold">Historique ({totalWatches})</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Vos derniers visionnages
           </p>
@@ -169,7 +174,7 @@ export default function HistoryPage() {
             {groups.map((group) => (
               <div key={group.key} className="space-y-3">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  {group.label}
+                  {group.label} ({group.items.length})
                 </h2>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
                   {group.items.map((watch) => {

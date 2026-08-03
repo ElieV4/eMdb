@@ -40,6 +40,7 @@ function buildNavTree(userLists: UserList[] | undefined): { main: NavItem[]; pro
         label: "Accueil",
         icon: Home,
         children: [
+          { href: "/continue-watching", label: "Continuer à regarder" },
           { href: "/watchlist", label: "Watchlist" },
           { href: "/calendar", label: "Calendrier" },
           { href: "/history", label: "Historique" },

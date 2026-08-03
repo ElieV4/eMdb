@@ -62,6 +62,7 @@ export { useDeleteAllWatchesByEpisode } from "./useDeleteAllWatchesByEpisode";
 export { useMarkWatchedUntilEpisode } from "./useMarkWatchedUntilEpisode";
 export { useSerieProgress } from "./useSerieProgress";
 export { useCalendar } from "./useCalendar";
+export { useInfiniteCalendar } from "./useInfiniteCalendar";
 export { useFollow } from "./useFollow";
 export { useUnfollow } from "./useUnfollow";
 export { useFollows } from "./useFollows";

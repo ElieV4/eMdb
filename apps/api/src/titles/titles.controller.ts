@@ -21,7 +21,7 @@ export class TitlesController {
 
   @Get('search')
   async search(@Query() query: SearchTitlesDto) {
-    return this.titlesService.searchTitles(query.q, query.type);
+    return this.titlesService.searchTitles(query.q, query.type, query.page);
   }
 
   /**

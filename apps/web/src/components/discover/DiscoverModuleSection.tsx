@@ -23,6 +23,7 @@ import { CardSlider } from "@/components/common/CardSlider";
 import { useDiscoverModule, DiscoverModuleKey } from "@/hooks/api/useDiscover";
 import { useWatchedTitles, useListMembership, useLists } from "@/hooks/api";
 import { useAuth } from "@/hooks/auth/useAuth";
+import { useProgressiveReveal } from "@/hooks/useProgressiveReveal";
 import {
   parseTitleFilters,
   titleMatchesFilters,
@@ -53,7 +54,7 @@ export function DiscoverModuleSection({
   variant?: "row" | "grid";
   moreHref?: string;
 }) {
-  const { data, isLoading, error } = useDiscoverModule(moduleKey, variant === "grid" ? 40 : 20);
+  const { data, isLoading, error } = useDiscoverModule(moduleKey, variant === "grid" ? 100 : 20);
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
   const { isAuthenticated } = useAuth();
@@ -73,7 +74,11 @@ export function DiscoverModuleSection({
   });
 
   const filtered = (data ?? []).filter((t) => titleMatchesFilters(toFilterable(t), filters));
-  const visible = variant === "row" ? filtered.slice(0, ROW_PREVIEW_COUNT) : filtered;
+  // Scroll infini côté client sur la grille (page dédiée /discover/:module) —
+  // le backend fournit déjà jusqu'à 100 résultats (plusieurs pages TMDB
+  // fusionnées), révélés progressivement plutôt que tous rendus d'un coup.
+  const { visibleItems: gridVisible, sentinelRef } = useProgressiveReveal(filtered, 24);
+  const visible = variant === "row" ? filtered.slice(0, ROW_PREVIEW_COUNT) : gridVisible;
   const hasMore = variant === "row" && filtered.length > ROW_PREVIEW_COUNT;
 
   return (
@@ -117,18 +122,21 @@ export function DiscoverModuleSection({
           ))}
         </CardSlider>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {visible.map((t) => (
-            <TitleCard
-              key={`${moduleKey}-${t.id}`}
-              title={t}
-              compact
-              watched={watchedTitles?.has(t.id)}
-              inWatchlist={watchlistIds.has(t.id)}
-              inFavorites={favoriteIds.has(t.id)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {visible.map((t) => (
+              <TitleCard
+                key={`${moduleKey}-${t.id}`}
+                title={t}
+                compact
+                watched={watchedTitles?.has(t.id)}
+                inWatchlist={watchlistIds.has(t.id)}
+                inFavorites={favoriteIds.has(t.id)}
+              />
+            ))}
+          </div>
+          <div ref={sentinelRef} />
+        </>
       )}
     </section>
   );

@@ -22,6 +22,16 @@ export interface PersonSearchResult {
 }
 
 /**
+ * Résultat de recherche de personnes, avec le total réel (TMDB total_results
+ * + résultats locaux non mergés) — pas seulement la portion chargée par la
+ * page courante (scroll infini sur `/search`).
+ */
+export interface SearchPeopleResult {
+  items: PersonSearchResult[];
+  total: number;
+}
+
+/**
  * Service métier pour le module people (Phase 3.4).
  *
  * Gère la recherche (TMDB + local), l'import "get or import", le détail
@@ -63,13 +73,17 @@ export class PeopleService {
    * Marque les résultats déjà présents localement via tmdb_id.
    *
    * @param query - Texte de recherche
+   * @param page - Page TMDB (1-indexée), pour le scroll infini sur /search
    * @returns Liste fusionnée de résultats
    */
-  async search(query: string): Promise<PersonSearchResult[]> {
+  async search(query: string, page: number = 1): Promise<SearchPeopleResult> {
     // 1. Appel TMDB
     let tmdbResults: TmdbSearchResult[] = [];
+    let tmdbTotal = 0;
     try {
-      tmdbResults = await searchPerson(query);
+      const tmdbPage = await searchPerson(query, page);
+      tmdbResults = tmdbPage.results;
+      tmdbTotal = tmdbPage.totalResults;
     } catch {
       // En cas d'échec TMDB (API key manquante, réseau…), on continue
       // avec les seuls résultats locaux.
@@ -121,20 +135,30 @@ export class PeopleService {
 
     // 5. Ajouter les résultats locaux non encore mergés via TMDB
     // (ceux avec un tmdb_id mais qui n'étaient pas dans les résultats TMDB,
-    //  et ceux sans tmdb_id importés manuellement)
-    for (const local of localResults) {
-      if (mergedLocalIds.has(local.id)) continue;
+    //  et ceux sans tmdb_id importés manuellement) — uniquement en page 1 :
+    // ce lot n'est pas paginé par TMDB, le répéter sur chaque page
+    // dupliquerait ces entrées lors de l'accumulation en scroll infini.
+    let localOnlyCount = 0;
+    if (page === 1) {
+      for (const local of localResults) {
+        if (mergedLocalIds.has(local.id)) continue;
 
-      merged.push({
-        tmdb_id: local.tmdb_id ?? 0,
-        nom: local.nom,
-        photo_url: local.photo_url,
-        local: true,
-        local_id: local.id,
-      });
+        localOnlyCount++;
+        merged.push({
+          tmdb_id: local.tmdb_id ?? 0,
+          nom: local.nom,
+          photo_url: local.photo_url,
+          local: true,
+          local_id: local.id,
+        });
+      }
     }
 
-    return merged;
+    // `total` : total réel toutes pages confondues (TMDB total_results est
+    // stable quelle que soit la page interrogée) + résultats locaux non
+    // mergés, ajoutés une seule fois (page 1) — pas la taille de `merged`
+    // qui ne reflète que la page courante.
+    return { items: merged, total: tmdbTotal + localOnlyCount };
   }
 
   /**

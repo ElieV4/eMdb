@@ -66,10 +66,13 @@ describe('PeopleService', () => {
 
   describe('search', () => {
     it('fusionne les résultats TMDB et locaux', async () => {
-      (searchPerson as jest.Mock).mockResolvedValue([
-        { id: 1, name: 'Alice', poster_path: '/alice.jpg' },
-        { id: 2, name: 'Bob', poster_path: null },
-      ]);
+      (searchPerson as jest.Mock).mockResolvedValue({
+        results: [
+          { id: 1, name: 'Alice', poster_path: '/alice.jpg' },
+          { id: 2, name: 'Bob', poster_path: null },
+        ],
+        totalResults: 2,
+      });
 
       prismaServiceMock.people.findMany.mockResolvedValue([
         {
@@ -88,22 +91,23 @@ describe('PeopleService', () => {
 
       const result = await service.search('Alice');
 
-      expect(result).toHaveLength(3);
+      expect(result.items).toHaveLength(3);
+      expect(result.total).toBe(3);
       // Alice (TMDB + local)
-      expect(result[0]).toMatchObject({
+      expect(result.items[0]).toMatchObject({
         tmdb_id: 1,
         nom: 'Alice',
         local: true,
         local_id: 'local-1',
       });
       // Bob (TMDB seulement)
-      expect(result[1]).toMatchObject({
+      expect(result.items[1]).toMatchObject({
         tmdb_id: 2,
         nom: 'Bob',
         local: false,
       });
       // Charles (local seulement, sans tmdb_id)
-      expect(result[2]).toMatchObject({
+      expect(result.items[2]).toMatchObject({
         tmdb_id: 0,
         nom: 'Charles',
         local: true,
@@ -125,30 +129,34 @@ describe('PeopleService', () => {
 
       const result = await service.search('Alice');
 
-      expect(result).toHaveLength(1);
-      expect(result[0].nom).toBe('Alice');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].nom).toBe('Alice');
     });
 
     it('retourne un tableau vide si aucun résultat', async () => {
-      (searchPerson as jest.Mock).mockResolvedValue([]);
+      (searchPerson as jest.Mock).mockResolvedValue({ results: [], totalResults: 0 });
       prismaServiceMock.people.findMany.mockResolvedValue([]);
 
       const result = await service.search('Inexistant');
 
-      expect(result).toEqual([]);
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
     });
 
     it('dédoublonne les résultats TMDB par id', async () => {
-      (searchPerson as jest.Mock).mockResolvedValue([
-        { id: 42, name: 'Doublon', poster_path: null },
-        { id: 42, name: 'Doublon', poster_path: null },
-      ]);
+      (searchPerson as jest.Mock).mockResolvedValue({
+        results: [
+          { id: 42, name: 'Doublon', poster_path: null },
+          { id: 42, name: 'Doublon', poster_path: null },
+        ],
+        totalResults: 2,
+      });
 
       prismaServiceMock.people.findMany.mockResolvedValue([]);
 
       const result = await service.search('Doublon');
 
-      expect(result).toHaveLength(1);
+      expect(result.items).toHaveLength(1);
     });
   });
 

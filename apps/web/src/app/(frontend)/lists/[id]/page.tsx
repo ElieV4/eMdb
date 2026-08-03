@@ -108,7 +108,9 @@ export default function ListDetailPage() {
           ) : list ? (
             <>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold">{list.nom}</h1>
+                <h1 className="text-2xl font-bold">
+                  {list.nom} ({items.length})
+                </h1>
                 <span className="text-xs rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">
                   {typeLabels[list.type] ?? list.type}
                 </span>

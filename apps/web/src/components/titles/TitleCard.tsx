@@ -108,13 +108,9 @@ export function TitleCard({
 
         <div className="p-3 bg-background">
           <div className="space-y-1">
-            {/* Titre */}
-            <h3
-              className={cn(
-                "font-semibold line-clamp-1 group-hover:text-primary",
-                compact ? "text-sm" : "text-base",
-              )}
-            >
+            {/* Titre — mêmes classes que DateCard/ContinueWatchingCard (uniformisation
+                typographique demandée par l'utilisateur, référence : cartes épisode du calendrier) */}
+            <h3 className="text-sm font-medium line-clamp-1 group-hover:text-primary">
               {displayTitle}
             </h3>
 
@@ -126,7 +122,7 @@ export function TitleCard({
             )}
 
             {/* Métadonnées (année, note) */}
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-xs">
               {year && <span className="text-muted-foreground">{year}</span>}
 
               {note && (
@@ -213,7 +209,7 @@ export function TitleCardHorizontal({
         />
 
         <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-sm line-clamp-1 group-hover:text-primary">
+        <h3 className="text-sm font-medium line-clamp-1 group-hover:text-primary">
           {titre}
         </h3>
         {titreOriginal && titreOriginal !== titre && (

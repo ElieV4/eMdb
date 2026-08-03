@@ -420,17 +420,19 @@ export class WatchesService {
    * `getContinueWatching` / module "Continuer à regarder").
    *
    * @param userId - UUID de l'utilisateur connecté
-   * @returns Épisodes des séries suivies à partir d'aujourd'hui (+ ceux
-   *   sans date de sortie connue), triés par date croissante
+   * @param page - Page demandée (1-indexée), défaut 1
+   * @param limit - Taille de page, défaut 100 (même plafond que /watches)
+   * @returns Page d'épisodes des séries suivies à partir d'aujourd'hui
+   *   (+ ceux sans date de sortie connue), triés par date croissante
    */
-  async getCalendar(userId: string) {
+  async getCalendar(userId: string, page = 1, limit = 100) {
     const followedSeries = await this.prisma.user_follows_serie.findMany({
       where: { user_id: userId },
       select: { title_id: true },
     });
 
     if (followedSeries.length === 0) {
-      return [];
+      return { items: [], total: 0, page, limit, totalPages: 0 };
     }
 
     const titleIds = followedSeries.map((follow) => follow.title_id);
@@ -444,38 +446,47 @@ export class WatchesService {
     // épisodes sans date de sortie connue restent inclus (groupe "Date
     // inconnue" dédié côté frontend, cf. modification J) : ils ne sont ni
     // passés ni futurs, donc hors du champ de ce filtre.
-    const episodes = await this.prisma.episodes.findMany({
-      where: {
-        seasons: { title_id: { in: titleIds } },
-        user_watches: { none: { user_id: userId } },
-        OR: [{ date_sortie: { gte: startOfToday } }, { date_sortie: null }],
-      },
-      select: {
-        numero: true,
-        titre: true,
-        date_sortie: true,
-        seasons: {
-          select: {
-            numero: true,
-            title_id: true,
-            titles: { select: { titre_vo: true, titre_vf: true, affiche_url: true } },
+    const where = {
+      seasons: { title_id: { in: titleIds } },
+      user_watches: { none: { user_id: userId } },
+      OR: [{ date_sortie: { gte: startOfToday } }, { date_sortie: null }],
+    };
+
+    const [episodes, total] = await Promise.all([
+      this.prisma.episodes.findMany({
+        where,
+        select: {
+          numero: true,
+          titre: true,
+          date_sortie: true,
+          seasons: {
+            select: {
+              numero: true,
+              title_id: true,
+              titles: { select: { titre_vo: true, titre_vf: true, affiche_url: true } },
+            },
           },
         },
-      },
-      orderBy: { date_sortie: 'asc' },
-    });
+        orderBy: { date_sortie: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.episodes.count({ where }),
+    ]);
 
-    // Calculé directement à partir de la liste ci-dessus plutôt que via
-    // countEpisodesNonVus()/fn_episodes_non_vus (PL/pgSQL) : évite une
-    // dépendance à une fonction qui peut être absente de la base locale
-    // (bug #50) et évite N requêtes supplémentaires (une par série suivie).
+    // Calculé sur la page courante plutôt que via countEpisodesNonVus()/
+    // fn_episodes_non_vus (PL/pgSQL) : évite une dépendance à une fonction
+    // qui peut être absente de la base locale (bug #50) et évite N
+    // requêtes supplémentaires (une par série suivie). Ne reflète que le
+    // nombre d'épisodes de cette série présents sur CETTE page, pas le
+    // total réel de la série — acceptable pour un badge indicatif.
     const nbNonVusParTitre = new Map<string, number>();
     for (const episode of episodes) {
       const titleId = episode.seasons.title_id;
       nbNonVusParTitre.set(titleId, (nbNonVusParTitre.get(titleId) ?? 0) + 1);
     }
 
-    return episodes.map((episode) => ({
+    const items = episodes.map((episode) => ({
       title_id: episode.seasons.title_id,
       titre_vo: episode.seasons.titles.titre_vo,
       titre_vf: episode.seasons.titles.titre_vf,
@@ -486,6 +497,8 @@ export class WatchesService {
       date_diffusion: episode.date_sortie,
       nb_non_vus: nbNonVusParTitre.get(episode.seasons.title_id) ?? 0,
     }));
+
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   /**

@@ -36,6 +36,16 @@ export interface PaginatedTitles {
 }
 
 /**
+ * Résultat de recherche de titres, avec le total réel (TMDB total_results
+ * des sources interrogées + résultats locaux sans tmdb_id) — pas seulement
+ * la portion chargée par la page courante (scroll infini sur `/search`).
+ */
+export interface SearchTitlesResult {
+  items: TitleSearchResult[];
+  total: number;
+}
+
+/**
  * Service métier pour le module titles (Phase 3.3).
  *
  * Gère la recherche (TMDB + local), l'import "get or import", le détail
@@ -55,20 +65,30 @@ export class TitlesService {
    *
    * @param query - Texte de recherche
    * @param type - 'film' | 'serie' | undefined (recherche les deux si absent)
-   * @returns Liste fusionnée de résultats
+   * @param page - Page TMDB (1-indexée, ~20 résultats par source et par
+   *   page) — transmise telle quelle à `searchMovie`/`searchTv`, pour le
+   *   scroll infini sur `/search`.
+   * @returns Liste fusionnée de résultats + total réel (toutes pages confondues)
    */
-  async searchTitles(query: string, type?: 'film' | 'serie'): Promise<TitleSearchResult[]> {
+  async searchTitles(
+    query: string,
+    type?: 'film' | 'serie',
+    page: number = 1,
+  ): Promise<SearchTitlesResult> {
     // 1. Appels TMDB
     let tmdbResults: Array<TmdbSearchResult & { type: 'film' | 'serie' }> = [];
+    let tmdbTotal = 0;
 
     if (type === 'film' || !type) {
-      const movieResults = await searchMovie(query);
-      tmdbResults = [...tmdbResults, ...movieResults.map((r) => ({ ...r, type: 'film' as const }))];
+      const movieResults = await searchMovie(query, undefined, page);
+      tmdbResults = [...tmdbResults, ...movieResults.results.map((r) => ({ ...r, type: 'film' as const }))];
+      tmdbTotal += movieResults.totalResults;
     }
 
     if (type === 'serie' || !type) {
-      const tvResults = await searchTv(query);
-      tmdbResults = [...tmdbResults, ...tvResults.map((r) => ({ ...r, type: 'serie' as const }))];
+      const tvResults = await searchTv(query, undefined, page);
+      tmdbResults = [...tmdbResults, ...tvResults.results.map((r) => ({ ...r, type: 'serie' as const }))];
+      tmdbTotal += tvResults.totalResults;
     }
 
     // 2. Recherche locale (ILIKE sur titre_vo / titre_vf)
@@ -114,22 +134,33 @@ export class TitlesService {
       });
     }
 
-    // 5. Ajouter les résultats locaux sans tmdb_id (import manuel)
-    for (const local of localResults) {
-      if (!local.tmdb_id) {
-        merged.push({
-          tmdb_id: 0,
-          titre_vo: local.titre_vo,
-          titre_vf: local.titre_vf,
-          poster_path: local.affiche_url,
-          type: local.type as 'film' | 'serie',
-          local: true,
-          local_id: local.id,
-        });
+    // 5. Ajouter les résultats locaux sans tmdb_id (import manuel) —
+    // uniquement sur la première page : ce lot n'est pas paginé par TMDB
+    // (recherche locale complète à chaque appel), le répéter sur chaque
+    // page dupliquerait ces entrées lors de l'accumulation en scroll infini.
+    let localOnlyCount = 0;
+    if (page === 1) {
+      for (const local of localResults) {
+        if (!local.tmdb_id) {
+          localOnlyCount++;
+          merged.push({
+            tmdb_id: 0,
+            titre_vo: local.titre_vo,
+            titre_vf: local.titre_vf,
+            poster_path: local.affiche_url,
+            type: local.type as 'film' | 'serie',
+            local: true,
+            local_id: local.id,
+          });
+        }
       }
     }
 
-    return merged;
+    // `total` : total réel toutes pages confondues (TMDB total_results est
+    // stable quelle que soit la page interrogée) + résultats locaux sans
+    // tmdb_id, ajoutés une seule fois (page 1) — pas la taille de `merged`
+    // qui ne reflète que la page courante.
+    return { items: merged, total: tmdbTotal + localOnlyCount };
   }
 
   /**

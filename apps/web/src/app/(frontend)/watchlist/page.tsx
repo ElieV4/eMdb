@@ -15,6 +15,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useLists } from "@/hooks/api/useLists";
 import { useList } from "@/hooks/api/useList";
 import { useWatchedTitles, useListMembership } from "@/hooks/api";
+import { useProgressiveReveal } from "@/hooks/useProgressiveReveal";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,6 +62,20 @@ export default function WatchlistPage() {
   const filters = parseTitleFilters(searchParams);
   const isLoading = isListsLoading || (!!watchlistId && isDetailLoading);
 
+  // Calculés avant tout retour anticipé : `useProgressiveReveal` contient
+  // des hooks React, qui doivent être appelés inconditionnellement à
+  // chaque rendu (règle des hooks) — impossible de le faire après les
+  // `if (...) return` d'authentification ci-dessous.
+  const listIdsByTitle = buildListIdsByTitle(lists);
+  const items = watchlist?.items ?? [];
+  const filteredItems = items.filter((item) =>
+    titleMatchesFilters(
+      toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      filters,
+    ),
+  );
+  const { visibleItems, sentinelRef } = useProgressiveReveal(filteredItems, 24);
+
   if (isAuthLoading) {
     return (
       <div className="container mx-auto max-w-7xl px-4 py-12">
@@ -80,20 +95,11 @@ export default function WatchlistPage() {
     );
   }
 
-  const listIdsByTitle = buildListIdsByTitle(lists);
-  const items = watchlist?.items ?? [];
-  const filteredItems = items.filter((item) =>
-    titleMatchesFilters(
-      toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
-      filters,
-    ),
-  );
-
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Watchlist</h1>
+          <h1 className="text-2xl font-bold">Watchlist ({items.length})</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Films et séries à voir
           </p>
@@ -122,18 +128,21 @@ export default function WatchlistPage() {
             Aucun titre de votre watchlist ne correspond aux filtres actifs.
           </p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {filteredItems.map((title) => (
-              <TitleCard
-                key={title.id}
-                title={titleToSearchResult(title)}
-                compact
-                watched={watchedTitles?.has(title.id)}
-                inWatchlist={watchlistIds.has(title.id)}
-                inFavorites={favoriteIds.has(title.id)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {visibleItems.map((title) => (
+                <TitleCard
+                  key={title.id}
+                  title={titleToSearchResult(title)}
+                  compact
+                  watched={watchedTitles?.has(title.id)}
+                  inWatchlist={watchlistIds.has(title.id)}
+                  inFavorites={favoriteIds.has(title.id)}
+                />
+              ))}
+            </div>
+            <div ref={sentinelRef} />
+          </>
         )}
       </div>
     </div>

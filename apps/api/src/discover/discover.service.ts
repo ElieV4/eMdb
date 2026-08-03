@@ -53,6 +53,28 @@ type RawTmdbItem = {
 export class DiscoverService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * TMDB pagine par lots fixes de 20 résultats — pour disposer d'assez de
+   * candidats après fusion film+série et tri (`limit` peut désormais
+   * monter à 100, page dédiée /discover/:module en scroll infini côté
+   * client), on récupère plusieurs pages TMDB par source plutôt qu'une
+   * seule. Plafonné à 5 pages (100 résultats bruts par source) pour éviter
+   * un nombre d'appels TMDB déraisonnable.
+   */
+  private pagesNeededFor(limit: number): number {
+    return Math.min(Math.ceil(limit / 20), 5);
+  }
+
+  private async fetchPages<T>(
+    fetchPage: (page: number) => Promise<{ results?: T[] }>,
+    pagesNeeded: number,
+  ): Promise<T[]> {
+    const pages = await Promise.all(
+      Array.from({ length: pagesNeeded }, (_, i) => fetchPage(i + 1)),
+    );
+    return pages.flatMap((p) => p.results ?? []);
+  }
+
   async getModule(module: string, limit: number): Promise<DiscoverTitleResult[]> {
     switch (module as DiscoverModule) {
       case 'tendances':
@@ -71,32 +93,34 @@ export class DiscoverService {
   }
 
   private async getTrending(limit: number): Promise<DiscoverTitleResult[]> {
+    const pagesNeeded = this.pagesNeededFor(limit);
     const [movies, tv] = await Promise.all([
-      getTrending('movie', 'week'),
-      getTrending('tv', 'week'),
+      this.fetchPages<RawTmdbItem>((page) => getTrending('movie', 'week', page), pagesNeeded),
+      this.fetchPages<RawTmdbItem>((page) => getTrending('tv', 'week', page), pagesNeeded),
     ]);
 
     return this.mergeAndFinalize(
-      [
-        ...this.mapItems(movies.results ?? [], 'film'),
-        ...this.mapItems(tv.results ?? [], 'serie'),
-      ],
+      [...this.mapItems(movies, 'film'), ...this.mapItems(tv, 'serie')],
       (a, b) => b.popularity - a.popularity,
       limit,
     );
   }
 
   private async getPopular(limit: number): Promise<DiscoverTitleResult[]> {
+    const pagesNeeded = this.pagesNeededFor(limit);
     const [movies, tv] = await Promise.all([
-      getDiscoverMovie({ sort_by: 'popularity.desc' }),
-      getDiscoverTv({ sort_by: 'popularity.desc' }),
+      this.fetchPages<RawTmdbItem>(
+        (page) => getDiscoverMovie({ sort_by: 'popularity.desc', page }),
+        pagesNeeded,
+      ),
+      this.fetchPages<RawTmdbItem>(
+        (page) => getDiscoverTv({ sort_by: 'popularity.desc', page }),
+        pagesNeeded,
+      ),
     ]);
 
     return this.mergeAndFinalize(
-      [
-        ...this.mapItems(movies.results ?? [], 'film'),
-        ...this.mapItems(tv.results ?? [], 'serie'),
-      ],
+      [...this.mapItems(movies, 'film'), ...this.mapItems(tv, 'serie')],
       (a, b) => b.popularity - a.popularity,
       limit,
     );
@@ -106,23 +130,31 @@ export class DiscoverService {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowIso = tomorrow.toISOString().slice(0, 10);
+    const pagesNeeded = this.pagesNeededFor(limit);
 
     const [movies, tv] = await Promise.all([
-      getDiscoverMovie({
-        sort_by: 'popularity.desc',
-        'primary_release_date.gte': tomorrowIso,
-      }),
-      getDiscoverTv({
-        sort_by: 'popularity.desc',
-        'first_air_date.gte': tomorrowIso,
-      }),
+      this.fetchPages<RawTmdbItem>(
+        (page) =>
+          getDiscoverMovie({
+            sort_by: 'popularity.desc',
+            'primary_release_date.gte': tomorrowIso,
+            page,
+          }),
+        pagesNeeded,
+      ),
+      this.fetchPages<RawTmdbItem>(
+        (page) =>
+          getDiscoverTv({
+            sort_by: 'popularity.desc',
+            'first_air_date.gte': tomorrowIso,
+            page,
+          }),
+        pagesNeeded,
+      ),
     ]);
 
     return this.mergeAndFinalize(
-      [
-        ...this.mapItems(movies.results ?? [], 'film'),
-        ...this.mapItems(tv.results ?? [], 'serie'),
-      ],
+      [...this.mapItems(movies, 'film'), ...this.mapItems(tv, 'serie')],
       (a, b) => b.popularity - a.popularity,
       limit,
     );
@@ -130,28 +162,36 @@ export class DiscoverService {
 
   private async getReleases(limit: number): Promise<DiscoverTitleResult[]> {
     const today = new Date().toISOString().slice(0, 10);
+    const pagesNeeded = this.pagesNeededFor(limit);
 
     // vote_count élevé : sans ce filtre, "sorties" remonte des titres très
     // obscurs (parfois une seule note à 10) plutôt que de vraies sorties
     // grand public.
     const [movies, tv] = await Promise.all([
-      getDiscoverMovie({
-        sort_by: 'primary_release_date.desc',
-        'primary_release_date.lte': today,
-        'vote_count.gte': 50,
-      }),
-      getDiscoverTv({
-        sort_by: 'first_air_date.desc',
-        'first_air_date.lte': today,
-        'vote_count.gte': 50,
-      }),
+      this.fetchPages<RawTmdbItem>(
+        (page) =>
+          getDiscoverMovie({
+            sort_by: 'primary_release_date.desc',
+            'primary_release_date.lte': today,
+            'vote_count.gte': 50,
+            page,
+          }),
+        pagesNeeded,
+      ),
+      this.fetchPages<RawTmdbItem>(
+        (page) =>
+          getDiscoverTv({
+            sort_by: 'first_air_date.desc',
+            'first_air_date.lte': today,
+            'vote_count.gte': 50,
+            page,
+          }),
+        pagesNeeded,
+      ),
     ]);
 
     return this.mergeAndFinalize(
-      [
-        ...this.mapItems(movies.results ?? [], 'film'),
-        ...this.mapItems(tv.results ?? [], 'serie'),
-      ],
+      [...this.mapItems(movies, 'film'), ...this.mapItems(tv, 'serie')],
       (a, b) => (b.date_sortie ?? '').localeCompare(a.date_sortie ?? ''),
       limit,
     );

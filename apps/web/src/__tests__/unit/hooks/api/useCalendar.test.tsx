@@ -36,7 +36,13 @@ describe("useCalendar", () => {
   });
 
   it("fetches calendar entries", async () => {
-    mockedApiFetch.mockResolvedValue(mockCalendar as any);
+    mockedApiFetch.mockResolvedValue({
+      items: mockCalendar,
+      total: mockCalendar.length,
+      page: 1,
+      limit: 100,
+      totalPages: 1,
+    } as any);
 
     const { result } = renderHook(() => useCalendar(), {
       wrapper: createWrapper(),
@@ -45,6 +51,6 @@ describe("useCalendar", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data).toEqual(mockCalendar);
-    expect(mockedApiFetch).toHaveBeenCalledWith("/calendar");
+    expect(mockedApiFetch).toHaveBeenCalledWith("/calendar?limit=100");
   });
 });

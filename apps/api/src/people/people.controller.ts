@@ -24,7 +24,7 @@ export class PeopleController {
    */
   @Get('search')
   async search(@Query() query: SearchPeopleDto) {
-    return this.peopleService.search(query.q);
+    return this.peopleService.search(query.q, query.page);
   }
 
   /**

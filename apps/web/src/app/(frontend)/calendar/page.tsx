@@ -10,9 +10,10 @@
 
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
-import { useCalendar } from "@/hooks/api/useCalendar";
+import { useInfiniteCalendar } from "@/hooks/api/useInfiniteCalendar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { PeriodFilter } from "@/components/common/PeriodFilter";
 import { DateCard } from "@/components/common/DateCard";
@@ -27,13 +28,43 @@ export default function CalendarPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const period = (searchParams.get("period") as Period | null) || "semaine";
-  const { data: entries, isLoading, error } = useCalendar(isAuthenticated);
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteCalendar(isAuthenticated);
+  const entries = data?.pages.flatMap((page) => page.items);
+  // Total réel côté backend — pas seulement ce qui a déjà été chargé par le
+  // scroll infini.
+  const totalEntries = data?.pages[0]?.total ?? 0;
 
   const setPeriod = (next: Period) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("period", next);
     router.replace(`/calendar?${params.toString()}`);
   };
+
+  // Charge la page suivante dès que la sentinelle en bas de liste entre
+  // dans le viewport (même pattern que /history).
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   if (isAuthLoading) {
     return (
@@ -69,7 +100,7 @@ export default function CalendarPage() {
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Calendrier</h1>
+          <h1 className="text-2xl font-bold">Calendrier ({totalEntries})</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Épisodes à venir de vos séries suivies
           </p>
@@ -100,7 +131,7 @@ export default function CalendarPage() {
             {groups.map((group) => (
               <div key={group.key} className="space-y-3">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  {group.label}
+                  {group.label} ({group.items.length})
                 </h2>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
                   {group.items.map((entry, idx) => (
@@ -120,7 +151,7 @@ export default function CalendarPage() {
             {undated.length > 0 && (
               <div className="space-y-3">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Date inconnue
+                  Date inconnue ({undated.length})
                 </h2>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
                   {undated.map((entry, idx) => (
@@ -134,6 +165,16 @@ export default function CalendarPage() {
                     />
                   ))}
                 </div>
+              </div>
+            )}
+
+            <div ref={sentinelRef} />
+
+            {isFetchingNextPage && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-[2/3] w-full" />
+                ))}
               </div>
             )}
           </div>

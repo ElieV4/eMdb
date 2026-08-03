@@ -16,6 +16,7 @@ const prismaServiceMock = {
   episodes: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
+    count: jest.fn(),
   },
   user_watches: {
     create: jest.fn(),
@@ -382,21 +383,29 @@ describe('WatchesService', () => {
         },
       ]);
 
+      prismaServiceMock.episodes.count.mockResolvedValue(1);
+
       const result = await service.getCalendar(userId);
 
-      expect(result).toEqual([
-        {
-          title_id: titleId,
-          titre_vo: 'Serie Test',
-          titre_vf: 'Série Test',
-          affiche_url: '/poster.jpg',
-          saison: 1,
-          episode_numero: 3,
-          episode_titre: 'Episode Titre',
-          date_diffusion: new Date('2026-08-01'),
-          nb_non_vus: 1,
-        },
-      ]);
+      expect(result).toEqual({
+        items: [
+          {
+            title_id: titleId,
+            titre_vo: 'Serie Test',
+            titre_vf: 'Série Test',
+            affiche_url: '/poster.jpg',
+            saison: 1,
+            episode_numero: 3,
+            episode_titre: 'Episode Titre',
+            date_diffusion: new Date('2026-08-01'),
+            nb_non_vus: 1,
+          },
+        ],
+        total: 1,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
+      });
       expect(prismaServiceMock.episodes.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
@@ -413,7 +422,7 @@ describe('WatchesService', () => {
 
       const result = await service.getCalendar(userId);
 
-      expect(result).toEqual([]);
+      expect(result).toEqual({ items: [], total: 0, page: 1, limit: 100, totalPages: 0 });
       expect(prismaServiceMock.episodes.findMany).not.toHaveBeenCalled();
     });
 
@@ -455,11 +464,14 @@ describe('WatchesService', () => {
         },
       ]);
 
+      prismaServiceMock.episodes.count.mockResolvedValue(3);
+
       const result = await service.getCalendar(userId);
 
-      expect(result.filter((entry) => entry.title_id === 'serie-1')[0].nb_non_vus).toBe(1);
-      expect(result.filter((entry) => entry.title_id === 'serie-2')).toHaveLength(2);
-      expect(result.filter((entry) => entry.title_id === 'serie-2')[0].nb_non_vus).toBe(2);
+      expect(result.items.filter((entry) => entry.title_id === 'serie-1')[0].nb_non_vus).toBe(1);
+      expect(result.items.filter((entry) => entry.title_id === 'serie-2')).toHaveLength(2);
+      expect(result.items.filter((entry) => entry.title_id === 'serie-2')[0].nb_non_vus).toBe(2);
+      expect(result.total).toBe(3);
     });
   });
 

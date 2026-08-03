@@ -14,7 +14,10 @@ export class DiscoverController {
   @Get(':module')
   async getModule(@Param('module') module: string, @Query('limit') limit?: string) {
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    const safeLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 50) : 20;
+    // Plafond relevé à 100 (au lieu de 50) pour la page dédiée /discover/:module
+    // (grille), qui révèle désormais ce lot progressivement au scroll côté
+    // client plutôt que de tout afficher d'un coup.
+    const safeLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 20;
     return this.discoverService.getModule(module, safeLimit);
   }
 }

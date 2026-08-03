@@ -121,11 +121,21 @@ export class WatchesController {
 
   /**
    * GET /calendar
-   * Calendrier des épisodes non vus pour les séries suivies.
+   * Calendrier des épisodes non vus pour les séries suivies, paginé
+   * (page/limit optionnels, défauts page=1 limit=100 — mêmes défauts que
+   * /watches, pour permettre le scroll infini sur /calendar).
    */
   @Get('calendar')
-  async getCalendar(@CurrentUser() user: any) {
-    return this.watchesService.getCalendar(user.id);
+  async getCalendar(
+    @CurrentUser() user: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.watchesService.getCalendar(
+      user.id,
+      page ? parseInt(page, 10) : undefined,
+      limit ? parseInt(limit, 10) : undefined,
+    );
   }
 
   /**
