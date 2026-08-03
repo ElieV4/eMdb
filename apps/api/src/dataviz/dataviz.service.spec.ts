@@ -627,6 +627,54 @@ describe('DatavizService', () => {
         ).resolves.toBeDefined();
       });
 
+      it('groupBy=director + legendBy=mediaType : colonnes series_id/series alignées sur t.type, GROUP BY étendu', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, {
+          metric: 'titles',
+          aggregation: 'distinctCount',
+          groupBy: 'director',
+          legendBy: 'mediaType',
+        } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain("(CASE WHEN t.type = 'film' THEN 'Film' ELSE 'Série' END) AS series");
+        expect(sql).toContain('GROUP BY p.id, p.nom, t.type');
+        expect(sql).toContain('ORDER BY value DESC, t.type');
+        expect(sql).toContain('LIMIT 20');
+      });
+
+      it('groupBy=actor + legendBy=mediaType : même mécanisme, jointure acteur + légende film/série', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, {
+          metric: 'titles',
+          aggregation: 'distinctCount',
+          groupBy: 'actor',
+          legendBy: 'mediaType',
+        } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain("r.code = 'acteur'");
+        expect(sql).toContain("(CASE WHEN t.type = 'film' THEN 'Film' ELSE 'Série' END) AS series");
+        expect(sql).toContain('GROUP BY p.id, p.nom, t.type');
+      });
+
+      it('groupBy=director + legendBy=genre : légende non-mediaType ignorée pour top 20 (aucune colonne series)', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, {
+          metric: 'titles',
+          aggregation: 'distinctCount',
+          groupBy: 'director',
+          legendBy: 'genre',
+        } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).not.toContain('AS series');
+        expect(sql).not.toContain('title_genres');
+      });
+
       it('metric=note + groupBy=title : rejeté (top20 restreint à duration/watches/titles)', async () => {
         await expect(
           service.query(userId, { metric: 'note', aggregation: 'avg', groupBy: 'title' } as any),

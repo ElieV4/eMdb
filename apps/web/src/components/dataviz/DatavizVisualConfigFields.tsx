@@ -231,7 +231,13 @@ export function DatavizVisualConfigFields({
     isGroupByRestricted(config.metric, config.aggregation) ? RESTRICTED_GROUP_BY_OPTIONS : GROUP_BY_OPTIONS
   ).filter((o) => top20Allowed || !TOP20_GROUP_BY_VALUES.includes(o.value));
   const legendAvailable = showLegend && supportsLegend(config.metric, config.aggregation);
-  const legendOptions = LEGEND_BASE_OPTIONS.filter((o) => o.value !== config.groupBy);
+  // Pour les groupements "top 20" (titre/acteur/réalisateur), la légende
+  // n'est supportée que par `mediaType` (film/série) côté backend — les
+  // autres groupements de légende n'ont pas de sens pour un classement.
+  const isTop20Group = TOP20_GROUP_BY_VALUES.includes(config.groupBy);
+  const legendOptions = isTop20Group
+    ? LEGEND_BASE_OPTIONS.filter((o) => o.value === "none" || o.value === "mediaType")
+    : LEGEND_BASE_OPTIONS.filter((o) => o.value !== config.groupBy);
 
   return (
     <>

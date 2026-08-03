@@ -749,11 +749,14 @@ export class DatavizService {
    * titres/acteurs/réalisateurs les plus regardés, toujours trié par valeur
    * décroissante et plafonné à 20 lignes — jamais l'intégralité de la
    * catégorie (contrairement à genre/pays/studio, dont la cardinalité reste
-   * raisonnable). Pas d'axe "Légende" ici (hors scope, cf. `DatavizQueryDto`).
-   * Restreint à `duration`+`sum` ou `watches`/`titles`+`count`/
-   * `distinctCount` : les autres combinaisons (note, min/max/avg/evolution)
-   * n'ont pas de sens pour un classement — validé ici en plus du frontend
-   * (défense en profondeur, l'API ne doit pas dépendre uniquement du menu).
+   * raisonnable). Supporte un axe "Légende" restreint à `mediaType`
+   * (film/série) — les autres groupements de légende (genre/pays/studio/
+   * period) n'ont pas de sens pour un classement top 20 (fan-out excessif
+   * ou redondant avec le classement lui-même). Restreint à `duration`+`sum`
+   * ou `watches`/`titles`+`count`/`distinctCount` : les autres combinaisons
+   * (note, min/max/avg/evolution) n'ont pas de sens pour un classement —
+   * validé ici en plus du frontend (défense en profondeur, l'API ne doit
+   * pas dépendre uniquement du menu).
    */
   private async rowsTop20(userId: string, dto: DatavizQueryDto): Promise<DatavizRow[]> {
     const validCombo =
@@ -773,16 +776,25 @@ export class DatavizService {
       noteCol: 't.note_imdb',
     });
     const where = this.buildWhere(userId, dto, 't');
+
+    // Légende restreinte à `mediaType` pour les top 20 — divise chaque
+    // barre en Film/Série. Les autres groupements de légende sont ignorés
+    // (hors scope pour un classement).
+    const legend = dto.legendBy === 'mediaType' ? this.categoryPieces('mediaType', dto.granularity ?? 'month', '2') : null;
+    const legendSelect = legend ? `, ${legend.categoryIdExpr} AS series_id, ${legend.categoryExpr} AS series` : '';
+    const groupByAll = [pieces.groupByExpr, legend?.groupByExpr].filter(Boolean).join(', ');
+    const orderByAll = legend ? `value DESC, ${legend.orderExpr}` : 'value DESC';
+
     const sql = `
-      SELECT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category, ${val} AS value
+      SELECT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category${legendSelect}, ${val} AS value
       FROM user_watches uw
       LEFT JOIN episodes e ON e.id = uw.episode_id
       LEFT JOIN seasons s ON s.id = e.season_id
       JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
       ${pieces.joinSql}
       WHERE ${where}
-      GROUP BY ${pieces.groupByExpr}
-      ORDER BY value DESC
+      GROUP BY ${groupByAll}
+      ORDER BY ${orderByAll}
       LIMIT 20
     `;
     return this.queryRaw<DatavizRow>(sql);

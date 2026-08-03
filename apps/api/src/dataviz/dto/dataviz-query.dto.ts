@@ -26,10 +26,12 @@ import { DatavizFilterQueryDto } from './dataviz-filter-query.dto';
  *
  * `title`/`actor`/`director` : groupements "top 20" (barchart des titres/
  * acteurs/réalisateurs les plus regardés) — toujours triés par valeur
- * décroissante et plafonnés à 20 lignes (`DatavizService.rowsTop20`), jamais
- * disponibles comme axe "Légende", et restreints à `duration`+`sum` ou
- * `watches`/`titles`+`count`/`distinctCount` (pas de sens pour `note`, ni
- * pour min/max/avg/evolution — validé côté service).
+ * décroissante et plafonnés à 20 lignes (`DatavizService.rowsTop20`),
+ * restreints à `duration`+`sum` ou `watches`/`titles`+`count`/
+ * `distinctCount` (pas de sens pour `note`, ni pour min/max/avg/evolution —
+ * validé côté service). Supportent un axe "Légende" restreint à `mediaType`
+ * (film/série) — les autres groupements de légende n'ont pas de sens pour
+ * un classement (fan-out excessif ou redondant).
  */
 export type DatavizMetric = 'duration' | 'watches' | 'titles' | 'note';
 export type DatavizAggregation = 'sum' | 'count' | 'distinctCount' | 'min' | 'max' | 'avg' | 'evolution';

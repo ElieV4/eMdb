@@ -58,6 +58,14 @@ export function DatavizSection() {
         <ConfigurableLineChart
           defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "quarter" }}
         />
+        <ConfigurableBreakdownChart
+          chartType="grouped-bar"
+          defaultConfig={{ ...defaultVisualConfig("titles", "distinctCount", "director"), legendBy: "mediaType" }}
+        />
+        <ConfigurableBreakdownChart
+          chartType="grouped-bar"
+          defaultConfig={{ ...defaultVisualConfig("titles", "distinctCount", "actor"), legendBy: "mediaType" }}
+        />
       </div>
     </div>
   );

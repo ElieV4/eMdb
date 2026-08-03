@@ -46,6 +46,11 @@ export function useDatavizConfig(initial: DatavizVisualConfig) {
       if (next.legendBy === next.groupBy && next.legendBy !== "none") {
         next.legendBy = "none";
       }
+      // Pour les groupements "top 20" (titre/acteur/réalisateur), la légende
+      // n'est supportée que par `mediaType` (film/série) côté backend.
+      if (TOP20_GROUP_BYS.includes(next.groupBy) && next.legendBy !== "none" && next.legendBy !== "mediaType") {
+        next.legendBy = "none";
+      }
       return next;
     });
   }
