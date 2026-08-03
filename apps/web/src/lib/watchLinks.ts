@@ -1,6 +1,20 @@
+import {
+  Apple,
+  BookOpen,
+  Clapperboard,
+  ExternalLink,
+  Film,
+  MonitorPlay,
+  Play,
+  Sparkles,
+  Tv,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
 export type WatchLink = {
   name: string;
   href: string;
+  icon: LucideIcon;
 };
 
 export type WatchLinkMode = "film" | "serie";
@@ -37,18 +51,33 @@ export function buildWatchLinks({
       ? {
           name: "Voir sur TMDB",
           href: `https://www.themoviedb.org/${type === "film" ? "movie" : "tv"}/${tmdbId}`,
+          icon: ExternalLink,
         }
       : null,
-    { name: "Netflix", href: `https://www.netflix.com/search?q=${query}` },
+    {
+      name: "Netflix",
+      href: `https://www.netflix.com/search?q=${query}`,
+      icon: Tv,
+    },
     {
       name: "Prime Video",
       href: `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${query}`,
+      icon: Play,
     },
-    { name: "Canal+", href: `https://www.canalplus.com/search?query=${query}` },
-    { name: "Disney+", href: `https://www.disneyplus.com/search?q=${query}` },
+    {
+      name: "Canal+",
+      href: `https://www.canalplus.com/search?query=${query}`,
+      icon: Clapperboard,
+    },
+    {
+      name: "Disney+",
+      href: `https://www.disneyplus.com/search?q=${query}`,
+      icon: Sparkles,
+    },
     {
       name: "Apple TV",
       href: `https://tv.apple.com/search?term=${query}`,
+      icon: Apple,
     },
   ].filter((link): link is WatchLink => !!link && !!link.href && link.href.trim() !== "");
 
@@ -56,14 +85,17 @@ export function buildWatchLinks({
     {
       name: "WatchTV",
       href: `https://www.watchtv.click/${type === "film" ? "movie" : "series"}/${slug}/`,
+      icon: MonitorPlay,
     },
     {
       name: "HydraFlix",
       href: `https://www.hydraflix.cc/${slug}/`,
+      icon: Film,
     },
     {
       name: "MovieDB Wiki",
       href: `https://www.moviedb.wiki/${slug}/`,
+      icon: BookOpen,
     },
   ].filter((link) => !!link.href && link.href.trim() !== "");
 

@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar, Clock, ArrowLeft } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { TitleCredits } from "@/components/titles/TitleCredits";
 import { WatchButton } from "@/components/watches/WatchButton";
@@ -86,26 +87,36 @@ export default function EpisodeDetailPage({
       })
     : { officialLinks: [], freeLinks: [] };
 
-  const renderLinkGroup = (groupTitle: string, links: Array<{ name: string; href: string }>) => {
+  const renderLinkGroup = (
+    groupTitle: string,
+    links: Array<{ name: string; href: string; icon?: LucideIcon }>,
+  ) => {
     if (links.length === 0) return null;
 
+    const Icon = links[0]?.icon;
+
     return (
-      <div className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="rounded-lg border border-border bg-background/40 p-3">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {Icon && <Icon className="h-4 w-4" />}
           {groupTitle}
         </h2>
         <div className="flex flex-wrap gap-2">
-          {links.map((link) => (
-            <a
-              key={link.name}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm text-foreground hover:bg-muted/60"
-            >
-              {link.name}
-            </a>
-          ))}
+          {links.map((link) => {
+            const LinkIcon = link.icon;
+            return (
+              <a
+                key={link.name}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm text-foreground hover:bg-muted/60"
+              >
+                {LinkIcon && <LinkIcon className="h-3.5 w-3.5" />}
+                {link.name}
+              </a>
+            );
+          })}
         </div>
       </div>
     );
@@ -196,8 +207,8 @@ export default function EpisodeDetailPage({
 
         {title && (
           <div className="grid gap-4 pt-2 md:grid-cols-2">
-            {renderLinkGroup("Liens officiels", watchLinks.officialLinks)}
-            {renderLinkGroup("Liens libres", watchLinks.freeLinks)}
+            {renderLinkGroup("Streaming FR", watchLinks.officialLinks)}
+            {renderLinkGroup("Gratuit / sites whitelistés", watchLinks.freeLinks)}
           </div>
         )}
 

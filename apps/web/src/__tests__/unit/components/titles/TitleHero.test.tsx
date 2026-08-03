@@ -111,7 +111,7 @@ describe("TitleHero", () => {
   it("affiche les liens directs vers les services de streaming en France et les liens libres valides", async () => {
     render(<TitleHero title={mockTitle} />);
 
-    expect(screen.getByText("Liens officiels")).toBeInTheDocument();
+    expect(screen.getByText("Streaming FR")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Voir sur TMDB/i })).toHaveAttribute(
       "href",
       "https://www.themoviedb.org/movie/123",
@@ -126,7 +126,7 @@ describe("TitleHero", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Liens libres")).toBeInTheDocument();
+      expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
     });
 
     expect(screen.getByRole("link", { name: /WatchTV/i })).toHaveAttribute(
@@ -161,6 +161,22 @@ describe("TitleHero", () => {
 
     await waitFor(() => {
       expect(screen.queryByRole("link", { name: /HydraFlix/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it("cache entièrement le bloc 'Gratuit / sites whitelistés' quand tous les sites renvoient 404", async () => {
+    (global.fetch as jest.Mock).mockImplementation(() =>
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        json: async () => ({ valid: false, status: 404 }),
+      } as Response),
+    );
+
+    render(<TitleHero title={mockTitle} />);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Gratuit / sites whitelistés")).not.toBeInTheDocument();
     });
   });
 
