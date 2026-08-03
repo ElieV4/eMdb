@@ -4,11 +4,10 @@ import { WatchesService } from './watches.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 jest.mock('@emdb/db', () => ({
-  countEpisodesNonVus: jest.fn(),
   getSerieProgress: jest.fn(),
 }));
 
-import { countEpisodesNonVus, getSerieProgress } from '@emdb/db';
+import { getSerieProgress } from '@emdb/db';
 
 const prismaServiceMock = {
   titles: {
@@ -16,6 +15,7 @@ const prismaServiceMock = {
   },
   episodes: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
   },
   user_watches: {
     create: jest.fn(),
@@ -29,6 +29,9 @@ const prismaServiceMock = {
     findMany: jest.fn(),
     create: jest.fn(),
     delete: jest.fn(),
+  },
+  list_items: {
+    deleteMany: jest.fn(),
   },
 };
 
@@ -68,7 +71,7 @@ describe('WatchesService', () => {
       expect(result.id).toBe(watchId);
       expect(prismaServiceMock.titles.findUnique).toHaveBeenCalledWith({
         where: { id: titleId },
-        select: { id: true },
+        select: { id: true, type: true },
       });
       expect(prismaServiceMock.user_watches.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -79,6 +82,29 @@ describe('WatchesService', () => {
           }),
         }),
       );
+    });
+
+    it('retire automatiquement un film de la watchlist une fois marqué vu', async () => {
+      prismaServiceMock.titles.findUnique.mockResolvedValue({ id: titleId, type: 'film' });
+      prismaServiceMock.user_watches.create.mockResolvedValue({ id: watchId, title_id: titleId });
+
+      await service.createWatch(userId, { title_id: titleId });
+
+      expect(prismaServiceMock.list_items.deleteMany).toHaveBeenCalledWith({
+        where: {
+          title_id: titleId,
+          user_lists: { user_id: userId, type: 'watchlist' },
+        },
+      });
+    });
+
+    it('ne retire pas une série de la watchlist quand un visionnage est enregistré', async () => {
+      prismaServiceMock.titles.findUnique.mockResolvedValue({ id: titleId, type: 'serie' });
+      prismaServiceMock.user_watches.create.mockResolvedValue({ id: watchId, title_id: titleId });
+
+      await service.createWatch(userId, { title_id: titleId });
+
+      expect(prismaServiceMock.list_items.deleteMany).not.toHaveBeenCalled();
     });
 
     it('crée un watch pour un episode_id', async () => {
@@ -341,32 +367,45 @@ describe('WatchesService', () => {
   // getCalendar
   // ======================================================================
   describe('getCalendar', () => {
-    it('retourne le calendrier des épisodes non vus', async () => {
-      const mockFollows = [
+    it('retourne une entrée par épisode non vu, avec saison/numéro/date', async () => {
+      prismaServiceMock.user_follows_serie.findMany.mockResolvedValue([{ title_id: titleId }]);
+      prismaServiceMock.episodes.findMany.mockResolvedValue([
         {
-          title_id: titleId,
-          titles: {
-            id: titleId,
-            tmdb_id: 123,
-            titre_vo: 'Serie Test',
-            titre_vf: 'Série Test',
-            affiche_url: '/poster.jpg',
-            next_episode_air_date: new Date('2026-08-01'),
+          numero: 3,
+          titre: 'Episode Titre',
+          date_sortie: new Date('2026-08-01'),
+          seasons: {
+            numero: 1,
+            title_id: titleId,
+            titles: { titre_vo: 'Serie Test', titre_vf: 'Série Test', affiche_url: '/poster.jpg' },
           },
         },
-      ];
-      prismaServiceMock.user_follows_serie.findMany.mockResolvedValue(mockFollows);
-      (countEpisodesNonVus as jest.Mock).mockResolvedValue(5);
+      ]);
 
       const result = await service.getCalendar(userId);
 
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        title_id: titleId,
-        titre_vo: 'Serie Test',
-        nb_non_vus: 5,
-      });
-      expect(countEpisodesNonVus).toHaveBeenCalledWith(userId, titleId);
+      expect(result).toEqual([
+        {
+          title_id: titleId,
+          titre_vo: 'Serie Test',
+          titre_vf: 'Série Test',
+          affiche_url: '/poster.jpg',
+          saison: 1,
+          episode_numero: 3,
+          episode_titre: 'Episode Titre',
+          date_diffusion: new Date('2026-08-01'),
+          nb_non_vus: 1,
+        },
+      ]);
+      expect(prismaServiceMock.episodes.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            seasons: { title_id: { in: [titleId] } },
+            user_watches: { none: { user_id: userId } },
+            OR: [{ date_sortie: { gte: expect.any(Date) } }, { date_sortie: null }],
+          },
+        }),
+      );
     });
 
     it('retourne un tableau vide si aucune série suivie', async () => {
@@ -375,39 +414,188 @@ describe('WatchesService', () => {
       const result = await service.getCalendar(userId);
 
       expect(result).toEqual([]);
+      expect(prismaServiceMock.episodes.findMany).not.toHaveBeenCalled();
     });
 
-    it('trie par nb_non_vus décroissant', async () => {
+    it('calcule nb_non_vus par série à partir du nombre d’épisodes retournés', async () => {
       prismaServiceMock.user_follows_serie.findMany.mockResolvedValue([
+        { title_id: 'serie-1' },
+        { title_id: 'serie-2' },
+      ]);
+      prismaServiceMock.episodes.findMany.mockResolvedValue([
         {
-          title_id: 'serie-1',
-          titles: {
-            id: 'serie-1',
-            titre_vo: 'Serie 1',
-            titre_vf: null,
-            affiche_url: null,
-            next_episode_air_date: null,
+          numero: 1,
+          titre: null,
+          date_sortie: null,
+          seasons: {
+            numero: 1,
+            title_id: 'serie-1',
+            titles: { titre_vo: 'Serie 1', titre_vf: null, affiche_url: null },
           },
         },
         {
-          title_id: 'serie-2',
-          titles: {
-            id: 'serie-2',
-            titre_vo: 'Serie 2',
-            titre_vf: null,
-            affiche_url: null,
-            next_episode_air_date: null,
+          numero: 1,
+          titre: null,
+          date_sortie: null,
+          seasons: {
+            numero: 1,
+            title_id: 'serie-2',
+            titles: { titre_vo: 'Serie 2', titre_vf: null, affiche_url: null },
+          },
+        },
+        {
+          numero: 2,
+          titre: null,
+          date_sortie: null,
+          seasons: {
+            numero: 1,
+            title_id: 'serie-2',
+            titles: { titre_vo: 'Serie 2', titre_vf: null, affiche_url: null },
           },
         },
       ]);
-      (countEpisodesNonVus as jest.Mock).mockResolvedValueOnce(3).mockResolvedValueOnce(10);
 
       const result = await service.getCalendar(userId);
 
-      expect(result[0].title_id).toBe('serie-2');
-      expect(result[0].nb_non_vus).toBe(10);
-      expect(result[1].title_id).toBe('serie-1');
-      expect(result[1].nb_non_vus).toBe(3);
+      expect(result.filter((entry) => entry.title_id === 'serie-1')[0].nb_non_vus).toBe(1);
+      expect(result.filter((entry) => entry.title_id === 'serie-2')).toHaveLength(2);
+      expect(result.filter((entry) => entry.title_id === 'serie-2')[0].nb_non_vus).toBe(2);
+    });
+  });
+
+  // ======================================================================
+  // getContinueWatching
+  // ======================================================================
+  describe('getContinueWatching', () => {
+    it('calcule la progression et exclut les séries entièrement vues', async () => {
+      prismaServiceMock.user_follows_serie.findMany.mockResolvedValue([
+        {
+          title_id: 'serie-en-cours',
+          titles: { id: 'serie-en-cours', titre_vo: 'En cours', titre_vf: null, affiche_url: null },
+        },
+        {
+          title_id: 'serie-terminee',
+          titles: { id: 'serie-terminee', titre_vo: 'Terminée', titre_vf: null, affiche_url: null },
+        },
+      ]);
+      prismaServiceMock.episodes.findMany.mockResolvedValue([
+        // serie-en-cours : 2 épisodes, 1 vu
+        {
+          id: 'ep-1',
+          numero: 1,
+          titre: 'Episode 1',
+          date_sortie: new Date('2026-01-01'),
+          seasons: { numero: 1, title_id: 'serie-en-cours' },
+          user_watches: [{ date_vue: new Date('2026-01-02') }],
+        },
+        {
+          id: 'ep-2',
+          numero: 2,
+          titre: 'Episode 2',
+          date_sortie: new Date('2026-02-01'),
+          seasons: { numero: 1, title_id: 'serie-en-cours' },
+          user_watches: [],
+        },
+        // serie-terminee : 1 épisode, vu
+        {
+          id: 'ep-3',
+          numero: 1,
+          titre: null,
+          date_sortie: new Date('2025-01-01'),
+          seasons: { numero: 1, title_id: 'serie-terminee' },
+          user_watches: [{ date_vue: new Date('2025-01-02') }],
+        },
+      ]);
+
+      const result = await service.getContinueWatching(userId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        title_id: 'serie-en-cours',
+        episode_id: 'ep-2',
+        saison: 1,
+        episode_numero: 2,
+        episode_titre: 'Episode 2',
+        total_episodes: 2,
+        episodes_vus: 1,
+        episodes_restants: 1,
+      });
+    });
+
+    it('retient le premier épisode non vu dans l’ordre saison/numéro comme prochain épisode', async () => {
+      prismaServiceMock.user_follows_serie.findMany.mockResolvedValue([
+        { title_id: 'serie', titles: { id: 'serie', titre_vo: 'Serie', titre_vf: null, affiche_url: null } },
+      ]);
+      prismaServiceMock.episodes.findMany.mockResolvedValue([
+        {
+          id: 's1e1',
+          numero: 1,
+          titre: null,
+          date_sortie: new Date('2024-01-01'),
+          seasons: { numero: 1, title_id: 'serie' },
+          user_watches: [{ date_vue: new Date('2024-01-02') }],
+        },
+        {
+          id: 's1e2',
+          numero: 2,
+          titre: null,
+          date_sortie: new Date('2024-01-08'),
+          seasons: { numero: 1, title_id: 'serie' },
+          user_watches: [],
+        },
+        {
+          id: 's2e1',
+          numero: 1,
+          titre: null,
+          date_sortie: new Date('2025-01-01'),
+          seasons: { numero: 2, title_id: 'serie' },
+          user_watches: [],
+        },
+      ]);
+
+      const result = await service.getContinueWatching(userId);
+
+      expect(result[0].episode_id).toBe('s1e2');
+      expect(result[0].saison).toBe(1);
+      expect(result[0].episode_numero).toBe(2);
+    });
+
+    it('trie par MAX(dernier visionnage, dernière sortie) décroissant', async () => {
+      prismaServiceMock.user_follows_serie.findMany.mockResolvedValue([
+        { title_id: 'ancienne-activite', titles: { id: 'ancienne-activite', titre_vo: 'A', titre_vf: null, affiche_url: null } },
+        { title_id: 'nouvel-episode', titles: { id: 'nouvel-episode', titre_vo: 'B', titre_vf: null, affiche_url: null } },
+      ]);
+      prismaServiceMock.episodes.findMany.mockResolvedValue([
+        {
+          id: 'ep-old',
+          numero: 1,
+          titre: null,
+          date_sortie: new Date('2020-01-01'),
+          seasons: { numero: 1, title_id: 'ancienne-activite' },
+          user_watches: [],
+        },
+        {
+          id: 'ep-new',
+          numero: 1,
+          titre: null,
+          date_sortie: new Date('2026-08-01'),
+          seasons: { numero: 1, title_id: 'nouvel-episode' },
+          user_watches: [],
+        },
+      ]);
+
+      const result = await service.getContinueWatching(userId);
+
+      expect(result.map((entry) => entry.title_id)).toEqual(['nouvel-episode', 'ancienne-activite']);
+    });
+
+    it('retourne un tableau vide si aucune série suivie', async () => {
+      prismaServiceMock.user_follows_serie.findMany.mockResolvedValue([]);
+
+      const result = await service.getContinueWatching(userId);
+
+      expect(result).toEqual([]);
+      expect(prismaServiceMock.episodes.findMany).not.toHaveBeenCalled();
     });
   });
 

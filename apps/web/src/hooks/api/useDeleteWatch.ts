@@ -14,6 +14,8 @@ export function useDeleteWatch() {
       apiFetch(`/watches/${watchId}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["watches"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["continue-watching"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["watched-titles-set"] });
     },

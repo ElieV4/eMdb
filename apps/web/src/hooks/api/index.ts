@@ -54,6 +54,7 @@ export { usePersonRecommendations } from "./usePersonRecommendations";
 
 // Phase 4 — Fonctionnalités utilisateur
 export { useWatches } from "./useWatches";
+export { useInfiniteWatches } from "./useInfiniteWatches";
 export { useCreateWatch } from "./useCreateWatch";
 export { useDeleteWatch } from "./useDeleteWatch";
 export { useDeleteAllWatches } from "./useDeleteAllWatches";
@@ -92,6 +93,9 @@ export { useListMembership } from "./useListMembership";
 
 // Bug 27 — Rafraîchissement filmographie TMDB
 export { useRefreshFilmography } from "./useRefreshFilmography";
+
+// Modification U — Module accueil "Continuer à regarder"
+export { useContinueWatching } from "./useContinueWatching";
 
 // Bug #55/#56 — Import depuis Trakt (page Profil)
 export {

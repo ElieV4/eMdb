@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateWatchDto } from './dto/create-watch.dto';
 import { ListWatchesFilterDto } from './dto/list-watches-filter.dto';
-import { countEpisodesNonVus, getSerieProgress } from '@emdb/db';
+import { getSerieProgress } from '@emdb/db';
 
 /**
  * Service métier pour le module watches (Phase 4.1).
@@ -53,10 +53,11 @@ export class WatchesService {
     }
 
     // Vérifier que le titre ou l'épisode existe
+    let title: { id: string; type: string } | null = null;
     if (title_id) {
-      const title = await this.prisma.titles.findUnique({
+      title = await this.prisma.titles.findUnique({
         where: { id: title_id },
-        select: { id: true },
+        select: { id: true, type: true },
       });
       if (!title) {
         throw new NotFoundException('Titre introuvable.');
@@ -73,7 +74,7 @@ export class WatchesService {
       }
     }
 
-    return this.prisma.user_watches.create({
+    const watch = await this.prisma.user_watches.create({
       data: {
         user_id: userId,
         title_id: title_id ?? null,
@@ -101,6 +102,22 @@ export class WatchesService {
         },
       },
     });
+
+    // Un film marqué vu sort automatiquement de la watchlist (retour
+    // utilisateur) — n'a de sens que pour un film (visionnage complet en un
+    // seul événement) : une série marquée "vue" épisode par épisode n'a pas
+    // ce même moment "terminé" univoque, donc la watchlist série n'est
+    // jamais retirée automatiquement.
+    if (title && title.type === 'film') {
+      await this.prisma.list_items.deleteMany({
+        where: {
+          title_id: title.id,
+          user_lists: { user_id: userId, type: 'watchlist' },
+        },
+      });
+    }
+
+    return watch;
   }
 
   /**
@@ -340,7 +357,21 @@ export class WatchesService {
               id: true,
               numero: true,
               titre: true,
-              seasons: { select: { numero: true } },
+              seasons: {
+                select: {
+                  numero: true,
+                  titles: {
+                    select: {
+                      id: true,
+                      tmdb_id: true,
+                      titre_vo: true,
+                      titre_vf: true,
+                      affiche_url: true,
+                      type: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -383,27 +414,100 @@ export class WatchesService {
   }
 
   /**
-   * Calendrier des épisodes non vus.
-   *
-   * Pour chaque série suivie par l'utilisateur, calcule le nombre d'épisodes
-   * non vus (fn_episodes_non_vus) et retourne les infos de la série.
+   * Calendrier de sortie : épisodes des séries suivies à venir à partir
+   * d'aujourd'hui, triés par date croissante (le calendrier des épisodes
+   * en retard/non vus indépendamment de la date est couvert séparément par
+   * `getContinueWatching` / module "Continuer à regarder").
    *
    * @param userId - UUID de l'utilisateur connecté
-   * @returns Liste des séries suivies avec nb_non_vus
+   * @returns Épisodes des séries suivies à partir d'aujourd'hui (+ ceux
+   *   sans date de sortie connue), triés par date croissante
    */
   async getCalendar(userId: string) {
     const followedSeries = await this.prisma.user_follows_serie.findMany({
       where: { user_id: userId },
-      include: {
-        titles: {
+      select: { title_id: true },
+    });
+
+    if (followedSeries.length === 0) {
+      return [];
+    }
+
+    const titleIds = followedSeries.map((follow) => follow.title_id);
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    // Le calendrier démarre à aujourd'hui et va croissant (retour
+    // utilisateur) — épisodes déjà sortis avant aujourd'hui et non vus
+    // exclus (backlog couvert par "Continuer à regarder" à la place). Les
+    // épisodes sans date de sortie connue restent inclus (groupe "Date
+    // inconnue" dédié côté frontend, cf. modification J) : ils ne sont ni
+    // passés ni futurs, donc hors du champ de ce filtre.
+    const episodes = await this.prisma.episodes.findMany({
+      where: {
+        seasons: { title_id: { in: titleIds } },
+        user_watches: { none: { user_id: userId } },
+        OR: [{ date_sortie: { gte: startOfToday } }, { date_sortie: null }],
+      },
+      select: {
+        numero: true,
+        titre: true,
+        date_sortie: true,
+        seasons: {
           select: {
-            id: true,
-            tmdb_id: true,
-            titre_vo: true,
-            titre_vf: true,
-            affiche_url: true,
-            next_episode_air_date: true,
+            numero: true,
+            title_id: true,
+            titles: { select: { titre_vo: true, titre_vf: true, affiche_url: true } },
           },
+        },
+      },
+      orderBy: { date_sortie: 'asc' },
+    });
+
+    // Calculé directement à partir de la liste ci-dessus plutôt que via
+    // countEpisodesNonVus()/fn_episodes_non_vus (PL/pgSQL) : évite une
+    // dépendance à une fonction qui peut être absente de la base locale
+    // (bug #50) et évite N requêtes supplémentaires (une par série suivie).
+    const nbNonVusParTitre = new Map<string, number>();
+    for (const episode of episodes) {
+      const titleId = episode.seasons.title_id;
+      nbNonVusParTitre.set(titleId, (nbNonVusParTitre.get(titleId) ?? 0) + 1);
+    }
+
+    return episodes.map((episode) => ({
+      title_id: episode.seasons.title_id,
+      titre_vo: episode.seasons.titles.titre_vo,
+      titre_vf: episode.seasons.titles.titre_vf,
+      affiche_url: episode.seasons.titles.affiche_url,
+      saison: episode.seasons.numero,
+      episode_numero: episode.numero,
+      episode_titre: episode.titre,
+      date_diffusion: episode.date_sortie,
+      nb_non_vus: nbNonVusParTitre.get(episode.seasons.title_id) ?? 0,
+    }));
+  }
+
+  /**
+   * Séries suivies avec au moins un épisode restant à voir (modification U,
+   * module accueil "Continuer à regarder") — une entrée par série, portant
+   * sur son PROCHAIN épisode non vu (pas la série en tant que telle : le
+   * titre affiché est celui de la série, mais l'action "marquer comme vu"
+   * porte sur cet épisode précis). Triées par
+   * MAX(date du dernier épisode vu, date de sortie du dernier épisode)
+   * décroissant — une série jamais commencée mais dont un nouvel épisode
+   * vient de sortir remonte donc aussi haut qu'une série activement suivie.
+   *
+   * @param userId - UUID de l'utilisateur connecté
+   * @returns Prochain épisode à voir par série suivie, triés par pertinence
+   */
+  async getContinueWatching(userId: string) {
+    const followedSeries = await this.prisma.user_follows_serie.findMany({
+      where: { user_id: userId },
+      select: {
+        title_id: true,
+        titles: {
+          select: { id: true, titre_vo: true, titre_vf: true, affiche_url: true },
         },
       },
     });
@@ -412,25 +516,111 @@ export class WatchesService {
       return [];
     }
 
-    const results = [];
+    const titleIds = followedSeries.map((follow) => follow.title_id);
 
-    for (const follow of followedSeries) {
-      const nbNonVus = await countEpisodesNonVus(userId, follow.title_id);
+    // Triés par saison puis numéro : le premier épisode non vu rencontré
+    // pour une série donnée, dans cet ordre, est son prochain épisode à
+    // voir (ordre de visionnage naturel, pas l'ordre de sortie — un
+    // épisode spécial "saison 0" antérieur à la sortie ne doit pas
+    // perturber la progression narrative).
+    const episodes = await this.prisma.episodes.findMany({
+      where: { seasons: { title_id: { in: titleIds } } },
+      select: {
+        id: true,
+        numero: true,
+        titre: true,
+        date_sortie: true,
+        seasons: { select: { numero: true, title_id: true } },
+        user_watches: {
+          where: { user_id: userId },
+          select: { date_vue: true },
+          orderBy: { date_vue: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: [{ seasons: { numero: 'asc' } }, { numero: 'asc' }],
+    });
 
-      results.push({
-        title_id: follow.title_id,
-        titre_vo: follow.titles.titre_vo,
-        titre_vf: follow.titles.titre_vf,
-        affiche_url: follow.titles.affiche_url,
-        next_episode_air_date: follow.titles.next_episode_air_date,
-        nb_non_vus: nbNonVus,
-      });
+    type Agg = {
+      total: number;
+      watched: number;
+      lastWatchedAt: Date | null;
+      lastAiredAt: Date | null;
+      nextEpisode: { id: string; saison: number; numero: number; titre: string | null } | null;
+    };
+    const aggByTitle = new Map<string, Agg>();
+
+    for (const episode of episodes) {
+      const titleId = episode.seasons.title_id;
+      const agg = aggByTitle.get(titleId) ?? {
+        total: 0,
+        watched: 0,
+        lastWatchedAt: null,
+        lastAiredAt: null,
+        nextEpisode: null,
+      };
+
+      agg.total += 1;
+
+      const lastWatch = episode.user_watches[0];
+      if (lastWatch) {
+        agg.watched += 1;
+        if (!agg.lastWatchedAt || lastWatch.date_vue > agg.lastWatchedAt) {
+          agg.lastWatchedAt = lastWatch.date_vue;
+        }
+      } else if (!agg.nextEpisode) {
+        agg.nextEpisode = {
+          id: episode.id,
+          saison: episode.seasons.numero,
+          numero: episode.numero,
+          titre: episode.titre,
+        };
+      }
+
+      if (episode.date_sortie && (!agg.lastAiredAt || episode.date_sortie > agg.lastAiredAt)) {
+        agg.lastAiredAt = episode.date_sortie;
+      }
+
+      aggByTitle.set(titleId, agg);
     }
 
-    // Trier par nb_non_vus décroissant
-    results.sort((a, b) => b.nb_non_vus - a.nb_non_vus);
+    return followedSeries
+      .map((follow) => {
+        const agg = aggByTitle.get(follow.title_id);
+        // Pas d'épisode restant (rien importé, ou série entièrement vue) :
+        // rien à "continuer" pour cette série.
+        if (!agg || !agg.nextEpisode) {
+          return null;
+        }
 
-    return results;
+        const sortDate =
+          agg.lastWatchedAt && agg.lastAiredAt
+            ? agg.lastWatchedAt > agg.lastAiredAt
+              ? agg.lastWatchedAt
+              : agg.lastAiredAt
+            : (agg.lastWatchedAt ?? agg.lastAiredAt);
+
+        return {
+          title_id: follow.title_id,
+          titre_vo: follow.titles.titre_vo,
+          titre_vf: follow.titles.titre_vf,
+          affiche_url: follow.titles.affiche_url,
+          episode_id: agg.nextEpisode.id,
+          saison: agg.nextEpisode.saison,
+          episode_numero: agg.nextEpisode.numero,
+          episode_titre: agg.nextEpisode.titre,
+          total_episodes: agg.total,
+          episodes_vus: agg.watched,
+          episodes_restants: agg.total - agg.watched,
+          sort_date: sortDate,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+      .sort((a, b) => {
+        const aTime = a.sort_date ? new Date(a.sort_date).getTime() : 0;
+        const bTime = b.sort_date ? new Date(b.sort_date).getTime() : 0;
+        return bTime - aTime;
+      });
   }
 
   // ======================================================================

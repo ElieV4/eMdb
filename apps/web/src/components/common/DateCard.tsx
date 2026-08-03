@@ -5,8 +5,9 @@
  * (modification J, puis retour "garde le format affiche").
  */
 
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { X, Eye, Bookmark, Heart } from "lucide-react";
 import { formatRelativeDate } from "@/lib/relativeDate";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,15 @@ type DateCardProps = {
    * (un `<button>` imbriqué dans un `<a>` casse silencieusement le clic). */
   onRemove?: () => void;
   removeLabel?: string;
+  /** Icones d'état (favori/watchlist/vu), même convention que `TitlePoster`
+   * (empilées en haut à gauche). Absentes par défaut — n'affecte pas les
+   * usages existants (calendrier, sliders accueil) qui ne les passent pas. */
+  watched?: boolean;
+  inWatchlist?: boolean;
+  inFavorites?: boolean;
+  /** Menu actions rapides ("⋮", ex. `TitleQuickActionsMenu`) — rendu en
+   * sibling du `Link`, à côté du bouton de suppression s'il est présent. */
+  quickActions?: ReactNode;
 };
 
 export function DateCard({
@@ -35,6 +45,10 @@ export function DateCard({
   className,
   onRemove,
   removeLabel = "Supprimer",
+  watched = false,
+  inWatchlist = false,
+  inFavorites = false,
+  quickActions,
 }: DateCardProps) {
   const src = imageUrl
     ? imageUrl.startsWith("http")
@@ -49,6 +63,39 @@ export function DateCard({
           {src ? (
             <img src={src} alt={title} className="w-full h-full object-cover" />
           ) : null}
+
+          {(inFavorites || inWatchlist || watched) && (
+            <div className="absolute top-1.5 left-1.5 z-10 flex flex-col items-center gap-1">
+              {inFavorites && (
+                <span
+                  className="flex items-center justify-center rounded-full bg-black/70 p-1"
+                  aria-label="Dans les favoris"
+                  title="Dans les favoris"
+                >
+                  <Heart className="h-3 w-3 text-red-500 fill-red-500" />
+                </span>
+              )}
+              {inWatchlist && (
+                <span
+                  className="flex items-center justify-center rounded-full bg-black/70 p-1"
+                  aria-label="Dans la watchlist"
+                  title="Dans la watchlist"
+                >
+                  <Bookmark className="h-3 w-3 text-white fill-white" />
+                </span>
+              )}
+              {watched && (
+                <span
+                  className="flex items-center justify-center rounded-full bg-black/70 p-1"
+                  aria-label="Déjà vu"
+                  title="Déjà vu"
+                >
+                  <Eye className="h-3 w-3 text-white fill-white" />
+                </span>
+              )}
+            </div>
+          )}
+
           {date && (
             <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
               {formatRelativeDate(date)}
@@ -64,20 +111,25 @@ export function DateCard({
           </p>
         )}
       </Link>
-      {onRemove && (
-        <button
-          type="button"
-          aria-label={removeLabel}
-          title={removeLabel}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onRemove();
-          }}
-          className="absolute top-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/90"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+      {(onRemove || quickActions) && (
+        <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1">
+          {quickActions}
+          {onRemove && (
+            <button
+              type="button"
+              aria-label={removeLabel}
+              title={removeLabel}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onRemove();
+              }}
+              className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/90"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

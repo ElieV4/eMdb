@@ -129,6 +129,17 @@ export class WatchesController {
   }
 
   /**
+   * GET /continue-watching
+   * Séries suivies avec au moins un épisode restant à voir, triées par
+   * MAX(date du dernier épisode vu, date de sortie du dernier épisode)
+   * décroissant (modification U).
+   */
+  @Get('continue-watching')
+  async getContinueWatching(@CurrentUser() user: any) {
+    return this.watchesService.getContinueWatching(user.id);
+  }
+
+  /**
    * POST /follows
    * Suivre une série.
    */

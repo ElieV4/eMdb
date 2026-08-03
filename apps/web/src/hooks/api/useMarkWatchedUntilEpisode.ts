@@ -19,6 +19,7 @@ export function useMarkWatchedUntilEpisode() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["watches"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["continue-watching"] });
       queryClient.invalidateQueries({ queryKey: ["serie-progress"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["watched-titles-set"] });

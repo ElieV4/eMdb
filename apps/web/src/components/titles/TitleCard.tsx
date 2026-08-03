@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Star } from "lucide-react";
 import { TitlePoster } from "./TitlePoster";
 import { TitleQuickActionsMenu } from "./TitleQuickActionsMenu";
+import { TitleWatchedButton } from "./TitleWatchedButton";
 import { TitleSearchResult } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +73,18 @@ export function TitleCard({
         inFavorites={inFavorites}
         watched={watched}
         className="absolute top-2 right-2 z-30"
+      />
+      {/* Mini bouton "marquer comme vu" — sous le coin bas droit de
+          l'affiche, en sibling du `Link` pour la même raison que le menu
+          actions rapides ci-dessus. */}
+      <TitleWatchedButton
+        titleId={id}
+        tmdbId={title.tmdbId}
+        type={type}
+        local={local}
+        watched={watched}
+        className="absolute z-20"
+        style={{ top: `${posterWidth * 1.5}px`, right: "8px", transform: "translateY(-50%)" }}
       />
       <Link
         href={href}

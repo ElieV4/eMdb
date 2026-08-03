@@ -108,7 +108,17 @@ export type UserWatch = {
     id: string;
     numero: number;
     titre: string | null;
-    seasons: { numero: number };
+    seasons: {
+      numero: number;
+      titles: {
+        id: string;
+        tmdb_id: number | null;
+        titre_vo: string;
+        titre_vf: string | null;
+        affiche_url: string | null;
+        type: string;
+      };
+    };
   };
 };
 
@@ -180,6 +190,22 @@ export type WatchFilters = {
   episode_id?: string;
   page?: number;
   limit?: number;
+};
+
+/** GET /continue-watching (modification U) — le prochain épisode non vu de chaque série suivie */
+export type ContinueWatchingEntry = {
+  title_id: string;
+  titre_vo: string;
+  titre_vf: string | null;
+  affiche_url: string | null;
+  episode_id: string;
+  saison: number;
+  episode_numero: number;
+  episode_titre: string | null;
+  total_episodes: number;
+  episodes_vus: number;
+  episodes_restants: number;
+  sort_date: Date | string | null;
 };
 
 export type CalendarEntry = {

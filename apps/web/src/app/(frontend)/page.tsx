@@ -20,6 +20,8 @@ import {
   useRecommendations,
 } from "@/hooks/api/useDashboard";
 import { useCalendar } from "@/hooks/api/useCalendar";
+import { useContinueWatching } from "@/hooks/api/useContinueWatching";
+import { ContinueWatchingCard } from "@/components/watches/ContinueWatchingCard";
 import { useLists } from "@/hooks/api/useLists";
 import { useList } from "@/hooks/api/useList";
 import { useWatchedTitles, useListMembership } from "@/hooks/api";
@@ -103,6 +105,9 @@ export default function HomePage() {
 
   const { data: calendarEntries, isLoading: isLoadingCalendar } =
     useCalendar(isAuthenticated);
+
+  const { data: continueWatching, isLoading: isLoadingContinueWatching } =
+    useContinueWatching(isAuthenticated);
 
   const { data: recommendations, isLoading: isLoadingRecommendations } =
     useRecommendations(10);
@@ -222,6 +227,66 @@ export default function HomePage() {
       {/* Dashboard pour utilisateurs connectés */}
       {isAuthenticated ? (
         <div className="space-y-10">
+          {/* Continuer à regarder (modification U) */}
+          {isLoadingContinueWatching ? (
+            <DashboardSection title="Continuer à regarder">
+              <div className="flex gap-4 overflow-hidden">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="shrink-0 w-32 sm:w-36 aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
+                  />
+                ))}
+              </div>
+            </DashboardSection>
+          ) : (
+            continueWatching &&
+            continueWatching.length > 0 && (
+              <DashboardSection title="Continuer à regarder">
+                <CardSlider>
+                  {continueWatching.map((entry) => (
+                    <ContinueWatchingCard
+                      key={entry.title_id}
+                      entry={entry}
+                      inWatchlist={watchlistIds.has(entry.title_id)}
+                      inFavorites={favoriteIds.has(entry.title_id)}
+                    />
+                  ))}
+                </CardSlider>
+              </DashboardSection>
+            )
+          )}
+
+          {/* Watchlist — juste après "Continuer à regarder" (retour utilisateur) */}
+          <DashboardSection
+            title="Watchlist"
+            subtitle="Films et séries à voir"
+            actionLabel={
+              watchlistItems.length > 0 ? "Voir la watchlist" : undefined
+            }
+            actionHref={watchlistItems.length > 0 ? `/watchlist` : undefined}
+          >
+            {watchlistItems.length > 0 ? (
+              <CardSlider moreHref={watchlistItems.length > 10 ? "/watchlist" : undefined}>
+                {watchlistItems.slice(0, 10).map((title) => (
+                  <TitleCard
+                    key={title.id}
+                    title={titleToSearchResult(title)}
+                    compact
+                    className="shrink-0"
+                    watched={watchedTitles?.has(title.id)}
+                    inWatchlist={watchlistIds.has(title.id)}
+                    inFavorites={favoriteIds.has(title.id)}
+                  />
+                ))}
+              </CardSlider>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">
+                Votre watchlist est vide. Ajoutez des titres à voir !
+              </p>
+            )}
+          </DashboardSection>
+
           {/* Historique */}
           {historyCards.length > 0 && (
             <DashboardSection
@@ -254,36 +319,6 @@ export default function HomePage() {
             ) : (
               <p className="text-sm text-muted-foreground py-4">
                 Aucun épisode à venir pour le moment.
-              </p>
-            )}
-          </DashboardSection>
-
-          {/* Watchlist */}
-          <DashboardSection
-            title="Watchlist"
-            subtitle="Films et séries à voir"
-            actionLabel={
-              watchlistItems.length > 0 ? "Voir la watchlist" : undefined
-            }
-            actionHref={watchlistItems.length > 0 ? `/watchlist` : undefined}
-          >
-            {watchlistItems.length > 0 ? (
-              <CardSlider moreHref={watchlistItems.length > 10 ? "/watchlist" : undefined}>
-                {watchlistItems.slice(0, 10).map((title) => (
-                  <TitleCard
-                    key={title.id}
-                    title={titleToSearchResult(title)}
-                    compact
-                    className="shrink-0"
-                    watched={watchedTitles?.has(title.id)}
-                    inWatchlist={watchlistIds.has(title.id)}
-                    inFavorites={favoriteIds.has(title.id)}
-                  />
-                ))}
-              </CardSlider>
-            ) : (
-              <p className="text-sm text-muted-foreground py-4">
-                Votre watchlist est vide. Ajoutez des titres à voir !
               </p>
             )}
           </DashboardSection>

@@ -18,6 +18,7 @@ export function useDeleteAllWatchesByEpisode() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["serie-progress"] });
       queryClient.invalidateQueries({ queryKey: ["calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["continue-watching"] });
       queryClient.invalidateQueries({ queryKey: ["watched-titles-set"] });
     },
   });
