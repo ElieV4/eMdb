@@ -329,6 +329,10 @@ export type TitleSearchResult = {
   genres?: Genre[];
   pays?: Country[];
   local: boolean;
+  /** Studios de production — uniquement renseigné pour les résultats déjà
+   * importés localement (filtre "Studio" sur /search, modification P).
+   * `undefined` = non applicable (résultat TMDB pas encore importé). */
+  studioIds?: string[];
 };
 
 export type PersonSearchResult = {

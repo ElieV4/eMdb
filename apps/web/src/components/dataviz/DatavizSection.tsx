@@ -31,17 +31,25 @@ export function DatavizSection() {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <DatavizMetricCard defaultConfig={defaultVisualConfig("duration", "sum", "none")} />
-        <DatavizMetricCard defaultConfig={defaultVisualConfig("watches", "count", "none")} />
-        <DatavizMetricCard defaultConfig={defaultVisualConfig("duration", "evolution", "period")} />
+        <DatavizMetricCard defaultConfig={defaultVisualConfig("titles", "distinctCount", "mediaType")} />
+        <DatavizMetricCard defaultConfig={defaultVisualConfig("watches", "count", "mediaType")} />
+        <DatavizMetricCard defaultConfig={defaultVisualConfig("duration", "evolution", "mediaType")} />
         <DatavizMetricCard defaultConfig={defaultVisualConfig("note", "avg", "none")} />
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <ConfigurableBreakdownChart chartType="grouped-bar" defaultConfig={defaultVisualConfig("duration", "sum", "genre")} />
-        <ConfigurableBreakdownChart chartType="stacked-bar" defaultConfig={defaultVisualConfig("watches", "count", "period")} />
-        <ConfigurableBreakdownChart chartType="donut" defaultConfig={defaultVisualConfig("duration", "sum", "mediaType")} />
-        <ConfigurableLineChart defaultConfig={defaultVisualConfig("duration", "sum", "period")} />
+        <ConfigurableBreakdownChart
+          chartType="grouped-bar"
+          defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "monthOfYear" }}
+        />
+        <ConfigurableBreakdownChart chartType="stacked-bar" defaultConfig={defaultVisualConfig("titles", "count", "genre")} />
+        <ConfigurableBreakdownChart
+          chartType="donut"
+          defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "weekday" }}
+        />
+        <ConfigurableLineChart
+          defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "quarter" }}
+        />
       </div>
     </div>
   );

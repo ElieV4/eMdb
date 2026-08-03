@@ -15,8 +15,16 @@ import {
   useInfiniteTitleSearch,
   useInfinitePeopleSearch,
 } from "@/hooks/api/useInfiniteSearch";
-import { useWatchedTitles, useListMembership } from "@/hooks/api";
+import { useWatchedTitles, useListMembership, useLists } from "@/hooks/api";
+import { useAuthStore } from "@/store/authStore";
 import { SearchType } from "@/lib/types/api";
+import {
+  parseTitleFilters,
+  titleMatchesFilters,
+  toFilterableTitle,
+  buildListIdsByTitle,
+  hasActiveTitleFilters,
+} from "@/lib/titleFilters";
 
 // Nombre d'éléments par page (scroll infini)
 const ITEMS_PER_PAGE = 20;
@@ -87,20 +95,37 @@ export default function SearchPage() {
 
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
+  const { isAuthenticated } = useAuthStore();
+  const { data: allLists } = useLists(isAuthenticated);
+
+  // Filtres du header (genre/pays/studio/année/note/listes/statut vu) —
+  // modification P (studio) : seuls studioIds/listIds/watchedStatus/type
+  // peuvent réellement s'appliquer ici, les résultats /titles/search ne
+  // portant ni genres/pays/année/note (TMDB comme local) ; studioIds n'est
+  // renseigné que pour les résultats déjà importés localement (cf.
+  // `TitleSearchResult.studioIds`, `undefined` = non applicable/ignoré).
+  const filters = parseTitleFilters(searchParams);
+  const listIdsByTitle = buildListIdsByTitle(allLists);
 
   // État de chargement
   const isLoading = isTitlesLoading || isPeopleLoading;
   const isPeopleTab = activeTab === "personne";
 
-  const titlesData = titlesPages?.pages.flatMap((p) => p.items) ?? [];
+  const rawTitlesData = titlesPages?.pages.flatMap((p) => p.items) ?? [];
+  const titlesData = rawTitlesData.filter((title) =>
+    titleMatchesFilters(
+      toFilterableTitle(title, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      filters,
+    ),
+  );
   const peopleData = peoplePages?.pages.flatMap((p) => p.items) ?? [];
 
   // Total réel (TMDB total_results + résultats locaux), pas seulement la
-  // portion déjà chargée par le scroll infini. En onglet "tout", les titres
-  // combinent films + séries dans le même hook (une seule requête `type`
-  // non filtré) donc son dernier `total` suffit ; en onglet type filtré,
-  // idem.
-  const titlesTotal = titlesPages?.pages.at(-1)?.total ?? titlesData.length;
+  // portion déjà chargée par le scroll infini — reflète la recherche avant
+  // filtres client (genre/pays/studio/...), comme ailleurs (Watchlist,
+  // listes) où le total du header et le nombre d'éléments affichés peuvent
+  // diverger quand un filtre est actif.
+  const titlesTotal = titlesPages?.pages.at(-1)?.total ?? rawTitlesData.length;
   const peopleTotal = peoplePages?.pages.at(-1)?.total ?? peopleData.length;
   const totalItems = isPeopleTab ? peopleTotal : titlesTotal;
 
@@ -193,30 +218,36 @@ export default function SearchPage() {
                 {totalItems} résultat{totalItems > 1 ? "s" : ""}
               </p>
 
-              {/* Grille de résultats */}
-              <div
-                className={cn(
-                  "grid gap-4",
-                  activeTab === "personne"
-                    ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
-                    : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
-                )}
-              >
-                {activeTab === "personne"
-                  ? peopleData.map((person) => (
-                      <PersonCard key={person.id} person={person} compact />
-                    ))
-                  : titlesData.map((title) => (
-                      <TitleCard
-                        key={title.id}
-                        title={title}
-                        compact
-                        watched={watchedTitles?.has(title.id)}
-                        inWatchlist={watchlistIds.has(title.id)}
-                        inFavorites={favoriteIds.has(title.id)}
-                      />
-                    ))}
-              </div>
+              {!isPeopleTab && titlesData.length === 0 && hasActiveTitleFilters(filters) ? (
+                <p className="text-sm text-muted-foreground">
+                  Aucun résultat chargé ne correspond aux filtres actifs.
+                </p>
+              ) : (
+                /* Grille de résultats */
+                <div
+                  className={cn(
+                    "grid gap-4",
+                    activeTab === "personne"
+                      ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+                      : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
+                  )}
+                >
+                  {activeTab === "personne"
+                    ? peopleData.map((person) => (
+                        <PersonCard key={person.id} person={person} compact />
+                      ))
+                    : titlesData.map((title) => (
+                        <TitleCard
+                          key={title.id}
+                          title={title}
+                          compact
+                          watched={watchedTitles?.has(title.id)}
+                          inWatchlist={watchlistIds.has(title.id)}
+                          inFavorites={favoriteIds.has(title.id)}
+                        />
+                      ))}
+                </div>
+              )}
 
               <div ref={sentinelRef} />
 

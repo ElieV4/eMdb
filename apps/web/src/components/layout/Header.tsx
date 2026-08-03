@@ -27,7 +27,7 @@ import { useEffect, useState, startTransition } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/useAuth";
-import { useTitleGenres, useTitleCountries, useLists } from "@/hooks/api";
+import { useTitleGenres, useTitleCountries, useTitleStudios, useLists } from "@/hooks/api";
 import { Button } from "@/components/ui/button";
 import { TypeFilterTabs, FilterTab } from "./TypeFilterTabs";
 import { FilterSidebar } from "./FilterSidebar";
@@ -73,6 +73,7 @@ export function Header() {
 
   const { data: genres } = useTitleGenres();
   const { data: countries } = useTitleCountries();
+  const { data: studios } = useTitleStudios();
   const { data: userLists } = useLists(isAuthenticated);
 
   const filters = parseTitleFilters(searchParams);
@@ -155,6 +156,13 @@ export function Header() {
     navigateWithFilters({ pays: next.length > 0 ? next.join(",") : null });
   };
 
+  const toggleStudio = (id: string) => {
+    const next = filters.studioIds.includes(id)
+      ? filters.studioIds.filter((s) => s !== id)
+      : [...filters.studioIds, id];
+    navigateWithFilters({ studios: next.length > 0 ? next.join(",") : null });
+  };
+
   const toggleList = (id: string) => {
     const next = filters.listIds.includes(id)
       ? filters.listIds.filter((l) => l !== id)
@@ -173,6 +181,11 @@ export function Header() {
   const selectAllCountries = () => {
     const ids = (countries ?? []).map((c) => c.id);
     navigateWithFilters({ pays: ids.length > 0 ? ids.join(",") : null });
+  };
+
+  const selectAllStudios = () => {
+    const ids = (studios ?? []).map((s) => s.id);
+    navigateWithFilters({ studios: ids.length > 0 ? ids.join(",") : null });
   };
 
   const selectAllLists = () => {
@@ -210,6 +223,7 @@ export function Header() {
       type: null,
       genres: null,
       pays: null,
+      studios: null,
       yearMin: null,
       yearMax: null,
       noteImdbMin: null,
@@ -292,6 +306,7 @@ export function Header() {
         onTypeChange={setTypeFilter}
         genres={genres}
         countries={countries}
+        studios={studios}
         lists={userLists}
         yearRange={yearRange}
         onYearRangeChange={setYearRange}
@@ -305,9 +320,11 @@ export function Header() {
         onWatchedYearRangeCommit={commitWatchedYearRange}
         onToggleGenre={toggleGenre}
         onToggleCountry={toggleCountry}
+        onToggleStudio={toggleStudio}
         onToggleList={toggleList}
         onSelectAllGenres={selectAllGenres}
         onSelectAllCountries={selectAllCountries}
+        onSelectAllStudios={selectAllStudios}
         onSelectAllLists={selectAllLists}
         onWatchedStatusChange={setWatchedStatus}
         onReset={resetFilters}

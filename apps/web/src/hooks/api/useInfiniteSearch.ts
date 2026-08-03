@@ -25,6 +25,7 @@ type BackendTitleSearchResult = {
   type: "film" | "serie";
   local: boolean;
   local_id?: string;
+  studio_ids?: string[];
 };
 
 type BackendPersonSearchResult = {
@@ -46,6 +47,7 @@ function mapTitle(item: BackendTitleSearchResult): TitleSearchResult {
     type: item.type,
     afficheUrl: item.poster_path ?? undefined,
     local: item.local,
+    studioIds: item.studio_ids,
   };
 }
 

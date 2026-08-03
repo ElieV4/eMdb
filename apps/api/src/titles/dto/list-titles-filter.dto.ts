@@ -8,6 +8,7 @@ import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-
  * - type : 'film' | 'serie'
  * - genre_id : UUID du genre (jointure title_genres)
  * - country_id : UUID du pays (jointure title_countries)
+ * - studio_id : UUID du studio (jointure title_studios, modification P)
  * - is_animation : booléen
  * - note_imdb_min : note minimale (0-10)
  * - sort_by : 'date_sortie' | 'note_imdb'
@@ -26,6 +27,10 @@ export class ListTitlesFilterDto {
   @IsOptional()
   @IsString()
   country_id?: string;
+
+  @IsOptional()
+  @IsString()
+  studio_id?: string;
 
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)

@@ -23,6 +23,11 @@ export interface TitleSearchResult {
   type: 'film' | 'serie';
   local: boolean;
   local_id?: string;
+  /** Studios de production — uniquement pour les résultats déjà importés
+   * localement (modification P, filtre "Studio" sur /search) : un résultat
+   * TMDB pur n'a pas encore cette donnée en base, `undefined` signifie
+   * "non applicable", pas "aucun studio" (cf. `FilterableTitle` côté front). */
+  studio_ids?: string[];
 }
 
 /**
@@ -106,11 +111,12 @@ export class TitlesService {
         titre_vf: true,
         affiche_url: true,
         type: true,
+        title_studios: { select: { studio_id: true } },
       },
     });
 
     // 3. Index local par tmdb_id pour le merge
-    const localByTmdbId = new Map<number, any>();
+    const localByTmdbId = new Map<number, (typeof localResults)[number]>();
     for (const local of localResults) {
       if (local.tmdb_id) {
         localByTmdbId.set(local.tmdb_id, local);
@@ -131,6 +137,7 @@ export class TitlesService {
         type: tmdb.type,
         local: !!local,
         local_id: local?.id,
+        studio_ids: local?.title_studios.map((ts) => ts.studio_id),
       });
     }
 
@@ -151,6 +158,7 @@ export class TitlesService {
             type: local.type as 'film' | 'serie',
             local: true,
             local_id: local.id,
+            studio_ids: local.title_studios.map((ts) => ts.studio_id),
           });
         }
       }
@@ -318,6 +326,12 @@ export class TitlesService {
     if (filters.country_id) {
       where.title_countries = {
         some: { country_id: filters.country_id },
+      };
+    }
+
+    if (filters.studio_id) {
+      where.title_studios = {
+        some: { studio_id: filters.studio_id },
       };
     }
 

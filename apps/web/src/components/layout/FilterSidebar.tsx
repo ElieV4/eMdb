@@ -48,6 +48,7 @@ interface FilterSidebarProps {
   onTypeChange: (id: string) => void;
   genres?: RefOption[];
   countries?: RefOption[];
+  studios?: RefOption[];
   lists?: ListOption[];
   yearRange: [number, number];
   onYearRangeChange: (next: [number, number]) => void;
@@ -61,9 +62,11 @@ interface FilterSidebarProps {
   onWatchedYearRangeCommit?: (next: [number, number]) => void;
   onToggleGenre: (id: string) => void;
   onToggleCountry: (id: string) => void;
+  onToggleStudio: (id: string) => void;
   onToggleList: (id: string) => void;
   onSelectAllGenres: () => void;
   onSelectAllCountries: () => void;
+  onSelectAllStudios: () => void;
   onSelectAllLists: () => void;
   onWatchedStatusChange: (status: string) => void;
   onReset: () => void;
@@ -78,6 +81,7 @@ export function FilterSidebar({
   onTypeChange,
   genres,
   countries,
+  studios,
   lists,
   yearRange,
   onYearRangeChange,
@@ -91,9 +95,11 @@ export function FilterSidebar({
   onWatchedYearRangeCommit,
   onToggleGenre,
   onToggleCountry,
+  onToggleStudio,
   onToggleList,
   onSelectAllGenres,
   onSelectAllCountries,
+  onSelectAllStudios,
   onSelectAllLists,
   onWatchedStatusChange,
   onReset,
@@ -237,6 +243,14 @@ export function FilterSidebar({
             selectedIds={filters.countryIds}
             onToggle={onToggleCountry}
             onSelectAll={onSelectAllCountries}
+          />
+
+          <MultiSelectDropdown
+            label="Studio"
+            options={studios}
+            selectedIds={filters.studioIds}
+            onToggle={onToggleStudio}
+            onSelectAll={onSelectAllStudios}
           />
 
           <MultiSelectDropdown

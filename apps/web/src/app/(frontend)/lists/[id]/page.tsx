@@ -9,7 +9,8 @@
 
 "use client";
 
-import { useParams, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
@@ -17,10 +18,13 @@ import { useList } from "@/hooks/api/useList";
 import { useLists } from "@/hooks/api/useLists";
 import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { TitleCard } from "@/components/titles/TitleCard";
+import { ListActionsMenu } from "@/components/lists/ListActionsMenu";
+import { ListReorder } from "@/components/lists/ListReorder";
+import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Check } from "lucide-react";
 import {
   parseTitleFilters,
   titleMatchesFilters,
@@ -54,12 +58,14 @@ const typeLabels: Record<string, string> = {
 
 export default function ListDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const { data: list, isLoading, error } = useList(params.id);
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
   const { data: allLists } = useLists(isAuthenticated);
+  const [editMode, setEditMode] = useState(false);
 
   const filters = parseTitleFilters(searchParams);
   const listIdsByTitle = buildListIdsByTitle(allLists);
@@ -106,21 +112,42 @@ export default function ListDetailPage() {
           {isLoading ? (
             <Skeleton className="h-8 w-64" />
           ) : list ? (
-            <>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold">
-                  {list.nom} ({items.length})
-                </h1>
-                <span className="text-xs rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">
-                  {typeLabels[list.type] ?? list.type}
-                </span>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold">
+                    {list.nom} ({items.length})
+                  </h1>
+                  <span className="text-xs rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">
+                    {typeLabels[list.type] ?? list.type}
+                  </span>
+                </div>
+                {list.description && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {list.description}
+                  </p>
+                )}
               </div>
-              {list.description && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {list.description}
-                </p>
+
+              {/* Boutons de gestion (modification S) : les trois actions
+                  pour une liste personnalisée, seulement "Modifier le
+                  contenu" pour Watchlist/Favoris (listes système, non
+                  renommables/non supprimables). En mode édition, remplacés
+                  par un simple bouton "Terminé". */}
+              {editMode ? (
+                <Button variant="outline" size="sm" onClick={() => setEditMode(false)}>
+                  <Check className="h-4 w-4" />
+                  Terminé
+                </Button>
+              ) : (
+                <ListActionsMenu
+                  list={list}
+                  variant="buttons"
+                  onEditContent={() => setEditMode(true)}
+                  onDeleted={() => router.push("/lists")}
+                />
               )}
-            </>
+            </div>
           ) : null}
         </div>
 
@@ -141,6 +168,11 @@ export default function ListDetailPage() {
           <p className="text-sm text-muted-foreground">
             Cette liste est vide. Ajoutez des titres depuis leur fiche.
           </p>
+        ) : editMode ? (
+          // Mode édition : glisser-déposer + retrait en un clic, sur la
+          // liste complète non filtrée (réordonner un sous-ensemble filtré
+          // réattribuerait des positions incohérentes aux items masqués).
+          <ListReorder listId={list?.id ?? ""} items={items.map(titleToSearchResult)} />
         ) : filteredItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Aucun titre de cette liste ne correspond aux filtres actifs.

@@ -17,6 +17,7 @@ export function useRemoveListItem() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-lists"] });
       queryClient.invalidateQueries({ queryKey: ["lists"] });
+      queryClient.invalidateQueries({ queryKey: ["list"] });
     },
   });
 }

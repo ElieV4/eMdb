@@ -12,6 +12,7 @@ export type TitleFilters = {
   type: TitleTypeFilter;
   genreIds: string[];
   countryIds: string[];
+  studioIds: string[];
   yearMin: number | null;
   yearMax: number | null;
   noteImdbMin: number | null;
@@ -43,6 +44,7 @@ export function parseTitleFilters(searchParams: URLSearchParams): TitleFilters {
     type: type === "film" || type === "serie" ? type : "tout",
     genreIds: searchParams.get("genres")?.split(",").filter(Boolean) ?? [],
     countryIds: searchParams.get("pays")?.split(",").filter(Boolean) ?? [],
+    studioIds: searchParams.get("studios")?.split(",").filter(Boolean) ?? [],
     yearMin: yearMin ? Number(yearMin) : null,
     yearMax: yearMax ? Number(yearMax) : null,
     noteImdbMin: noteImdbMin ? Number(noteImdbMin) : null,
@@ -59,6 +61,7 @@ export function hasActiveTitleFilters(filters: TitleFilters) {
     filters.type !== "tout" ||
     filters.genreIds.length > 0 ||
     filters.countryIds.length > 0 ||
+    filters.studioIds.length > 0 ||
     filters.yearMin !== null ||
     filters.yearMax !== null ||
     filters.noteImdbMin !== null ||
@@ -109,6 +112,10 @@ export type FilterableTitle = {
   note: number | null | undefined;
   genreIds: string[] | undefined;
   countryIds: string[] | undefined;
+  /** Ids des studios de production (filtre "Studio", modification P) —
+   * absent/`undefined` sur les surfaces qui ne portent pas cette donnée
+   * (ex. résultats /search pas encore importés localement). */
+  studioIds?: string[];
   /** Ids des listes utilisateur contenant ce titre (filtre "Listes"). */
   listIds: string[];
   /** Le titre a-t-il été marqué comme vu (filtre "vu / tout / non vu") ? */
@@ -139,6 +146,7 @@ export function toFilterableTitle(
     note?: number | null;
     genres?: { id: string }[];
     pays?: { id: string }[];
+    studioIds?: string[];
   },
   context?: {
     watchedTitleIds?: Set<string>;
@@ -152,6 +160,7 @@ export function toFilterableTitle(
     note: title.note ?? null,
     genreIds: title.genres?.map((g) => g.id) ?? [],
     countryIds: title.pays?.map((p) => p.id) ?? [],
+    studioIds: title.studioIds,
     listIds: context?.listIdsByTitle?.get(title.id) ?? [],
     watched: context?.watchedTitleIds?.has(title.id) ?? false,
   };
@@ -174,6 +183,13 @@ export function titleMatchesFilters(
     filters.countryIds.length > 0 &&
     title.countryIds !== undefined &&
     !filters.countryIds.some((id) => title.countryIds!.includes(id))
+  )
+    return false;
+
+  if (
+    filters.studioIds.length > 0 &&
+    title.studioIds !== undefined &&
+    !filters.studioIds.some((id) => title.studioIds!.includes(id))
   )
     return false;
 
