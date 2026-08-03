@@ -38,6 +38,22 @@ export class DatavizFilterQueryDto {
   @IsUUID('4', { each: true })
   listIds?: string[];
 
+  /** Filtres "Titre"/"Acteur"/"Réalisateur" (nouveaux groupements top 20). */
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value))
+  @IsUUID('4', { each: true })
+  titleIds?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value))
+  @IsUUID('4', { each: true })
+  actorIds?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value))
+  @IsUUID('4', { each: true })
+  directorIds?: string[];
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

@@ -3,7 +3,7 @@
  * Phase 3 - Pages de détail
  */
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { TitleHero } from "@/components/titles/TitleHero";
 import { TitleDetail } from "@/lib/types/api";
 
@@ -44,6 +44,27 @@ const mockSerie: TitleDetail = {
 };
 
 describe("TitleHero", () => {
+  beforeEach(() => {
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const isValidationCall = url.includes("/watch-links/validate?");
+
+      if (isValidationCall) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ valid: true, status: 200 }),
+        } as Response);
+      }
+
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      } as Response);
+    }) as jest.Mock;
+  });
+
   it("affiche le titre VO", () => {
     render(<TitleHero title={mockTitle} />);
     expect(screen.getByText("Inception")).toBeInTheDocument();
@@ -85,6 +106,62 @@ describe("TitleHero", () => {
   it("affiche le synopsis quand disponible", () => {
     render(<TitleHero title={mockTitle} />);
     expect(screen.getByText("Un film de science-fiction.")).toBeInTheDocument();
+  });
+
+  it("affiche les liens directs vers les services de streaming en France et les liens libres valides", async () => {
+    render(<TitleHero title={mockTitle} />);
+
+    expect(screen.getByText("Liens officiels")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Voir sur TMDB/i })).toHaveAttribute(
+      "href",
+      "https://www.themoviedb.org/movie/123",
+    );
+    expect(screen.getByRole("link", { name: /Netflix/i })).toHaveAttribute(
+      "href",
+      "https://www.netflix.com/search?q=Inception",
+    );
+    expect(screen.getByRole("link", { name: /Prime Video/i })).toHaveAttribute(
+      "href",
+      "https://www.primevideo.com/search/ref=atv_nb_sr?phrase=Inception",
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Liens libres")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("link", { name: /WatchTV/i })).toHaveAttribute(
+      "href",
+      "https://www.watchtv.click/movie/inception/",
+    );
+    expect(screen.getByRole("link", { name: /HydraFlix/i })).toHaveAttribute(
+      "href",
+      "https://www.hydraflix.cc/inception/",
+    );
+  });
+
+  it("n'affiche pas les liens libres quand le site renvoie 404", async () => {
+    (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("hydraflix.cc")) {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          json: async () => ({ valid: false, status: 404 }),
+        } as Response);
+      }
+
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ valid: true, status: 200 }),
+      } as Response);
+    });
+
+    render(<TitleHero title={mockTitle} />);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("link", { name: /HydraFlix/i })).not.toBeInTheDocument();
+    });
   });
 
   it("n'affiche pas le titre VF quand identique au VO", () => {

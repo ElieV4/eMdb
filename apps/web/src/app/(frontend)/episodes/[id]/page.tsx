@@ -13,6 +13,8 @@ import { TitleCredits } from "@/components/titles/TitleCredits";
 import { WatchButton } from "@/components/watches/WatchButton";
 import { RatingInput } from "@/components/ratings/RatingInput";
 import { useEpisode } from "@/hooks/api/useEpisode";
+import { useTitle } from "@/hooks/api/useTitles";
+import { buildWatchLinks } from "@/lib/watchLinks";
 import { useEpisodeCredits } from "@/hooks/api/useEpisodeCredits";
 import { useWatches } from "@/hooks/api/useWatches";
 import { useUpsertRating } from "@/hooks/api/useUpsertRating";
@@ -29,6 +31,8 @@ export default function EpisodeDetailPage({
   const queryClient = useQueryClient();
 
   const { data: episode, isLoading, isError } = useEpisode(id);
+  const titleId = episode?.seasons?.title_id ?? "";
+  const { data: title } = useTitle(titleId);
   const {
     data: credits,
     isLoading: isCreditsLoading,
@@ -73,7 +77,39 @@ export default function EpisodeDetailPage({
     : null;
 
   const seasonNumero = seasons?.numero ?? 0;
-  const titleId = seasons?.title_id ?? "";
+
+  const watchLinks = title
+    ? buildWatchLinks({
+        title: title.titre_vo,
+        type: title.type,
+        tmdbId: title.tmdb_id,
+      })
+    : { officialLinks: [], freeLinks: [] };
+
+  const renderLinkGroup = (groupTitle: string, links: Array<{ name: string; href: string }>) => {
+    if (links.length === 0) return null;
+
+    return (
+      <div className="space-y-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {groupTitle}
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {links.map((link) => (
+            <a
+              key={link.name}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm text-foreground hover:bg-muted/60"
+            >
+              {link.name}
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -155,6 +191,13 @@ export default function EpisodeDetailPage({
                 upsertRating.mutate({ episode_id: id, note_perso: value })
               }
             />
+          </div>
+        )}
+
+        {title && (
+          <div className="grid gap-4 pt-2 md:grid-cols-2">
+            {renderLinkGroup("Liens officiels", watchLinks.officialLinks)}
+            {renderLinkGroup("Liens libres", watchLinks.freeLinks)}
           </div>
         )}
 

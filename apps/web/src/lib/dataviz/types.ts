@@ -6,8 +6,34 @@
 
 export type DatavizMetric = "duration" | "watches" | "titles" | "note";
 export type DatavizAggregation = "sum" | "count" | "distinctCount" | "min" | "max" | "avg" | "evolution";
-export type DatavizGroupBy = "none" | "mediaType" | "period" | "genre" | "country" | "studio";
+export type DatavizGroupBy =
+  | "none"
+  | "mediaType"
+  | "period"
+  | "genre"
+  | "country"
+  | "studio"
+  | "title"
+  | "actor"
+  | "director";
 export type DatavizMediaType = "film" | "serie";
+
+/**
+ * Groupements "top 20" — classement des titres/acteurs/réalisateurs les plus
+ * regardés (barchart uniquement, jamais une carte : une seule valeur n'a pas
+ * de sens pour un classement, cf. `DatavizMetricCard`). Toujours triés par
+ * valeur décroissante et plafonnés à 20 côté backend — jamais d'axe
+ * "Légende" (hors scope). Restreints à `duration`+`sum` ou `watches`/
+ * `titles`+`count`/`distinctCount` : voir `isTop20GroupByAllowed`.
+ */
+export const TOP20_GROUP_BYS: DatavizGroupBy[] = ["title", "actor", "director"];
+
+export function isTop20GroupByAllowed(metric: DatavizMetric, aggregation: DatavizAggregation): boolean {
+  return (
+    (metric === "duration" && aggregation === "sum") ||
+    ((metric === "watches" || metric === "titles") && (aggregation === "count" || aggregation === "distinctCount"))
+  );
+}
 
 /**
  * Agrégations valides par métrique (reflète `ALLOWED_AGGREGATIONS` côté
@@ -68,6 +94,10 @@ export type DatavizExtraFilters = {
   countryIds: string[];
   studioIds: string[];
   listIds: string[];
+  /** Filtres "Titre"/"Acteur"/"Réalisateur" (groupements top 20). */
+  titleIds: string[];
+  actorIds: string[];
+  directorIds: string[];
 };
 
 export const DEFAULT_EXTRA_FILTERS: DatavizExtraFilters = {
@@ -82,6 +112,9 @@ export const DEFAULT_EXTRA_FILTERS: DatavizExtraFilters = {
   countryIds: [],
   studioIds: [],
   listIds: [],
+  titleIds: [],
+  actorIds: [],
+  directorIds: [],
 };
 
 /** Configuration complète d'un visuel — identique pour les 8 widgets. */

@@ -1,4 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@emdb/db';
 
 /**
@@ -53,6 +54,20 @@ export class PrismaService implements OnModuleDestroy {
   async $queryRawUnsafe<T = any>(sql: string, ...params: any[]): Promise<T> {
     // @ts-ignore - Prisma $queryRawUnsafe type issue
     return prisma.$queryRawUnsafe<T>(sql, ...params);
+  }
+
+  /**
+   * Exécute une requête SQL brute *paramétrée* via Prisma (valeurs liées,
+   * jamais interpolées dans le texte de la requête) — contrairement à
+   * `$queryRawUnsafe`, adapté quand une valeur ne peut pas être validée en
+   * amont comme un UUID/nombre (ex. texte de recherche libre saisi par
+   * l'utilisateur, modules dataviz : filtres "Titre"/"Acteur"/"Réalisateur"/
+   * "Studio").
+   *
+   * @param query - Fragment construit via `Prisma.sql` (jamais une string brute)
+   */
+  async $queryRaw<T = any>(query: Prisma.Sql): Promise<T> {
+    return prisma.$queryRaw<T>(query);
   }
 
   /**

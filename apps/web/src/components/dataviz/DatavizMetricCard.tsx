@@ -36,7 +36,7 @@ export function DatavizMetricCard({ defaultConfig }: { defaultConfig: DatavizVis
           title={title}
           menu={
             <ChartConfigMenu label={title} width="w-80">
-              <DatavizVisualConfigFields config={config} updateConfig={updateConfig} />
+              <DatavizVisualConfigFields config={config} updateConfig={updateConfig} enableTop20={false} />
             </ChartConfigMenu>
           }
         />

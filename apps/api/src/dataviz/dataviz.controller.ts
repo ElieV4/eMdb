@@ -5,6 +5,7 @@ import { DatavizService } from './dataviz.service';
 import { WatchTimeQueryDto } from './dto/watch-time-query.dto';
 import { WatchCountQueryDto } from './dto/watch-count-query.dto';
 import { DatavizQueryDto } from './dto/dataviz-query.dto';
+import { DatavizFilterOptionsQueryDto } from './dto/dataviz-filter-options-query.dto';
 
 /**
  * Contrôleur des endpoints dataviz (Phase 6.1, puis modification W).
@@ -15,6 +16,7 @@ import { DatavizQueryDto } from './dto/dataviz-query.dto';
  * - GET /dataviz/watch-time?groupBy=genre|period|country|animation&yearFrom=&yearTo= (Phase 6.1)
  * - GET /dataviz/watch-count?groupBy=genre|period|country|animation&yearFrom=&yearTo= (Phase 6.1)
  * - GET /dataviz/query?metric=&aggregation=&groupBy=&... (modification W, menu unifié — cf. `DatavizQueryDto`)
+ * - GET /dataviz/filters/titles|actors|directors|studios?q= (groupements "top 20" — cf. `DatavizService.getFilterOptions`)
  */
 @UseGuards(JwtAuthGuard)
 @Controller('dataviz')
@@ -59,5 +61,31 @@ export class DatavizController {
   @Get('query')
   async query(@Query() query: DatavizQueryDto, @CurrentUser() user: any) {
     return this.datavizService.query(user.id, query);
+  }
+
+  /**
+   * GET /dataviz/filters/titles|actors|directors|studios?q=
+   * Options des dropdowns "Titre"/"Acteur"/"Réalisateur"/"Studio" (menu "⋮",
+   * groupements "top 20") : sans `q`, les 20 entités les plus regardées par
+   * l'utilisateur ; avec `q`, une recherche parmi ce qu'il a déjà regardé.
+   */
+  @Get('filters/titles')
+  async filterTitles(@Query() query: DatavizFilterOptionsQueryDto, @CurrentUser() user: any) {
+    return this.datavizService.getFilterOptions(user.id, 'title', query.q);
+  }
+
+  @Get('filters/actors')
+  async filterActors(@Query() query: DatavizFilterOptionsQueryDto, @CurrentUser() user: any) {
+    return this.datavizService.getFilterOptions(user.id, 'actor', query.q);
+  }
+
+  @Get('filters/directors')
+  async filterDirectors(@Query() query: DatavizFilterOptionsQueryDto, @CurrentUser() user: any) {
+    return this.datavizService.getFilterOptions(user.id, 'director', query.q);
+  }
+
+  @Get('filters/studios')
+  async filterStudios(@Query() query: DatavizFilterOptionsQueryDto, @CurrentUser() user: any) {
+    return this.datavizService.getFilterOptions(user.id, 'studio', query.q);
   }
 }

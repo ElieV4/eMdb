@@ -23,11 +23,30 @@ import { DatavizFilterQueryDto } from './dataviz-filter-query.dto';
  * conserve que les groupements `none`/`period` — ces agrégations comparent
  * des compteurs par période (ex. "moyenne de visionnages par mois"), pas de
  * sens par genre/pays/studio/type de média.
+ *
+ * `title`/`actor`/`director` : groupements "top 20" (barchart des titres/
+ * acteurs/réalisateurs les plus regardés) — toujours triés par valeur
+ * décroissante et plafonnés à 20 lignes (`DatavizService.rowsTop20`), jamais
+ * disponibles comme axe "Légende", et restreints à `duration`+`sum` ou
+ * `watches`/`titles`+`count`/`distinctCount` (pas de sens pour `note`, ni
+ * pour min/max/avg/evolution — validé côté service).
  */
 export type DatavizMetric = 'duration' | 'watches' | 'titles' | 'note';
 export type DatavizAggregation = 'sum' | 'count' | 'distinctCount' | 'min' | 'max' | 'avg' | 'evolution';
-export type DatavizGroupBy = 'none' | 'mediaType' | 'period' | 'genre' | 'country' | 'studio';
+export type DatavizGroupBy =
+  | 'none'
+  | 'mediaType'
+  | 'period'
+  | 'genre'
+  | 'country'
+  | 'studio'
+  | 'title'
+  | 'actor'
+  | 'director';
 export type DatavizMediaType = 'film' | 'serie';
+
+/** Groupements "top 20" — cf. note ci-dessus. */
+export const TOP20_GROUP_BYS: DatavizGroupBy[] = ['title', 'actor', 'director'];
 
 export const ALLOWED_AGGREGATIONS: Record<DatavizMetric, DatavizAggregation[]> = {
   duration: ['sum', 'min', 'max', 'avg', 'evolution'],
@@ -55,7 +74,7 @@ export class DatavizQueryDto extends DatavizFilterQueryDto {
   @IsEnum(['sum', 'count', 'distinctCount', 'min', 'max', 'avg', 'evolution'])
   aggregation!: DatavizAggregation;
 
-  @IsEnum(['none', 'mediaType', 'period', 'genre', 'country', 'studio'])
+  @IsEnum(['none', 'mediaType', 'period', 'genre', 'country', 'studio', 'title', 'actor', 'director'])
   groupBy!: DatavizGroupBy;
 
   /**

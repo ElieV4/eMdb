@@ -211,6 +211,9 @@ const GROUP_BY_LABEL: Record<Exclude<DatavizGroupBy, "none" | "period">, string>
   genre: "par genre",
   country: "par pays",
   studio: "par studio",
+  title: "par titre",
+  actor: "par acteur",
+  director: "par réalisateur",
 };
 
 const GRANULARITY_LABEL: Record<DatavizGranularity, string> = {

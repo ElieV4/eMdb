@@ -27,6 +27,9 @@ function buildParams(config: DatavizVisualConfig): URLSearchParams {
   if (config.countryIds.length > 0) params.set("countryIds", config.countryIds.join(","));
   if (config.studioIds.length > 0) params.set("studioIds", config.studioIds.join(","));
   if (config.listIds.length > 0) params.set("listIds", config.listIds.join(","));
+  if (config.titleIds.length > 0) params.set("titleIds", config.titleIds.join(","));
+  if (config.actorIds.length > 0) params.set("actorIds", config.actorIds.join(","));
+  if (config.directorIds.length > 0) params.set("directorIds", config.directorIds.join(","));
   return params;
 }
 

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WatchTimeQueryDto } from './dto/watch-time-query.dto';
 import { WatchCountQueryDto } from './dto/watch-count-query.dto';
@@ -8,7 +9,11 @@ import {
   DatavizGroupBy,
   DatavizMetric,
   DatavizQueryDto,
+  TOP20_GROUP_BYS,
 } from './dto/dataviz-query.dto';
+
+export type DatavizFilterOptionKind = 'title' | 'actor' | 'director' | 'studio';
+export type DatavizFilterOption = { id: string; nom: string };
 
 type DatavizRow = {
   category_id: string | null;
@@ -390,6 +395,9 @@ export class DatavizService {
     countryIds?: string[];
     studioIds?: string[];
     listIds?: string[];
+    titleIds?: string[];
+    actorIds?: string[];
+    directorIds?: string[];
     releaseYearMin?: number;
     releaseYearMax?: number;
     noteImdbMin?: number;
@@ -411,6 +419,18 @@ export class DatavizService {
     if (query.listIds && query.listIds.length > 0) {
       const ids = query.listIds.map((id) => `'${id}'::UUID`).join(',');
       sql += ` AND EXISTS (SELECT 1 FROM list_items lif WHERE lif.title_id = t.id AND lif.list_id IN (${ids}))`;
+    }
+    if (query.titleIds && query.titleIds.length > 0) {
+      const ids = query.titleIds.map((id) => `'${id}'::UUID`).join(',');
+      sql += ` AND t.id IN (${ids})`;
+    }
+    if (query.actorIds && query.actorIds.length > 0) {
+      const ids = query.actorIds.map((id) => `'${id}'::UUID`).join(',');
+      sql += ` AND EXISTS (SELECT 1 FROM credits crf JOIN roles rf ON rf.id = crf.role_id AND rf.code = 'acteur' WHERE crf.title_id = t.id AND crf.person_id IN (${ids}))`;
+    }
+    if (query.directorIds && query.directorIds.length > 0) {
+      const ids = query.directorIds.map((id) => `'${id}'::UUID`).join(',');
+      sql += ` AND EXISTS (SELECT 1 FROM credits crf JOIN roles rf ON rf.id = crf.role_id AND rf.code = 'realisateur' WHERE crf.title_id = t.id AND crf.person_id IN (${ids}))`;
     }
     if (query.releaseYearMin !== undefined) {
       sql += ` AND t.date_sortie IS NOT NULL AND EXTRACT(YEAR FROM t.date_sortie) >= ${query.releaseYearMin}`;
@@ -509,6 +529,34 @@ export class DatavizService {
           orderExpr: `${st}.nom`,
         };
       }
+      case 'title':
+        // `t` est déjà en scope (jointure principale de toutes les requêtes
+        // dataviz) — aucune jointure supplémentaire nécessaire, contrairement
+        // à genre/pays/studio/acteur/réalisateur.
+        return {
+          categoryIdExpr: 't.id::TEXT',
+          categoryExpr: 'COALESCE(t.titre_vf, t.titre_vo)',
+          joinSql: '',
+          groupByExpr: 't.id, t.titre_vf, t.titre_vo',
+          orderExpr: 't.id',
+        };
+      case 'actor':
+      case 'director': {
+        // Sous-requête dédupliquée (title_id, person_id) : un même acteur
+        // peut avoir plusieurs lignes `credits` pour un même titre (casting
+        // principal + apparitions par épisode) — sans ce DISTINCT en amont,
+        // un visionnage serait compté plusieurs fois pour cette personne.
+        const roleCode = groupBy === 'actor' ? 'acteur' : 'realisateur';
+        const p = `p${aliasSuffix}`;
+        const rc = `rc${aliasSuffix}`;
+        return {
+          categoryIdExpr: `${p}.id::TEXT`,
+          categoryExpr: `${p}.nom`,
+          joinSql: `JOIN (SELECT DISTINCT cr.title_id, cr.person_id FROM credits cr JOIN roles r ON r.id = cr.role_id AND r.code = '${roleCode}') ${rc} ON ${rc}.title_id = t.id JOIN people ${p} ON ${p}.id = ${rc}.person_id`,
+          groupByExpr: `${p}.id, ${p}.nom`,
+          orderExpr: `${p}.nom`,
+        };
+      }
       case 'none':
       default:
         return { categoryIdExpr: 'NULL::TEXT', categoryExpr: `'Total'`, joinSql: '', groupByExpr: '', orderExpr: '' };
@@ -586,6 +634,9 @@ export class DatavizService {
   }
 
   private async queryRows(userId: string, dto: DatavizQueryDto): Promise<DatavizRow[]> {
+    if (TOP20_GROUP_BYS.includes(dto.groupBy)) {
+      return this.rowsTop20(userId, dto);
+    }
     const restrictedToPeriod =
       (dto.metric === 'watches' || dto.metric === 'titles') &&
       (['min', 'max', 'avg', 'evolution'] as DatavizAggregation[]).includes(dto.aggregation);
@@ -689,6 +740,50 @@ export class DatavizService {
       JOIN studio_counts sc ON sc.studio_id = ws.studio_id
       GROUP BY category_id, category${legendGroupBy}
       ORDER BY value DESC
+    `;
+    return this.queryRaw<DatavizRow>(sql);
+  }
+
+  /**
+   * Groupements "top 20" (`title`/`actor`/`director`) : classement des
+   * titres/acteurs/réalisateurs les plus regardés, toujours trié par valeur
+   * décroissante et plafonné à 20 lignes — jamais l'intégralité de la
+   * catégorie (contrairement à genre/pays/studio, dont la cardinalité reste
+   * raisonnable). Pas d'axe "Légende" ici (hors scope, cf. `DatavizQueryDto`).
+   * Restreint à `duration`+`sum` ou `watches`/`titles`+`count`/
+   * `distinctCount` : les autres combinaisons (note, min/max/avg/evolution)
+   * n'ont pas de sens pour un classement — validé ici en plus du frontend
+   * (défense en profondeur, l'API ne doit pas dépendre uniquement du menu).
+   */
+  private async rowsTop20(userId: string, dto: DatavizQueryDto): Promise<DatavizRow[]> {
+    const validCombo =
+      (dto.metric === 'duration' && dto.aggregation === 'sum') ||
+      ((dto.metric === 'watches' || dto.metric === 'titles') &&
+        (dto.aggregation === 'count' || dto.aggregation === 'distinctCount'));
+    if (!validCombo) {
+      throw new BadRequestException(
+        `Le groupement "${dto.groupBy}" n'est disponible que pour Durée/Somme ou Visionnages-Titres/Nombre.`,
+      );
+    }
+
+    const pieces = this.categoryPieces(dto.groupBy, dto.granularity ?? 'month');
+    const val = this.valueAggExpr(dto.metric, dto.aggregation, {
+      idCol: 't.id',
+      minutesCol: this.durationExpr,
+      noteCol: 't.note_imdb',
+    });
+    const where = this.buildWhere(userId, dto, 't');
+    const sql = `
+      SELECT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category, ${val} AS value
+      FROM user_watches uw
+      LEFT JOIN episodes e ON e.id = uw.episode_id
+      LEFT JOIN seasons s ON s.id = e.season_id
+      JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      ${pieces.joinSql}
+      WHERE ${where}
+      GROUP BY ${pieces.groupByExpr}
+      ORDER BY value DESC
+      LIMIT 20
     `;
     return this.queryRaw<DatavizRow>(sql);
   }
@@ -808,5 +903,112 @@ export class DatavizService {
       ${pieces.orderExpr ? `ORDER BY ${pieces.orderExpr}` : ''}
     `;
     return this.queryRaw<DatavizRow>(sql);
+  }
+
+  // ======================================================================
+  // Options des filtres "Titre"/"Acteur"/"Réalisateur"/"Studio" — menu "⋮"
+  // ======================================================================
+
+  /**
+   * Échappe les caractères spéciaux `LIKE`/`ILIKE` (`%`, `_`, `\`) dans un
+   * texte de recherche libre, pour qu'ils soient traités littéralement
+   * plutôt que comme des jokers.
+   */
+  private escapeLikePattern(q: string): string {
+    return q.replace(/[\\%_]/g, (char) => `\\${char}`);
+  }
+
+  /**
+   * Options du dropdown "Titre"/"Acteur"/"Réalisateur"/"Studio" (menu "⋮"
+   * de chaque visuel dataviz, modification "top 20") : sans `q`, les 20
+   * entités les plus regardées par l'utilisateur (nombre de visionnages
+   * décroissant) ; avec `q`, une recherche parmi les entités déjà regardées
+   * — jamais tout le catalogue local, ces filtres ne servent qu'à affiner
+   * les propres statistiques de l'utilisateur.
+   *
+   * `q` est un texte libre saisi par l'utilisateur (contrairement aux ids
+   * genre/pays/studio/liste, jamais validable en amont comme un UUID) —
+   * requête *paramétrée* via `Prisma.sql`/`$queryRaw` (valeur liée, jamais
+   * interpolée dans le texte SQL), à la différence du reste de ce service.
+   */
+  async getFilterOptions(userId: string, kind: DatavizFilterOptionKind, q?: string): Promise<DatavizFilterOption[]> {
+    const pattern = q && q.trim() ? `%${this.escapeLikePattern(q.trim())}%` : null;
+    switch (kind) {
+      case 'title':
+        return this.filterOptionTitles(userId, pattern);
+      case 'studio':
+        return this.filterOptionStudios(userId, pattern);
+      case 'actor':
+        return this.filterOptionPeople(userId, 'acteur', pattern);
+      case 'director':
+        return this.filterOptionPeople(userId, 'realisateur', pattern);
+    }
+  }
+
+  private async filterOptionTitles(userId: string, pattern: string | null): Promise<DatavizFilterOption[]> {
+    const searchClause = pattern
+      ? Prisma.sql`AND (t.titre_vo ILIKE ${pattern} ESCAPE '\\' OR t.titre_vf ILIKE ${pattern} ESCAPE '\\')`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<{ id: string; nom: string }[]>(Prisma.sql`
+      SELECT t.id, COALESCE(t.titre_vf, t.titre_vo) AS nom, COUNT(*) AS cnt
+      FROM user_watches uw
+      LEFT JOIN episodes e ON e.id = uw.episode_id
+      LEFT JOIN seasons s ON s.id = e.season_id
+      JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      WHERE uw.user_id = ${userId}::UUID ${searchClause}
+      GROUP BY t.id, t.titre_vf, t.titre_vo
+      ORDER BY cnt DESC
+      LIMIT 20
+    `);
+    return this.toFilterOptions(rows);
+  }
+
+  private async filterOptionStudios(userId: string, pattern: string | null): Promise<DatavizFilterOption[]> {
+    const searchClause = pattern ? Prisma.sql`AND st.nom ILIKE ${pattern} ESCAPE '\\'` : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<{ id: string; nom: string }[]>(Prisma.sql`
+      SELECT st.id, st.nom, COUNT(*) AS cnt
+      FROM user_watches uw
+      LEFT JOIN episodes e ON e.id = uw.episode_id
+      LEFT JOIN seasons s ON s.id = e.season_id
+      JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      JOIN title_studios ts ON ts.title_id = t.id
+      JOIN studios st ON st.id = ts.studio_id
+      WHERE uw.user_id = ${userId}::UUID ${searchClause}
+      GROUP BY st.id, st.nom
+      ORDER BY cnt DESC
+      LIMIT 20
+    `);
+    return this.toFilterOptions(rows);
+  }
+
+  private async filterOptionPeople(
+    userId: string,
+    roleCode: 'acteur' | 'realisateur',
+    pattern: string | null,
+  ): Promise<DatavizFilterOption[]> {
+    const searchClause = pattern ? Prisma.sql`AND p.nom ILIKE ${pattern} ESCAPE '\\'` : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<{ id: string; nom: string }[]>(Prisma.sql`
+      SELECT p.id, p.nom, COUNT(*) AS cnt
+      FROM user_watches uw
+      LEFT JOIN episodes e ON e.id = uw.episode_id
+      LEFT JOIN seasons s ON s.id = e.season_id
+      JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      JOIN (
+        SELECT DISTINCT cr.title_id, cr.person_id
+        FROM credits cr
+        JOIN roles r ON r.id = cr.role_id AND r.code = ${roleCode}
+      ) rc ON rc.title_id = t.id
+      JOIN people p ON p.id = rc.person_id
+      WHERE uw.user_id = ${userId}::UUID ${searchClause}
+      GROUP BY p.id, p.nom
+      ORDER BY cnt DESC
+      LIMIT 20
+    `);
+    return this.toFilterOptions(rows);
+  }
+
+  /** `queryRaw` renvoie `cnt` en `BigInt` (COUNT Postgres) — non utilisé côté appelant, retiré ici. */
+  private toFilterOptions(rows: { id: string; nom: string }[]): DatavizFilterOption[] {
+    return rows.map((row) => ({ id: row.id, nom: row.nom }));
   }
 }

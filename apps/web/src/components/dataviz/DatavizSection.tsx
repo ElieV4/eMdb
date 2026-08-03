@@ -44,6 +44,14 @@ export function DatavizSection() {
         />
         <ConfigurableBreakdownChart chartType="stacked-bar" defaultConfig={defaultVisualConfig("titles", "count", "genre")} />
         <ConfigurableBreakdownChart
+          chartType="grouped-bar"
+          defaultConfig={{ ...defaultVisualConfig("titles", "distinctCount", "director"), legendBy: "mediaType" }}
+        />
+        <ConfigurableBreakdownChart
+          chartType="grouped-bar"
+          defaultConfig={{ ...defaultVisualConfig("titles", "distinctCount", "actor"), legendBy: "mediaType" }}
+        />
+        <ConfigurableBreakdownChart
           chartType="donut"
           defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "weekday" }}
         />

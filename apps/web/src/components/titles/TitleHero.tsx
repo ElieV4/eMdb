@@ -6,7 +6,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Star } from "lucide-react";
+import { useEffect, useState } from "react";
 import { CreditGrouped, TitleDetail } from "@/lib/types/api";
+import { API_BASE_URL } from "@/lib/api/apiClient";
+import { buildWatchLinks, WatchLink } from "@/lib/watchLinks";
 import { cn } from "@/lib/utils";
 import { TitlePoster } from "./TitlePoster";
 
@@ -33,12 +36,77 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
   } = title;
 
   const directors = credits?.["Réalisateur"] ?? [];
-  const tmdbUrl = tmdb_id
-    ? `https://www.themoviedb.org/${type === "film" ? "movie" : "tv"}/${tmdb_id}`
-    : null;
-
   const year = date_sortie ? new Date(date_sortie).getFullYear() : null;
   const displayTitle = titre_vf && titre_vf !== titre_vo ? titre_vo : titre_vo;
+
+  const { officialLinks, freeLinks } = buildWatchLinks({
+    title: titre_vo,
+    type,
+    tmdbId: tmdb_id,
+  });
+  const [validFreeLinks, setValidFreeLinks] = useState<WatchLink[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const validateFreeLinks = async () => {
+      if (freeLinks.length === 0) {
+        setValidFreeLinks([]);
+        return;
+      }
+
+      const checked = await Promise.all(
+        freeLinks.map(async (link) => {
+          try {
+            const res = await fetch(
+              `${API_BASE_URL}/watch-links/validate?url=${encodeURIComponent(link.href)}`,
+              { cache: "no-store" },
+            );
+            const data = (await res.json()) as { valid?: boolean; status?: number };
+            return data.valid === false ? null : link;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      if (!cancelled) {
+        setValidFreeLinks(checked.filter(Boolean) as WatchLink[]);
+      }
+    };
+
+    void validateFreeLinks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [titre_vo, type, tmdb_id]);
+
+  const renderLinkGroup = (title: string, links: Array<{ name: string; href: string }>) => {
+    const validLinks = links.filter((link) => !!link.href && link.href.trim() !== "");
+    if (validLinks.length === 0) return null;
+
+    return (
+      <div className="space-y-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {validLinks.map((link) => (
+            <a
+              key={link.name}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm text-foreground hover:bg-muted/60"
+            >
+              {link.name}
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div
@@ -133,16 +201,10 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
             </p>
           )}
 
-          {tmdbUrl && (
-            <a
-              href={tmdbUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block text-sm text-primary hover:underline"
-            >
-              Voir sur TMDB
-            </a>
-          )}
+          <div className="grid gap-4 pt-2 md:grid-cols-2">
+            {renderLinkGroup("Liens officiels", officialLinks)}
+            {renderLinkGroup("Liens libres", validFreeLinks)}
+          </div>
         </div>
       </div>
     </div>

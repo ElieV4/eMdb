@@ -9,7 +9,14 @@
 
 import { useState } from "react";
 import { useDatavizQuery } from "./useDatavizQuery";
-import { ALLOWED_AGGREGATIONS, DatavizVisualConfig, isGroupByRestricted, supportsLegend } from "@/lib/dataviz/types";
+import {
+  ALLOWED_AGGREGATIONS,
+  DatavizVisualConfig,
+  isGroupByRestricted,
+  isTop20GroupByAllowed,
+  supportsLegend,
+  TOP20_GROUP_BYS,
+} from "@/lib/dataviz/types";
 
 export function useDatavizConfig(initial: DatavizVisualConfig) {
   const [config, setConfig] = useState<DatavizVisualConfig>(initial);
@@ -24,6 +31,11 @@ export function useDatavizConfig(initial: DatavizVisualConfig) {
       }
       // watches/titles + min/max/avg/évolution restreint le groupement à tout/période.
       if (isGroupByRestricted(next.metric, next.aggregation) && next.groupBy !== "none" && next.groupBy !== "period") {
+        next.groupBy = "none";
+      }
+      // Groupement top 20 (titre/acteur/réalisateur) devenu incompatible
+      // avec la nouvelle métrique/agrégation (ex. passage à "note").
+      if (TOP20_GROUP_BYS.includes(next.groupBy) && !isTop20GroupByAllowed(next.metric, next.aggregation)) {
         next.groupBy = "none";
       }
       // Agrégation devenue incompatible avec l'axe "Légende" (evolution/note+avg/restreint).

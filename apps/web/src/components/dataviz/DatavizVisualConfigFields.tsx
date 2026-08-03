@@ -22,7 +22,16 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { MultiSelectDropdown } from "@/components/common/MultiSelectDropdown";
-import { useTitleGenres, useTitleCountries, useTitleStudios, useLists } from "@/hooks/api";
+import { SearchableMultiSelectDropdown } from "./SearchableMultiSelectDropdown";
+import {
+  useTitleGenres,
+  useTitleCountries,
+  useLists,
+  useDatavizTitleOptions,
+  useDatavizActorOptions,
+  useDatavizDirectorOptions,
+  useDatavizStudioOptions,
+} from "@/hooks/api";
 import { useAuthStore } from "@/store/authStore";
 import {
   DropdownMenu,
@@ -36,6 +45,7 @@ import { AGGREGATION_LABEL } from "@/lib/dataviz/transformers";
 import {
   ALLOWED_AGGREGATIONS,
   isGroupByRestricted,
+  isTop20GroupByAllowed,
   supportsLegend,
   DatavizAggregation,
   DatavizGranularity,
@@ -59,14 +69,21 @@ const GROUP_BY_OPTIONS: { value: DatavizGroupBy; label: string }[] = [
   { value: "genre", label: "Genre" },
   { value: "country", label: "Pays" },
   { value: "studio", label: "Studio" },
+  { value: "title", label: "Titre (top 20)" },
+  { value: "actor", label: "Acteur (top 20)" },
+  { value: "director", label: "Réalisateur (top 20)" },
 ];
 
 const RESTRICTED_GROUP_BY_OPTIONS = GROUP_BY_OPTIONS.filter((o) => o.value === "none" || o.value === "period");
 
-// "Légende" : mêmes groupements, mais "none" se lit "Aucune" (pas "Tout").
+const TOP20_GROUP_BY_VALUES: DatavizGroupBy[] = ["title", "actor", "director"];
+
+// "Légende" : mêmes groupements, mais "none" se lit "Aucune" (pas "Tout") —
+// jamais les groupements "top 20" (titre/acteur/réalisateur, hors scope
+// comme axe secondaire, cf. `DatavizQueryDto.legendBy`).
 const LEGEND_BASE_OPTIONS: { value: DatavizGroupBy; label: string }[] = [
   { value: "none", label: "Aucune" },
-  ...GROUP_BY_OPTIONS.filter((o) => o.value !== "none"),
+  ...GROUP_BY_OPTIONS.filter((o) => o.value !== "none" && !TOP20_GROUP_BY_VALUES.includes(o.value)),
 ];
 
 const MEDIA_TYPE_FILTER_OPTIONS: { value: "tout" | DatavizMediaType; label: string }[] = [
@@ -177,16 +194,19 @@ export function DatavizVisualConfigFields({
   config,
   updateConfig,
   showLegend = false,
+  enableTop20 = true,
 }: {
   config: DatavizVisualConfig;
   updateConfig: (patch: Partial<DatavizVisualConfig>) => void;
   /** N'affiche le contrôle "Légende" que pour les barcharts/linechart. */
   showLegend?: boolean;
+  /** Groupements "top 20" (titre/acteur/réalisateur) — une seule valeur n'a
+   * pas de sens pour un classement, donc masqués sur les cartes (`DatavizMetricCard`). */
+  enableTop20?: boolean;
 }) {
   const { isAuthenticated } = useAuthStore();
   const { data: genres } = useTitleGenres();
   const { data: countries } = useTitleCountries();
-  const { data: studios } = useTitleStudios();
   const { data: lists } = useLists(isAuthenticated);
 
   const [watchedYearRange, setWatchedYearRange] = useState<[number, number]>([
@@ -206,9 +226,10 @@ export function DatavizVisualConfigFields({
     value,
     label: AGGREGATION_LABEL[value],
   }));
-  const groupByOptions = isGroupByRestricted(config.metric, config.aggregation)
-    ? RESTRICTED_GROUP_BY_OPTIONS
-    : GROUP_BY_OPTIONS;
+  const top20Allowed = enableTop20 && isTop20GroupByAllowed(config.metric, config.aggregation);
+  const groupByOptions = (
+    isGroupByRestricted(config.metric, config.aggregation) ? RESTRICTED_GROUP_BY_OPTIONS : GROUP_BY_OPTIONS
+  ).filter((o) => top20Allowed || !TOP20_GROUP_BY_VALUES.includes(o.value));
   const legendAvailable = showLegend && supportsLegend(config.metric, config.aggregation);
   const legendOptions = LEGEND_BASE_OPTIONS.filter((o) => o.value !== config.groupBy);
 
@@ -378,9 +399,9 @@ export function DatavizVisualConfigFields({
             }
             onSelectAll={() => updateConfig({ countryIds: (countries ?? []).map((c) => c.id) })}
           />
-          <MultiSelectDropdown
+          <SearchableMultiSelectDropdown
             label="Studio"
-            options={studios}
+            useOptions={useDatavizStudioOptions}
             selectedIds={config.studioIds}
             onToggle={(id) =>
               updateConfig({
@@ -389,7 +410,42 @@ export function DatavizVisualConfigFields({
                   : [...config.studioIds, id],
               })
             }
-            onSelectAll={() => updateConfig({ studioIds: (studios ?? []).map((s) => s.id) })}
+          />
+          <SearchableMultiSelectDropdown
+            label="Titre"
+            useOptions={useDatavizTitleOptions}
+            selectedIds={config.titleIds}
+            onToggle={(id) =>
+              updateConfig({
+                titleIds: config.titleIds.includes(id)
+                  ? config.titleIds.filter((t) => t !== id)
+                  : [...config.titleIds, id],
+              })
+            }
+          />
+          <SearchableMultiSelectDropdown
+            label="Acteur"
+            useOptions={useDatavizActorOptions}
+            selectedIds={config.actorIds}
+            onToggle={(id) =>
+              updateConfig({
+                actorIds: config.actorIds.includes(id)
+                  ? config.actorIds.filter((a) => a !== id)
+                  : [...config.actorIds, id],
+              })
+            }
+          />
+          <SearchableMultiSelectDropdown
+            label="Réalisateur"
+            useOptions={useDatavizDirectorOptions}
+            selectedIds={config.directorIds}
+            onToggle={(id) =>
+              updateConfig({
+                directorIds: config.directorIds.includes(id)
+                  ? config.directorIds.filter((d) => d !== id)
+                  : [...config.directorIds, id],
+              })
+            }
           />
           <MultiSelectDropdown
             label="Listes"

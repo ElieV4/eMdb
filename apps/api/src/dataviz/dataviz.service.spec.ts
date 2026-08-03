@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { DatavizService } from './dataviz.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WatchTimeQueryDto } from './dto/watch-time-query.dto';
@@ -6,6 +7,7 @@ import { WatchCountQueryDto } from './dto/watch-count-query.dto';
 
 const mockPrismaService = {
   $queryRawUnsafe: jest.fn(),
+  $queryRaw: jest.fn(),
 };
 
 describe('DatavizService', () => {
@@ -581,6 +583,157 @@ describe('DatavizService', () => {
       expect(sql).toContain("EXISTS (SELECT 1 FROM list_items lif WHERE lif.title_id = t.id AND lif.list_id IN ('list-1'::UUID))");
       expect(sql).toContain('EXTRACT(YEAR FROM t.date_sortie) >= 2000');
       expect(sql).toContain('t.note_imdb <= 9');
+    });
+
+    describe('groupBy top20 (title/actor/director)', () => {
+      it('groupBy=title : pas de jointure supplémentaire (t déjà en scope), trié par valeur, plafonné à 20', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'title' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain('COALESCE(t.titre_vf, t.titre_vo)');
+        expect(sql).toContain('ORDER BY value DESC');
+        expect(sql).toContain('LIMIT 20');
+      });
+
+      it('groupBy=actor : jointure credits/roles (code=acteur) dédupliquée par (title_id, person_id)', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'actor' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain('SELECT DISTINCT cr.title_id, cr.person_id');
+        expect(sql).toContain("r.code = 'acteur'");
+        expect(sql).toContain('JOIN people p');
+        expect(sql).toContain('ORDER BY value DESC');
+        expect(sql).toContain('LIMIT 20');
+      });
+
+      it('groupBy=director : même jointure que acteur, code=realisateur', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'director' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain("r.code = 'realisateur'");
+      });
+
+      it('watches/titles + count/distinctCount + groupBy=actor : combinaison valide, aucune exception', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await expect(
+          service.query(userId, { metric: 'titles', aggregation: 'distinctCount', groupBy: 'director' } as any),
+        ).resolves.toBeDefined();
+      });
+
+      it('metric=note + groupBy=title : rejeté (top20 restreint à duration/watches/titles)', async () => {
+        await expect(
+          service.query(userId, { metric: 'note', aggregation: 'avg', groupBy: 'title' } as any),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('metric=duration + aggregation=evolution + groupBy=actor : rejeté (top20 restreint à sum)', async () => {
+        await expect(
+          service.query(userId, { metric: 'duration', aggregation: 'evolution', groupBy: 'actor' } as any),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('filtre titleIds : AND t.id IN (...)', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, titleIds: ['title-1'] } as any);
+
+        expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
+          expect.stringContaining("AND t.id IN ('title-1'::UUID)"),
+        );
+      });
+
+      it('filtre actorIds : EXISTS sur credits/roles (code=acteur)', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, actorIds: ['person-1'] } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain("rf.code = 'acteur'");
+        expect(sql).toContain("crf.person_id IN ('person-1'::UUID)");
+      });
+
+      it('filtre directorIds : EXISTS sur credits/roles (code=realisateur)', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, directorIds: ['person-2'] } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain("rf.code = 'realisateur'");
+        expect(sql).toContain("crf.person_id IN ('person-2'::UUID)");
+      });
+    });
+  });
+
+  describe('getFilterOptions (dropdowns Titre/Acteur/Réalisateur/Studio)', () => {
+    it("kind='title', sans q : top 20 par nombre de visionnages, sans clause de recherche", async () => {
+      mockPrismaService.$queryRaw.mockResolvedValue([{ id: 't1', nom: 'The Matrix', cnt: 5n }]);
+
+      const result = await service.getFilterOptions(userId, 'title');
+
+      expect(result).toEqual([{ id: 't1', nom: 'The Matrix' }]);
+      const calledWith = mockPrismaService.$queryRaw.mock.calls[0][0];
+      expect(calledWith.sql).toContain('COALESCE(t.titre_vf, t.titre_vo) AS nom');
+      expect(calledWith.sql).toContain('ORDER BY cnt DESC');
+      expect(calledWith.sql).toContain('LIMIT 20');
+      expect(calledWith.sql).not.toContain('ILIKE');
+      expect(calledWith.values).toContain(userId);
+    });
+
+    it("kind='title', avec q : recherche ILIKE paramétrée (jamais interpolée dans le texte SQL)", async () => {
+      mockPrismaService.$queryRaw.mockResolvedValue([]);
+
+      await service.getFilterOptions(userId, 'title', 'matrix');
+
+      const calledWith = mockPrismaService.$queryRaw.mock.calls[0][0];
+      expect(calledWith.sql).toContain('ILIKE');
+      expect(calledWith.sql).not.toContain('matrix');
+      expect(calledWith.values).toContain('%matrix%');
+    });
+
+    it("échappe les caractères spéciaux LIKE (%, _) dans le texte de recherche", async () => {
+      mockPrismaService.$queryRaw.mockResolvedValue([]);
+
+      await service.getFilterOptions(userId, 'title', '50%_off');
+
+      const calledWith = mockPrismaService.$queryRaw.mock.calls[0][0];
+      expect(calledWith.values).toContain('%50\\%\\_off%');
+    });
+
+    it("kind='actor' : jointure credits/roles (code=acteur) dédupliquée, scope aux entités déjà regardées", async () => {
+      mockPrismaService.$queryRaw.mockResolvedValue([]);
+
+      await service.getFilterOptions(userId, 'actor', 'keanu');
+
+      const calledWith = mockPrismaService.$queryRaw.mock.calls[0][0];
+      expect(calledWith.sql).toContain('SELECT DISTINCT cr.title_id, cr.person_id');
+      expect(calledWith.values).toContain('acteur');
+      expect(calledWith.values).toContain('%keanu%');
+    });
+
+    it("kind='director' : même jointure, code=realisateur", async () => {
+      mockPrismaService.$queryRaw.mockResolvedValue([]);
+
+      await service.getFilterOptions(userId, 'director');
+
+      const calledWith = mockPrismaService.$queryRaw.mock.calls[0][0];
+      expect(calledWith.values).toContain('realisateur');
+    });
+
+    it("kind='studio' : jointure title_studios/studios", async () => {
+      mockPrismaService.$queryRaw.mockResolvedValue([]);
+
+      await service.getFilterOptions(userId, 'studio');
+
+      const calledWith = mockPrismaService.$queryRaw.mock.calls[0][0];
+      expect(calledWith.sql).toContain('JOIN title_studios ts ON ts.title_id = t.id');
+      expect(calledWith.sql).toContain('JOIN studios st ON st.id = ts.studio_id');
     });
   });
 });

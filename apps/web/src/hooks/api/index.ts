@@ -15,6 +15,14 @@ export {
 } from "./useTitles";
 
 export {
+  useDatavizTitleOptions,
+  useDatavizActorOptions,
+  useDatavizDirectorOptions,
+  useDatavizStudioOptions,
+  type DatavizFilterOption,
+} from "./useDatavizFilterOptions";
+
+export {
   usePeople,
   usePerson,
   usePersonFilmography,
