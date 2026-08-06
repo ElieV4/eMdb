@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DatavizSection } from "@/components/dataviz/DatavizSection";
 import { AdminRefreshButton } from "@/components/admin/AdminRefreshButton";
 import { TraktImportButton } from "@/components/profile/TraktImportButton";
+import { ImportCreditsButton } from "@/components/profile/ImportCreditsButton";
 
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuthStore();
@@ -114,7 +115,10 @@ export default function ProfilePage() {
             Importez votre historique de visionnage, vos notes et votre
             watchlist depuis un export Trakt (.zip).
           </p>
-          <TraktImportButton />
+          <div className="flex flex-wrap gap-2">
+            <TraktImportButton />
+            <ImportCreditsButton />
+          </div>
         </section>
       </div>
     </div>

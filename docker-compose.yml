@@ -45,6 +45,7 @@ services:
     environment:
       DATABASE_URL: postgresql://emdb:emdb@postgres:5432/emdb
       REDIS_URL: redis://redis:6379
+      IMPORT_TMP_DIR: /tmp/emdb-import
     ports:
       - '3001:3001'
     depends_on:
@@ -56,6 +57,7 @@ services:
       - ./apps/api:/app/apps/api
       # - ./packages:/app/packages
       - /app/node_modules
+      - emdb_import_tmp:/tmp/emdb-import
 
   worker:
     build:
@@ -77,7 +79,9 @@ services:
       - ./apps/worker:/app/apps/worker
       - ./packages:/app/packages
       - /app/node_modules
+      - emdb_import_tmp:/tmp/emdb-import
 
 volumes:
   emdb_postgres_data:
   emdb_redis_data:
+  emdb_import_tmp:

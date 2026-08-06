@@ -20,7 +20,7 @@ const USER_EMAIL = 'elie.vincent4@gmail.com';
 // Casting non importé ici (rafraîchissable ensuite titre par titre via le
 // bouton "Actualiser") : sur ~1000 titres, l'import du casting représenterait
 // à lui seul plusieurs dizaines de milliers d'appels TMDB.
-const IMPORT_WITH_CREDITS = true ;
+const IMPORT_WITH_CREDITS = false;
 
 async function loadJson(fileName) {
   const filePath = path.join(TRAKT_EXPORT_DIR, fileName);

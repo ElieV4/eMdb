@@ -107,7 +107,10 @@ async function createSyncLog(params: {
   });
 }
 
-export async function importPersonByTmdbId(tmdbId: number) {
+export async function importPersonByTmdbId(
+  tmdbId: number,
+  options: { skipWikidata?: boolean } = {},
+) {
   // Court-circuit si la personne existe déjà localement — sans ça, importer
   // un titre au casting/équipe nombreux (parfois 100+ credits) déclenchait
   // 2 appels TMDB (+ Wikidata) PAR personne, même pour des personnes déjà
@@ -124,7 +127,14 @@ export async function importPersonByTmdbId(tmdbId: number) {
     getPersonExternalIds(tmdbId),
   ]);
   const { wikidata_id } = mapTmdbPersonExternalIds(externalIds);
-  const wikiUrl = wikidata_id ? await getWikipediaUrlFromWikidataId(wikidata_id) : null;
+  // `skipWikidata` : pour un import de masse (des centaines/milliers de
+  // personnes), le rate-limit Wikidata (bug #5, 429) ralentit inutilement
+  // un backfill de credits — wiki_url reste nullable, complétable plus tard
+  // via le refresh normal d'une personne.
+  const wikiUrl =
+    wikidata_id && !options.skipWikidata
+      ? await getWikipediaUrlFromWikidataId(wikidata_id)
+      : null;
 
   const mappedPerson = mapTmdbPerson(tmdbPerson, wikiUrl);
 
@@ -187,16 +197,30 @@ async function ensureGenreIds(genres: { id: number; name: string }[]) {
       continue;
     }
 
-    const record = await prisma.genres.upsert({
-      where: { nom: genre.nom },
-      create: {
-        nom: genre.nom,
-        tmdb_id: genre.tmdb_id,
-      },
-      update: {
-        tmdb_id: genre.tmdb_id,
-      },
-    });
+    // Le seed initial des genres (packages/db/seed/seed_genres.ts) demande
+    // TMDB en français (noms accentués : "Aventure", "Science-Fiction"...),
+    // mais les endpoints d'import de titre (getMovieDetails/getTvDetails)
+    // n'envoient aucun paramètre de langue et reçoivent donc les noms TMDB
+    // en anglais. Un upsert par `nom` seul créait alors un doublon en
+    // anglais avec le MÊME tmdb_id qu'une ligne française déjà seedée —
+    // violation de la contrainte unique sur `tmdb_id`. On regarde donc
+    // d'abord si le tmdb_id est déjà connu (peu importe le nom en base) ;
+    // seul un tmdb_id réellement inédit retombe sur l'upsert par nom
+    // (comportement du bug #7 : un genre existant sous un autre tmdb_id).
+    let record = await prisma.genres.findUnique({ where: { tmdb_id: genre.tmdb_id } });
+
+    if (!record) {
+      record = await prisma.genres.upsert({
+        where: { nom: genre.nom },
+        create: {
+          nom: genre.nom,
+          tmdb_id: genre.tmdb_id,
+        },
+        update: {
+          tmdb_id: genre.tmdb_id,
+        },
+      });
+    }
     ids.push(record.id);
   }
 
@@ -373,6 +397,69 @@ export async function importTitleByTmdbId(
     });
     throw error;
   }
+}
+
+/**
+ * Importe/complète le casting+équipe d'un titre déjà connu localement, sans
+ * toucher au reste de ses métadonnées (genres/pays/studios/saisons) — chemin
+ * dédié pour un backfill de credits en masse (ex. `credits-import.worker.ts`)
+ * après un import Trakt réalisé avec `withCredits: false` pour rester rapide.
+ */
+export async function importCreditsForTitle(
+  titleId: string,
+  options: { creditFilter?: string[]; skipWikidata?: boolean } = {},
+) {
+  const title = await prisma.titles.findUnique({ where: { id: titleId } });
+  if (!title?.tmdb_id) {
+    throw new Error('Titre introuvable ou sans tmdb_id');
+  }
+
+  const tmdbData =
+    title.type === 'film' ? await getMovieDetails(title.tmdb_id) : await getTvDetails(title.tmdb_id);
+
+  if (!tmdbData.credits) {
+    return { imported: 0 };
+  }
+
+  let creditInserts = mapTmdbCredits(tmdbData.credits, title.id, null);
+  if (options.creditFilter?.length) {
+    creditInserts = creditInserts.filter((credit) => options.creditFilter!.includes(credit.role));
+  }
+
+  let imported = 0;
+
+  // En parallèle plutôt qu'un `for` séquentiel — même raisonnement que dans
+  // `importTitleByTmdbId` (bug #35) : le `RateLimiter` de tmdb-client
+  // sérialise déjà les vrais appels réseau à leur cadence configurée.
+  await Promise.all(
+    creditInserts.map(async (credit) => {
+      const person = await importPersonByTmdbId(credit.tmdb_person_id, {
+        skipWikidata: options.skipWikidata,
+      });
+      const roleId = await ensureRoleId(credit.role, credit.role_libelle);
+      try {
+        await prisma.credits.create({
+          data: {
+            title_id: title.id,
+            person_id: person.id,
+            episode_id: null,
+            role_id: roleId,
+            personnage: credit.personnage,
+            ordre: credit.ordre,
+            source: 'tmdb',
+          },
+        });
+        imported++;
+      } catch (error: any) {
+        if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
+          return;
+        }
+        throw error;
+      }
+    }),
+  );
+
+  return { imported };
 }
 
 export async function importSeasonsForSerie(titleId: string) {

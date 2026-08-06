@@ -134,22 +134,34 @@ function parseRetryAfter(retryAfter: string | null): number | null {
 
 class RateLimiter {
   private tokens: number;
-  private lastRefill: number;
   private queue: Array<() => void> = [];
+  private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly maxRequests: number,
     private readonly intervalMs: number,
   ) {
     this.tokens = maxRequests;
-    this.lastRefill = Date.now();
   }
 
-  private refill() {
-    const now = Date.now();
-    if (now - this.lastRefill >= this.intervalMs) {
+  // Un unique timer récurrent draine la file, plutôt qu'un `setTimeout`
+  // par appel en attente (ancienne approche) : quand un burst dépasse
+  // `maxRequests` en une fois (ex. import des credits d'un titre au casting
+  // nombreux, 80+ acteurs en parallèle via Promise.all), chaque appel en
+  // attente calculait son propre délai depuis le MÊME `lastRefill`, donc
+  // tous leurs timers arrivaient à échéance quasi simultanément ; seul le
+  // premier à s'exécuter faisait un vrai refill (et ne drainait qu'un lot de
+  // `maxRequests`), les autres s'exécutant juste après trouvaient
+  // `lastRefill` déjà à jour et ne faisaient rien — sans aucun nouveau timer
+  // programmé pour les entrées encore en file, celles-ci restaient bloquées
+  // indéfiniment (aucun `schedule()` ultérieur pour les débloquer tant que
+  // ce burst était la seule activité en cours).
+  private ensureTimer() {
+    if (this.timer) {
+      return;
+    }
+    this.timer = setInterval(() => {
       this.tokens = this.maxRequests;
-      this.lastRefill = now;
       while (this.tokens > 0 && this.queue.length > 0) {
         const next = this.queue.shift();
         if (!next) {
@@ -158,7 +170,12 @@ class RateLimiter {
         this.tokens -= 1;
         next();
       }
-    }
+      if (this.queue.length === 0 && this.timer) {
+        clearInterval(this.timer);
+        this.timer = null;
+      }
+    }, this.intervalMs);
+    this.timer.unref?.();
   }
 
   public async schedule<T>(callback: () => Promise<T>): Promise<T> {
@@ -167,8 +184,6 @@ class RateLimiter {
         callback().then(resolve, reject);
       };
 
-      this.refill();
-
       if (this.tokens > 0) {
         this.tokens -= 1;
         execute();
@@ -176,8 +191,7 @@ class RateLimiter {
       }
 
       this.queue.push(execute);
-      const delay = Math.max(this.intervalMs - (Date.now() - this.lastRefill), 0);
-      setTimeout(() => this.refill(), delay);
+      this.ensureTimer();
     });
   }
 }

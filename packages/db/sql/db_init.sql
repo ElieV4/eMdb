@@ -243,11 +243,21 @@ CREATE TRIGGER trg_user_ratings_updated_at
 -- LISTES (a voir, personnalisees) + partage
 -- ============================================================
 
+-- Valeurs de `type` alignées sur celles réellement écrites par le code
+-- ('a_voir'/'personnalisee' ne correspondaient à aucun appel actuel) :
+-- 'watchlist'/'favoris'/'custom' (création utilisateur, cf.
+-- lists.service.ts + create-list.dto.ts, et la liste par défaut créée à
+-- l'inscription, cf. auth.service.ts) et 'collection' (listes générées par
+-- l'import Trakt, cf. trakt-import.worker.ts). Même classe de bug que
+-- tmdb_sync_log_action_check : toute base initialisée depuis ce fichier
+-- (contrairement à une base créée via `prisma db push`, qui ne connaît pas
+-- ces check constraints) faisait échouer la création de CHAQUE liste,
+-- y compris la watchlist par défaut à l'inscription.
 CREATE TABLE user_lists (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     nom         TEXT NOT NULL,
-    type        TEXT NOT NULL CHECK (type IN ('a_voir','personnalisee')),
+    type        TEXT NOT NULL CHECK (type IN ('watchlist','favoris','custom','collection')),
     description TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -312,11 +322,16 @@ CREATE TABLE person_recommendations (
 -- NOTIFICATIONS (nouveaux episodes suivis, rappels...)
 -- ============================================================
 
+-- Valeurs de `type` alignées sur celles réellement écrites par le code
+-- (generateNewEpisodeNotifications/generateSeasonPremiereNotification,
+-- packages/tmdb-sync/src/index.ts) — 'nouvel_episode'/'rappel'/'recommandation'
+-- ne correspondaient à aucun appel actuel. Même classe de bug que
+-- tmdb_sync_log_action_check/user_lists_type_check.
 CREATE TABLE notifications (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     episode_id  UUID REFERENCES episodes(id) ON DELETE CASCADE,
-    type        TEXT NOT NULL CHECK (type IN ('nouvel_episode','rappel','recommandation')),
+    type        TEXT NOT NULL CHECK (type IN ('new_episode','season_premiere')),
     lu          BOOLEAN NOT NULL DEFAULT false,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -327,18 +342,28 @@ CREATE INDEX idx_notifications_user_unread ON notifications(user_id) WHERE lu = 
 -- LOG DE SYNCHRONISATION TMDB [v2]
 -- ============================================================
 
+-- Valeurs de `action`/`status` alignées sur les seuls appels réels de
+-- `createSyncLog()` (packages/tmdb-sync/src/index.ts, `importTitleByTmdbId`)
+-- — les valeurs françaises d'origine ('import'/'refresh'/'import_saisons',
+-- 'succes'/'echec') ne correspondaient à aucun appel du code actuel : toute
+-- table initialisée depuis ce fichier (ex. `docker-entrypoint-initdb.d`,
+-- contrairement à une base créée via `prisma db push`, qui ne connaît pas
+-- ces check constraints, cf. schema.prisma) faisait échouer silencieusement
+-- CHAQUE import de titre (createSyncLog rejeté par la contrainte, l'erreur
+-- non catchée dans `importTitleByTmdbId` remontait jusqu'au `catch` vide de
+-- `findOrImportTitle`, qui comptait juste le titre en échec).
 CREATE TABLE tmdb_sync_log (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tmdb_id     INT NOT NULL,
     type        TEXT NOT NULL CHECK (type IN ('film','serie','personne')),
-    action      TEXT NOT NULL CHECK (action IN ('import','refresh','import_saisons')),
-    status      TEXT NOT NULL CHECK (status IN ('succes','echec')),
+    action      TEXT NOT NULL CHECK (action IN ('importTitle','importPerson','dailySyncNewEpisodes','weeklyResyncChanges')),
+    status      TEXT NOT NULL CHECK (status IN ('started','success','failed')),
     error       TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_sync_log_tmdb ON tmdb_sync_log(tmdb_id, type);
-CREATE INDEX idx_sync_log_status_echec ON tmdb_sync_log(created_at) WHERE status = 'echec';
+CREATE INDEX idx_sync_log_status_echec ON tmdb_sync_log(created_at) WHERE status = 'failed';
 
 -- ============================================================
 -- FONCTIONS METIER [v2]

@@ -1,21 +1,27 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
-import { TRAKT_IMPORT_QUEUE_NAME, buildRedisConnection } from './import.config';
+import {
+  TRAKT_IMPORT_QUEUE_NAME,
+  CREDITS_IMPORT_QUEUE_NAME,
+  buildRedisConnection,
+} from './import.config';
 
 @Injectable()
 export class ImportService {
   private readonly logger = new Logger(ImportService.name);
-  private queue: Queue | null = null;
+  private queues = new Map<string, Queue>();
 
   constructor(private readonly configService: ConfigService) {}
 
-  private getQueue(): Queue {
-    if (!this.queue) {
+  private getQueue(queueName: string): Queue {
+    let queue = this.queues.get(queueName);
+    if (!queue) {
       const redisUrl = this.configService.get<string>('REDIS_URL') ?? 'redis://localhost:6379';
-      this.queue = new Queue(TRAKT_IMPORT_QUEUE_NAME, { connection: buildRedisConnection(redisUrl) });
+      queue = new Queue(queueName, { connection: buildRedisConnection(redisUrl) });
+      this.queues.set(queueName, queue);
     }
-    return this.queue;
+    return queue;
   }
 
   /**
@@ -29,7 +35,7 @@ export class ImportService {
    * retiré immédiatement de Redis à la complétion ne serait plus consultable.
    */
   async startTraktImport(userId: string, extractDir: string): Promise<{ jobId: string | undefined; status: string }> {
-    const queue = this.getQueue();
+    const queue = this.getQueue(TRAKT_IMPORT_QUEUE_NAME);
 
     this.logger.log(`Ajout d'un job trakt-import pour l'utilisateur ${userId}`);
 
@@ -49,7 +55,40 @@ export class ImportService {
   }
 
   async getJobStatus(jobId: string) {
-    const queue = this.getQueue();
+    return this.getStatus(TRAKT_IMPORT_QUEUE_NAME, jobId);
+  }
+
+  /**
+   * Ajoute un job d'import de credits à la queue — même pattern que
+   * `startTraktImport` (bouton "Importer les credits" de la page Profil,
+   * exécuté après un import Trakt fait sans casting pour rester rapide).
+   */
+  async startCreditsImport(userId: string): Promise<{ jobId: string | undefined; status: string }> {
+    const queue = this.getQueue(CREDITS_IMPORT_QUEUE_NAME);
+
+    this.logger.log(`Ajout d'un job credits-import pour l'utilisateur ${userId}`);
+
+    const job = await queue.add(
+      'credits-import',
+      { userId },
+      {
+        removeOnComplete: { age: 3600 },
+        removeOnFail: { age: 3600 },
+        attempts: 1,
+      },
+    );
+
+    this.logger.log(`Job credits-import créé : jobId=${job.id}`);
+
+    return { jobId: job.id, status: 'queued' };
+  }
+
+  async getCreditsJobStatus(jobId: string) {
+    return this.getStatus(CREDITS_IMPORT_QUEUE_NAME, jobId);
+  }
+
+  private async getStatus(queueName: string, jobId: string) {
+    const queue = this.getQueue(queueName);
     const job = await queue.getJob(jobId);
 
     if (!job) {

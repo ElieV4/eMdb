@@ -120,7 +120,7 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
 
     if (!title) {
       try {
-        title = await importTitleByTmdbId(tmdbId, type, { withCredits: true });
+        title = await importTitleByTmdbId(tmdbId, type, { withCredits: false });
         titlesImported++;
       } catch {
         titlesFailed++;

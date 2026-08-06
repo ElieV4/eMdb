@@ -35,6 +35,20 @@ const TRAKT_MARKER_FILES = [
 ];
 
 /**
+ * Dossier où le zip est uploadé/extrait, PUIS lu par le worker BullMQ
+ * (`trakt-import.worker.ts`) pour traiter les fichiers JSON — API et worker
+ * tournent dans des containers Docker distincts, donc `os.tmpdir()` seul
+ * pointerait vers deux filesystèmes différents : le worker ne trouverait
+ * jamais les fichiers que l'API vient d'extraire (job qui se termine en
+ * silence avec 0 résultat, aucun fichier repère détecté). `IMPORT_TMP_DIR`
+ * doit pointer vers un volume monté aux deux containers au même chemin (cf.
+ * docker-compose.yml, service `import-tmp`) ; à défaut (dev natif hors
+ * Docker, API et worker sur la même machine), `os.tmpdir()` suffit.
+ */
+const IMPORT_TMP_DIR = process.env.IMPORT_TMP_DIR || os.tmpdir();
+fs.mkdirSync(IMPORT_TMP_DIR, { recursive: true });
+
+/**
  * Endpoints d'import Trakt (bug #55/#56) — bouton "Importer depuis Trakt"
  * de la page Profil. Accessibles à tout utilisateur connecté (import de ses
  * propres données, pas une opération admin).
@@ -57,7 +71,7 @@ export class ImportController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: os.tmpdir(),
+        destination: IMPORT_TMP_DIR,
         filename: (_req, _file, cb) => cb(null, `trakt-upload-${randomUUID()}.zip`),
       }),
       fileFilter: (_req, file, cb) => {
@@ -75,7 +89,7 @@ export class ImportController {
       throw new BadRequestException('Aucun fichier fourni.');
     }
 
-    const extractDir = path.join(os.tmpdir(), `trakt-import-${randomUUID()}`);
+    const extractDir = path.join(IMPORT_TMP_DIR, `trakt-import-${randomUUID()}`);
 
     try {
       const zip = new AdmZip(file.path);
@@ -113,6 +127,25 @@ export class ImportController {
   @Get('trakt/:jobId/status')
   async getStatus(@Param('jobId') jobId: string) {
     return this.importService.getJobStatus(jobId);
+  }
+
+  /**
+   * POST /import/credits
+   * Bouton "Importer les credits" de la page Profil — importe le casting
+   * (acteurs + réalisateurs) de tous les titres avec lesquels l'utilisateur
+   * a interagi (watches/ratings/listes), en tâche de fond. Complète un
+   * import Trakt fait sans casting (`withCredits: false`, pour rester rapide
+   * sur un gros export).
+   */
+  @Post('credits')
+  async importCredits(@CurrentUser() user: any) {
+    return this.importService.startCreditsImport(user.id);
+  }
+
+  /** GET /import/credits/:jobId/status — même contrat que /import/trakt/:jobId/status. */
+  @Get('credits/:jobId/status')
+  async getCreditsStatus(@Param('jobId') jobId: string) {
+    return this.importService.getCreditsJobStatus(jobId);
   }
 
   /** Cherche récursivement (1 niveau) le dossier contenant les fichiers repères Trakt. */

@@ -14,4 +14,11 @@ import { buildRedisConnection as buildRedisConnectionFromAdmin } from '../admin/
  */
 export const TRAKT_IMPORT_QUEUE_NAME = 'trakt-import';
 
+/**
+ * Nom de la queue BullMQ utilisée pour les jobs d'import de credits (bouton
+ * "Importer les credits" de la page Profil). Doit correspondre à
+ * CREDITS_IMPORT_QUEUE_NAME dans apps/worker/src/credits-import.worker.ts.
+ */
+export const CREDITS_IMPORT_QUEUE_NAME = 'credits-import';
+
 export const buildRedisConnection = buildRedisConnectionFromAdmin;
