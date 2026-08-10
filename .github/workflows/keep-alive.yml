@@ -1,0 +1,32 @@
+name: Keep-alive backend
+
+# Ping l'API en prod toutes les ~10 min pour :
+# - empêcher le spin-down du Web Service Render (free) après 15 min d'inactivité
+# - empêcher la mise en pause du projet Supabase (free) après 1 semaine sans requête DB
+#
+# Nécessite la variable de repo RENDER_URL (Settings > Secrets and variables >
+# Actions > Variables), ex: https://emdb-api.onrender.com — cf. docs/DEPLOIEMENT.md.
+# Tant que RENDER_URL n'est pas configurée, ce workflow ne fait rien.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health et /health/db
+        env:
+          RENDER_URL: ${{ vars.RENDER_URL }}
+        run: |
+          if [ -z "$RENDER_URL" ]; then
+            echo "RENDER_URL non configurée — voir docs/DEPLOIEMENT.md. Skip."
+            exit 0
+          fi
+          echo "Ping $RENDER_URL/health"
+          curl -fsS "$RENDER_URL/health"
+          echo
+          echo "Ping $RENDER_URL/health/db"
+          curl -fsS "$RENDER_URL/health/db"

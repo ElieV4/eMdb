@@ -1,4 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { PrismaService } from './prisma/prisma.service';
 
 const ALLOWED_WATCH_LINK_HOSTS = new Set([
   'www.watchtv.click',
@@ -11,9 +12,19 @@ const ALLOWED_WATCH_LINK_HOSTS = new Set([
 
 @Controller()
 export class AppController {
+  constructor(private readonly prisma: PrismaService) {}
+
   @Get('health')
   health() {
     return { status: 'ok', service: 'emdb-api' };
+  }
+
+  // Ping DB pour le workflow keep-alive (évite la mise en pause du projet
+  // Supabase après 1 semaine d'inactivité, cf. docs/DEPLOIEMENT.md).
+  @Get('health/db')
+  async healthDb() {
+    await this.prisma.$queryRawUnsafe('SELECT 1');
+    return { status: 'ok', service: 'emdb-api', db: 'ok' };
   }
 
   @Get('watch-links/validate')

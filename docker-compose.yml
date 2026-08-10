@@ -46,6 +46,9 @@ services:
       DATABASE_URL: postgresql://emdb:emdb@postgres:5432/emdb
       REDIS_URL: redis://redis:6379
       IMPORT_TMP_DIR: /tmp/emdb-import
+      # false en local : le conteneur `worker` gère déjà les jobs BullMQ,
+      # cf. EMBED_WORKER dans apps/api/src/main.ts pour le déploiement cloud.
+      EMBED_WORKER: 'false'
     ports:
       - '3001:3001'
     depends_on:

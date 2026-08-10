@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "start:dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "start:prod": "ts-node --transpile-only src/index.ts",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "test": "jest"
   },
@@ -15,7 +16,8 @@
     "@emdb/recommender": "*",
     "@emdb/tmdb-sync": "*",
     "bullmq": "^5.12.1",
-    "ioredis": "^5.4.1"
+    "ioredis": "^5.4.1",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
