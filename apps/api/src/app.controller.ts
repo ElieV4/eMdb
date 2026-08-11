@@ -1,5 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
+import { findArchiveOrgFilm } from './watch-links.util';
 
 const ALLOWED_WATCH_LINK_HOSTS = new Set([
   'www.watchtv.click',
@@ -59,5 +60,33 @@ export class AppController {
     } catch {
       return { valid: false, status: 0 };
     }
+  }
+
+  // Recherche + vérification d'un film complet sur Internet Archive (VO ou
+  // VF), utilisé uniquement pour les films (cf. apps/web TitleHero) — API
+  // gratuite sans clé, contrairement à YouTube (quota trop faible pour une
+  // validation à chaque visite de fiche film).
+  @Get('watch-links/archive-org')
+  async findArchiveOrgLink(
+    @Query('titreVo') titreVo: string,
+    @Query('titreVf') titreVf?: string,
+    @Query('anneeSortie') anneeSortie?: string,
+  ) {
+    if (!titreVo) {
+      return { found: false };
+    }
+
+    const annee = anneeSortie ? parseInt(anneeSortie, 10) : undefined;
+    const match = await findArchiveOrgFilm({
+      titreVo,
+      titreVf,
+      anneeSortie: Number.isFinite(annee) ? annee : undefined,
+    });
+
+    if (!match) {
+      return { found: false };
+    }
+
+    return { found: true, url: match.url, label: match.label };
   }
 }

@@ -5,7 +5,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Star } from "lucide-react";
+import { Archive, Star } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CreditGrouped, TitleDetail } from "@/lib/types/api";
@@ -51,25 +51,56 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
     let cancelled = false;
 
     const validateFreeLinks = async () => {
-      if (freeLinks.length === 0) {
-        setValidFreeLinks([]);
-        return;
+      const checks: Promise<WatchLink | null>[] = freeLinks.map(async (link) => {
+        try {
+          const res = await fetch(
+            `${API_BASE_URL}/watch-links/validate?url=${encodeURIComponent(link.href)}`,
+            { cache: "no-store" },
+          );
+          const data = (await res.json()) as { valid?: boolean; status?: number };
+          return data.valid === false ? null : link;
+        } catch {
+          return null;
+        }
+      });
+
+      // Internet Archive : pas d'URL devinable (identifiant non prévisible),
+      // recherche + vérification côté API (titre + langue VO/VF détectée si
+      // possible) — uniquement pour les films (cf. discussion module liens
+      // gratuits, YouTube écarté : quota API trop faible pour valider à
+      // chaque visite de fiche).
+      if (type === "film") {
+        checks.push(
+          (async () => {
+            try {
+              const params = new URLSearchParams({ titreVo: titre_vo });
+              if (titre_vf) params.set("titreVf", titre_vf);
+              if (year) params.set("anneeSortie", String(year));
+              const res = await fetch(
+                `${API_BASE_URL}/watch-links/archive-org?${params.toString()}`,
+                { cache: "no-store" },
+              );
+              const data = (await res.json()) as {
+                found?: boolean;
+                url?: string;
+                label?: "VO" | "VF" | null;
+              };
+              if (!data.found || !data.url) return null;
+              return {
+                name: data.label
+                  ? `Internet Archive (${data.label})`
+                  : "Internet Archive",
+                href: data.url,
+                icon: Archive,
+              };
+            } catch {
+              return null;
+            }
+          })(),
+        );
       }
 
-      const checked = await Promise.all(
-        freeLinks.map(async (link) => {
-          try {
-            const res = await fetch(
-              `${API_BASE_URL}/watch-links/validate?url=${encodeURIComponent(link.href)}`,
-              { cache: "no-store" },
-            );
-            const data = (await res.json()) as { valid?: boolean; status?: number };
-            return data.valid === false ? null : link;
-          } catch {
-            return null;
-          }
-        }),
-      );
+      const checked = await Promise.all(checks);
 
       if (!cancelled) {
         setValidFreeLinks(checked.filter(Boolean) as WatchLink[]);
@@ -81,7 +112,7 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
     return () => {
       cancelled = true;
     };
-  }, [titre_vo, type, tmdb_id]);
+  }, [titre_vo, titre_vf, type, tmdb_id, year]);
 
   const renderLinkGroup = (
     groupTitle: string,
