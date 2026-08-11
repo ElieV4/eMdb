@@ -30,6 +30,15 @@ export type TraktImportResult = {
 export const TRAKT_IMPORT_QUEUE_NAME = 'trakt-import';
 
 /**
+ * Clé d'identité d'un visionnage (titre/épisode + timestamp exact) — sert à
+ * dédupliquer les imports Trakt : un même export réimporté (ou deux exports
+ * qui se recoupent) ne doit pas créer deux fois le même visionnage.
+ */
+function watchKey(titleId: string | null, episodeId: string | null, dateVue: Date): string {
+  return `${titleId ?? ''}|${episodeId ?? ''}|${dateVue.toISOString()}`;
+}
+
+/**
  * Import Trakt en tâche de fond (bug #55/#56) — bouton "Importer depuis
  * Trakt" de la page Profil. Reprend la logique de `scripts/import-trakt.js`
  * (corrigée : déclenche l'import TMDB des titres absents du catalogue local
@@ -103,6 +112,18 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
 
   const titleCache = new Map<string, { id: string; type: string } | null>();
   const toppedUpShows = new Set<string>();
+
+  // Comparaison existant vs import prévu (avant toute écriture) : charge
+  // tous les visionnages déjà en base pour cet utilisateur, pour repérer
+  // les doublons titre+timestamp exact — qu'ils viennent d'un réimport du
+  // même export ou d'un chevauchement entre deux exports.
+  const existingWatches = await prisma.user_watches.findMany({
+    where: { user_id: userId },
+    select: { title_id: true, episode_id: true, date_vue: true },
+  });
+  const seenWatchKeys = new Set<string>(
+    existingWatches.map((w) => watchKey(w.title_id, w.episode_id, w.date_vue)),
+  );
 
   // `resolved` avance d'exactement 1 à chaque *premier* passage sur un
   // `cacheKey` (type:tmdb_id) donné, qu'il ait fallu l'importer ou qu'il
@@ -179,12 +200,16 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
           }
           const episodeId = await findEpisodeByTmdb(showTmdbId, seasonNumber, episodeNumber);
           if (!episodeId) { watchSkip++; continue; }
+          const dateVue = item.watched_at ? new Date(item.watched_at) : new Date();
+          const key = watchKey(null, episodeId, dateVue);
+          if (seenWatchKeys.has(key)) { watchSkip++; continue; }
+          seenWatchKeys.add(key);
           await prisma.user_watches.create({
             data: {
               user_id: userId,
               title_id: null,
               episode_id: episodeId,
-              date_vue: item.watched_at ? new Date(item.watched_at) : new Date(),
+              date_vue: dateVue,
             },
           });
           watchCount++;
@@ -193,12 +218,16 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
           if (!tmdbId) { watchSkip++; continue; }
           const title = await findOrImportTitle(tmdbId, 'serie');
           if (!title) { watchSkip++; continue; }
+          const dateVue = item.watched_at ? new Date(item.watched_at) : new Date();
+          const key = watchKey(title.id, null, dateVue);
+          if (seenWatchKeys.has(key)) { watchSkip++; continue; }
+          seenWatchKeys.add(key);
           await prisma.user_watches.create({
             data: {
               user_id: userId,
               title_id: title.id,
               episode_id: null,
-              date_vue: item.watched_at ? new Date(item.watched_at) : new Date(),
+              date_vue: dateVue,
             },
           });
           watchCount++;
@@ -219,12 +248,16 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
         if (!tmdbId) { movieSkip++; continue; }
         const title = await findOrImportTitle(tmdbId, 'film');
         if (!title) { movieSkip++; continue; }
+        const dateVue = item.last_watched_at ? new Date(item.last_watched_at) : new Date();
+        const key = watchKey(title.id, null, dateVue);
+        if (seenWatchKeys.has(key)) { movieSkip++; continue; }
+        seenWatchKeys.add(key);
         await prisma.user_watches.create({
           data: {
             user_id: userId,
             title_id: title.id,
             episode_id: null,
-            date_vue: item.last_watched_at ? new Date(item.last_watched_at) : new Date(),
+            date_vue: dateVue,
           },
         });
         movieCount++;
