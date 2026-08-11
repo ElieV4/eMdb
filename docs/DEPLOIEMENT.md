@@ -31,12 +31,23 @@ Le workflow lit la variable de repo `RENDER_URL` (Settings > Secrets and variabl
 ### 1. Supabase (base de données)
 
 1. Créer un projet sur [supabase.com](https://supabase.com).
-2. Récupérer la connection string directe (Project Settings > Database > Connection string) → c'est `SUPABASE_DB_URL` / `DATABASE_URL`.
+2. Récupérer la connection string — **utiliser le "Session pooler" (IPv4)**, pas la connexion directe : depuis fin 2023 la connexion directe (port 5432 sur `db.<ref>.supabase.co`) est IPv6-only sauf add-on payant, et Render/la plupart des réseaux n'ont pas de sortie IPv6. Project Settings > Database > Connection string > onglet **Session pooler** :
+   ```
+   postgresql://postgres.<project-ref>:[PASSWORD]@aws-0-<région>.pooler.supabase.com:5432/postgres
+   ```
+   C'est cette chaîne qui sert de `SUPABASE_DB_URL` / `DATABASE_URL` partout (localement pour appliquer le schéma, et sur Render).
 3. Appliquer le schéma (base vierge, pas de données à migrer) :
    ```bash
-   psql "$SUPABASE_DB_URL" -f packages/db/sql/db_init.sql
+   npx prisma db execute --file packages/db/sql/db_init.sql --url "$SUPABASE_DB_URL"
    ```
-4. Générer le client Prisma en pointant sur cette base si besoin de vérifier :
+   (pas de `psql` nécessaire — la CLI Prisma déjà présente dans le monorepo suffit.)
+4. **Vérifier qu'il n'y a pas de dérive** entre `db_init.sql` et le schéma réellement utilisé par l'app (`packages/db/prisma/schema.prisma` peut avoir évolué sans que `db_init.sql` soit mis à jour en parallèle — c'est arrivé une fois, cf. commit `fix(db): synchroniser db_init.sql...`) :
+   ```bash
+   npx prisma db pull --schema=/tmp/verify.prisma  # avec DATABASE_URL=$SUPABASE_DB_URL
+   diff packages/db/prisma/schema.prisma /tmp/verify.prisma
+   ```
+   Toute différence de colonne/type doit être corrigée dans `packages/db/sql/db_init.sql` (source de vérité pour un bootstrap neuf) puis réappliquée en base.
+5. Générer le client Prisma en pointant sur cette base si besoin de vérifier :
    ```bash
    DATABASE_URL="$SUPABASE_DB_URL" npm run prisma:generate
    ```
