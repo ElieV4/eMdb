@@ -9,7 +9,7 @@
 
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useInfiniteWatches } from "@/hooks/api/useInfiniteWatches";
@@ -27,7 +27,7 @@ import { parseTitleFilters, buildListIdsByTitle } from "@/lib/titleFilters";
 import { groupByPeriod, Period } from "@/lib/periodGrouping";
 import { UserWatch } from "@/lib/types/api";
 
-export default function HistoryPage() {
+function HistoryPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -235,5 +235,13 @@ export default function HistoryPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={null}>
+      <HistoryPageContent />
+    </Suspense>
   );
 }

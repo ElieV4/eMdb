@@ -10,6 +10,7 @@
 
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useLists } from "@/hooks/api/useLists";
@@ -47,7 +48,7 @@ function titleToSearchResult(title: Title): TitleSearchResult {
   };
 }
 
-export default function WatchlistPage() {
+function WatchlistPageContent() {
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const { data: lists, isLoading: isListsLoading } = useLists(isAuthenticated);
@@ -191,5 +192,13 @@ export default function WatchlistPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function WatchlistPage() {
+  return (
+    <Suspense fallback={null}>
+      <WatchlistPageContent />
+    </Suspense>
   );
 }

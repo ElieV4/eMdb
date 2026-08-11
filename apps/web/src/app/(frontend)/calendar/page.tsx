@@ -10,7 +10,7 @@
 
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useInfiniteCalendar } from "@/hooks/api/useInfiniteCalendar";
@@ -23,7 +23,7 @@ import { AlertCircle, Tv } from "lucide-react";
 import { groupByPeriod, Period } from "@/lib/periodGrouping";
 import { CalendarEntry } from "@/lib/types/api";
 
-export default function CalendarPage() {
+function CalendarPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -181,5 +181,13 @@ export default function CalendarPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={null}>
+      <CalendarPageContent />
+    </Suspense>
   );
 }

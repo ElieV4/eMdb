@@ -6,6 +6,7 @@
 
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Calendar, TrendingUp, Users } from "lucide-react";
@@ -92,7 +93,7 @@ function DashboardSection({
   );
 }
 
-export default function HomePage() {
+function HomePageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const searchParams = useSearchParams();
   const filters = parseTitleFilters(searchParams);
@@ -467,5 +468,13 @@ export default function HomePage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomePageContent />
+    </Suspense>
   );
 }

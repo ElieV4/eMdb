@@ -16,9 +16,10 @@
 
 "use client";
 
+import { Suspense } from "react";
 import { DiscoverModuleSection, DISCOVER_MODULES } from "@/components/discover/DiscoverModuleSection";
 
-export default function DiscoverPage() {
+function DiscoverPageContent() {
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="space-y-10">
@@ -41,5 +42,13 @@ export default function DiscoverPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function DiscoverPage() {
+  return (
+    <Suspense fallback={null}>
+      <DiscoverPageContent />
+    </Suspense>
   );
 }

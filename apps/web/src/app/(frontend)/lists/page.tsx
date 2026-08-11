@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +26,7 @@ import {
   titleMatchesFilters,
 } from "@/lib/titleFilters";
 
-export default function ListsPage() {
+function ListsPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const searchParams = useSearchParams();
@@ -120,5 +120,13 @@ export default function ListsPage() {
         <ListDialog open={dialogOpen} onOpenChange={setDialogOpen} />
       </div>
     </div>
+  );
+}
+
+export default function ListsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ListsPageContent />
+    </Suspense>
   );
 }

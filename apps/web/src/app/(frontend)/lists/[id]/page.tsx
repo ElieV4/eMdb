@@ -9,7 +9,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -56,7 +56,7 @@ const typeLabels: Record<string, string> = {
   custom: "Personnalisée",
 };
 
-export default function ListDetailPage() {
+function ListDetailPageContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -193,5 +193,13 @@ export default function ListDetailPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ListDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <ListDetailPageContent />
+    </Suspense>
   );
 }
