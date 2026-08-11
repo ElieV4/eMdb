@@ -1,21 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Search,
-  Menu,
-  X,
-  List,
-  UserCircle,
-  Home,
-  Compass,
-  LucideIcon,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Search, List, UserCircle, Home, Compass, LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useLists } from "@/hooks/api/useLists";
 import { UserList } from "@/lib/types/api";
+import { BottomNav } from "./BottomNav";
 
 type NavChild = { href: string; label: string };
 type NavItem = { href: string; label: string; icon: LucideIcon; children?: NavChild[] };
@@ -157,7 +148,6 @@ function SidebarNav({
 }
 
 export function Sidebar() {
-  const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { isAuthenticated } = useAuth();
   const { data: userLists } = useLists(isAuthenticated);
@@ -166,8 +156,11 @@ export function Sidebar() {
   return (
     <>
       {/* Desktop sidebar : eMDB fixé en haut, arbre de navigation centré au
-          milieu, Profil fixé en bas (modification N, retour utilisateur). */}
-      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:z-40 lg:border-r">
+          milieu, Profil fixé en bas (modification N, retour utilisateur).
+          Fond opaque (bg-background) : sans lui, le contenu de page défilé
+          horizontalement apparaissait par transparence sous la sidebar
+          (position fixed + z-40 sans remplissage). */}
+      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:z-40 lg:border-r lg:bg-background">
         <div className="flex flex-col h-full px-4 py-6">
           <Link href="/" className="text-xl font-bold tracking-tight">
             eMDB
@@ -186,61 +179,10 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Mobile header */}
-      <div className="lg:hidden flex items-center gap-2 px-4 py-3 border-b">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setOpen(true)}
-          aria-label="Menu"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
-        <Link href="/" className="text-lg font-bold tracking-tight">
-          eMDB
-        </Link>
-      </div>
-
-      {/* Mobile overlay menu */}
-      {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setOpen(false)}
-          />
-          <div className="relative flex flex-col h-full w-64 border-r bg-background">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <Link
-                href="/"
-                className="text-lg font-bold tracking-tight"
-                onClick={() => setOpen(false)}
-              >
-                eMDB
-              </Link>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setOpen(false)}
-                aria-label="Fermer le menu"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="flex-1 flex flex-col justify-center overflow-y-auto px-4 py-4">
-              <SidebarNav tree={main} pathname={pathname} onNavigate={() => setOpen(false)} />
-            </div>
-            <div className="px-4 py-3 border-t">
-              <TopLevelLink
-                href={profile.href}
-                label={profile.label}
-                icon={profile.icon}
-                isActive={isTopLevelActive(pathname, profile.href)}
-                onNavigate={() => setOpen(false)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* < lg : barre d'icônes fixe en bas plutôt qu'un menu hamburger/drawer
+          (retour utilisateur : l'ancien menu se "rétractait" de façon peu
+          lisible dès qu'il manquait de place). */}
+      <BottomNav />
     </>
   );
 }

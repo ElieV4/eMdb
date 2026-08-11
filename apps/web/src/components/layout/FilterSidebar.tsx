@@ -108,13 +108,19 @@ export function FilterSidebar({
 
   return (
     <>
-      {/* Overlay : ferme la sidebar au clic en dehors */}
+      {/* Overlay : ferme le panneau au clic en dehors (au-dessus de la
+          barre d'icônes du bas, cf. BottomNav z-40) */}
       <div
-        className="fixed inset-0 z-40 bg-black/20"
+        className="fixed inset-0 z-[45] bg-black/20"
         onClick={onClose}
         aria-hidden="true"
       />
-      <aside className="fixed top-0 right-0 z-50 h-full w-80 max-w-[90vw] overflow-y-auto border-l border-border bg-background p-4 shadow-xl">
+      {/* < lg : feuille qui remonte du bas (assez peu de place pour une
+          sidebar). >= lg : sidebar droite, plafonnée à 30% de la largeur
+          (retour utilisateur). */}
+      <aside
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] w-full overflow-y-auto rounded-t-xl border-t border-border bg-background p-4 shadow-xl lg:inset-x-auto lg:inset-y-0 lg:right-0 lg:h-full lg:max-h-full lg:w-80 lg:max-w-[30vw] lg:rounded-t-none lg:rounded-l-xl lg:border-l lg:border-t-0"
+      >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-sm font-semibold">Filtres</h2>
           <div className="flex items-center gap-3">

@@ -33,14 +33,18 @@ export function TypeFilterTabs({
           type="button"
           onClick={() => onChange(tab.id)}
           className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200",
+            "flex items-center gap-1.5 rounded-full px-2 py-1.5 text-xs font-medium transition-all duration-200 sm:px-3",
             active === tab.id
               ? "bg-primary/20 text-primary"
               : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
           )}
+          aria-label={tab.label}
+          title={tab.label}
         >
           {tab.icon}
-          <span>{tab.label}</span>
+          {/* Icône seule si trop peu de place (retour utilisateur) — le
+              libellé ne réapparaît qu'à partir de sm (640px). */}
+          <span className="hidden sm:inline">{tab.label}</span>
         </button>
       ))}
     </div>

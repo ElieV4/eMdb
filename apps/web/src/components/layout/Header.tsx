@@ -28,7 +28,6 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useTitleGenres, useTitleCountries, useTitleStudios, useLists } from "@/hooks/api";
-import { Button } from "@/components/ui/button";
 import { TypeFilterTabs, FilterTab } from "./TypeFilterTabs";
 import { FilterSidebar } from "./FilterSidebar";
 import {
@@ -40,21 +39,7 @@ import {
   NOTE_IMDB_MIN,
   NOTE_IMDB_MAX,
 } from "@/lib/titleFilters";
-import {
-  Menu,
-  X,
-  Filter,
-  Film,
-  Tv,
-  Users,
-  Search,
-  Compass,
-  Calendar,
-  List,
-  History,
-  UserCircle,
-  BookmarkCheck,
-} from "lucide-react";
+import { Filter, Film, Tv, Users, Search } from "lucide-react";
 
 const FILTER_TABS: FilterTab[] = [
   { id: "tout", label: "Tout", icon: <Search className="h-3.5 w-3.5" /> },
@@ -68,7 +53,6 @@ export function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
 
   const { data: genres } = useTitleGenres();
@@ -235,28 +219,23 @@ export function Header() {
     });
   };
 
-  // Navigation links for mobile menu
-  const navLinks = [
-    { href: "/", label: "Accueil", icon: <Search className="h-4 w-4" /> },
-    { href: "/search", label: "Recherche", icon: <Search className="h-4 w-4" /> },
-    { href: "/discover", label: "Découvrir", icon: <Compass className="h-4 w-4" /> },
-    { href: "/calendar", label: "Calendrier", icon: <Calendar className="h-4 w-4" /> },
-    { href: "/watchlist", label: "Watchlist", icon: <BookmarkCheck className="h-4 w-4" /> },
-    { href: "/lists", label: "Listes", icon: <List className="h-4 w-4" /> },
-    { href: "/history", label: "Historique", icon: <History className="h-4 w-4" /> },
-    { href: "/profile", label: "Profil", icon: <UserCircle className="h-4 w-4" /> },
-  ];
-
   return (
-    <header className="sticky top-0 z-50">
+    <header className="sticky top-0 z-50 bg-background">
       <div className="mx-auto grid grid-cols-3 items-center max-w-7xl px-4 py-2">
-        {/* Colonne gauche : vide (équilibre la grille pour un centrage réel) */}
-        <div />
+        {/* Colonne gauche : logo eMDB, visible seulement < lg (à lg et plus,
+            le logo vit déjà dans la Sidebar) — remplace l'ancien div vide
+            qui ne servait qu'à équilibrer la grille. */}
+        <div>
+          <Link href="/" className="text-lg font-bold tracking-tight lg:hidden">
+            eMDB
+          </Link>
+        </div>
 
-        {/* Filtres centraux - visible sur desktop uniquement, masqués quand
-            le panneau "Filtres" est ouvert (le filtre par type y migre
-            alors en premier contrôle, cf. FilterSidebar). */}
-        <div className="hidden lg:flex items-center justify-center gap-1">
+        {/* Filtres centraux — visibles à toutes les tailles (icône seule
+            si trop peu de place, cf. TypeFilterTabs), masqués quand le
+            panneau "Filtres" est ouvert (le filtre par type y migre alors
+            en premier contrôle, cf. FilterSidebar). */}
+        <div className="flex items-center justify-center gap-1">
           {!filterSidebarOpen && !isProfilePage && (
             <TypeFilterTabs tabs={visibleTabs} active={rawTypeTab} onChange={setTypeFilter} />
           )}
@@ -264,36 +243,22 @@ export function Header() {
 
         {/* Actions droite */}
         <div className="flex items-center justify-end gap-2">
-          {/* Bouton "Filtres" — déploie la sidebar droite (absent sur
-              Profil, cf. isProfilePage) */}
+          {/* Bouton "Filtres" — déploie le panneau de filtres (sidebar
+              droite si assez de place, sinon feuille du bas, cf.
+              FilterSidebar) ; absent sur Profil, cf. isProfilePage. */}
           {!isProfilePage && (
             <button
               onClick={() => setFilterSidebarOpen((v) => !v)}
-              className={`hidden lg:flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 filterSidebarOpen || hasActiveTitleFilters(filters)
                   ? "bg-primary/20 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
               <Filter className="h-3.5 w-3.5" />
-              <span>Filtres</span>
+              <span className="hidden sm:inline">Filtres</span>
             </button>
           )}
-
-          {/* Menu hamburger mobile */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Menu"
-          >
-            {menuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
-          </Button>
         </div>
       </div>
 
@@ -329,58 +294,6 @@ export function Header() {
         onWatchedStatusChange={setWatchedStatus}
         onReset={resetFilters}
       />
-
-      {/* Menu navigation mobile */}
-      {menuOpen && (
-        <nav className="border-t px-4 py-2 lg:hidden bg-background/95 backdrop-blur">
-          {/* Filtres centraux en mobile (absents sur Profil) */}
-          {!isProfilePage && (
-            <TypeFilterTabs
-              tabs={visibleTabs}
-              active={rawTypeTab}
-              onChange={(id) => {
-                setTypeFilter(id);
-                setMenuOpen(false);
-              }}
-              className="overflow-x-auto pb-3 mb-3 border-b flex-nowrap"
-            />
-          )}
-
-          {/* Liens de navigation */}
-          <div className="space-y-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
-                onClick={() => setMenuOpen(false)}
-              >
-                {link.icon}
-                <span>{link.label}</span>
-              </Link>
-            ))}
-          </div>
-
-          {!isAuthenticated && (
-            <div className="mt-3 pt-3 border-t space-y-1">
-              <Link
-                href="/login"
-                className="block rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
-                onClick={() => setMenuOpen(false)}
-              >
-                Connexion
-              </Link>
-              <Link
-                href="/register"
-                className="block rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
-                onClick={() => setMenuOpen(false)}
-              >
-                Inscription
-              </Link>
-            </div>
-          )}
-        </nav>
-      )}
     </header>
   );
 }
