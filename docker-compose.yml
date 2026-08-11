@@ -40,6 +40,10 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: emdb-api
     restart: unless-stopped
+    # Le Dockerfile utilise `node dist/main` (build de prod) pour le déploiement
+    # cloud. En local, `./apps/api` est monté en volume par-dessus l'image (donc
+    # sans le `dist/` généré au build) : on repasse en mode watch (ts-node/nest).
+    command: npm run start:dev
     env_file:
       - .env
     environment:

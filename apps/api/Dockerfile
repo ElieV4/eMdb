@@ -36,7 +36,12 @@ RUN mkdir -p /app/node_modules/@emdb && \
     ln -s /app/packages/tmdb-sync /app/node_modules/@emdb/tmdb-sync && \
     ln -s /app/packages/recommender /app/node_modules/@emdb/recommender
 
+# Build de prod de l'API (nest build). `nest start --watch` (mode dev, compilateur
+# webpack incrémental) est bien trop gourmand en mémoire pour une instance à 512 Mo
+# de RAM (ex. Render free) — OOM au démarrage constaté en pratique.
+RUN cd /app/apps/api && npx nest build
+
 WORKDIR /app/apps/api
 EXPOSE 3001
 
-CMD ["npm", "run", "start:dev"]
+CMD ["node", "dist/main"]
