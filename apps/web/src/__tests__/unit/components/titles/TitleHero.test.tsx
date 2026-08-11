@@ -223,7 +223,7 @@ describe("TitleHero", () => {
     });
   });
 
-  it("cache entièrement le bloc 'Gratuit / sites whitelistés' quand tous les sites renvoient 404", async () => {
+  it("garde le bloc 'Gratuit / sites whitelistés' visible avec un message quand tous les sites renvoient 404 (retour utilisateur : jamais masqué)", async () => {
     (global.fetch as jest.Mock).mockImplementation(() =>
       Promise.resolve({
         ok: false,
@@ -234,9 +234,13 @@ describe("TitleHero", () => {
 
     render(<TitleHero title={mockTitle} />);
 
+    expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
+    expect(screen.getByText("Recherche en cours…")).toBeInTheDocument();
+
     await waitFor(() => {
-      expect(screen.queryByText("Gratuit / sites whitelistés")).not.toBeInTheDocument();
+      expect(screen.getByText("Aucun lien trouvé.")).toBeInTheDocument();
     });
+    expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
   });
 
   it("n'affiche pas le titre VF quand identique au VO", () => {

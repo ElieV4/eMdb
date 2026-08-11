@@ -46,9 +46,14 @@ export function DatavizSection() {
           chartType="stacked-bar" 
           defaultConfig={{ ...defaultVisualConfig("titles", "count", "genre"), legendBy: "mediaType"}} 
         />
+        {/* Pas de legendBy ici : le donut n'affiche qu'une seule série
+            (cf. BreakdownDonutChart) — legendBy: "mediaType" faisait
+            revenir 2 lignes par jour (Film/Série) que le donut affichait
+            comme 2 parts distinctes avec le même libellé au lieu de les
+            regrouper (retour utilisateur). */}
         <ConfigurableBreakdownChart
           chartType="donut"
-          defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "weekday", legendBy: "mediaType"  }}
+          defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "weekday" }}
         />
         <ConfigurableLineChart
           defaultConfig={{ ...defaultVisualConfig("duration", "sum", "period"), granularity: "quarter", legendBy: "mediaType" }}

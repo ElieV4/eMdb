@@ -40,7 +40,13 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import { YEAR_RANGE_MIN, YEAR_RANGE_MAX, NOTE_IMDB_MIN, NOTE_IMDB_MAX } from "@/lib/titleFilters";
+import {
+  YEAR_RANGE_MIN,
+  YEAR_RANGE_MAX,
+  WATCHED_YEAR_RANGE_MIN,
+  NOTE_IMDB_MIN,
+  NOTE_IMDB_MAX,
+} from "@/lib/titleFilters";
 import { AGGREGATION_LABEL } from "@/lib/dataviz/transformers";
 import {
   ALLOWED_AGGREGATIONS,
@@ -210,7 +216,7 @@ export function DatavizVisualConfigFields({
   const { data: lists } = useLists(isAuthenticated);
 
   const [watchedYearRange, setWatchedYearRange] = useState<[number, number]>([
-    config.watchedYearMin ?? YEAR_RANGE_MIN,
+    config.watchedYearMin ?? WATCHED_YEAR_RANGE_MIN,
     config.watchedYearMax ?? YEAR_RANGE_MAX,
   ]);
   const [releaseYearRange, setReleaseYearRange] = useState<[number, number]>([
@@ -333,14 +339,14 @@ export function DatavizVisualConfigFields({
         <RangeSlider
           label="Année de visionnage"
           range={watchedYearRange}
-          min={YEAR_RANGE_MIN}
+          min={WATCHED_YEAR_RANGE_MIN}
           max={YEAR_RANGE_MAX}
           step={1}
           format={(n) => String(n)}
           onChange={setWatchedYearRange}
           onCommit={([min, max]) =>
             updateConfig({
-              watchedYearMin: min === YEAR_RANGE_MIN ? null : min,
+              watchedYearMin: min === WATCHED_YEAR_RANGE_MIN ? null : min,
               watchedYearMax: max === YEAR_RANGE_MAX ? null : max,
             })
           }

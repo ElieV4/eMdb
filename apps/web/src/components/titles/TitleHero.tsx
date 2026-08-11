@@ -5,8 +5,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ExternalLink, Star, Tv } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ExternalLink, Loader2, Star, Tv } from "lucide-react";
 import { CreditGrouped, TitleDetail } from "@/lib/types/api";
 import { useWatchLinks } from "@/hooks/useWatchLinks";
 import { cn } from "@/lib/utils";
@@ -38,7 +37,7 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
   const year = date_sortie ? new Date(date_sortie).getFullYear() : null;
   const displayTitle = titre_vf && titre_vf !== titre_vo ? titre_vo : titre_vo;
 
-  const { officialProviders, freeLinks } = useWatchLinks({
+  const { officialProviders, freeLinks, isFreeLinksLoading } = useWatchLinks({
     titreVo: titre_vo,
     titreVf: titre_vf,
     type,
@@ -46,23 +45,24 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
     anneeSortie: year,
   });
 
-  const renderLinkGroup = (
-    groupTitle: string,
-    links: Array<{ name: string; href: string; icon?: LucideIcon }>,
-  ) => {
-    const validLinks = links.filter((link) => !!link.href && link.href.trim() !== "");
-    if (validLinks.length === 0) return null;
-
-    const Icon = links[0]?.icon;
-
-    return (
-      <div className="rounded-lg border border-border bg-background/40 p-3">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {Icon && <Icon className="h-4 w-4" />}
-          {groupTitle}
-        </h2>
+  // Module toujours affiché, même sans résultat (retour utilisateur) : on
+  // veut savoir si la vérification est en cours ou terminée sans rien
+  // trouver, plutôt que de faire disparaître le module dans les deux cas.
+  const renderFreeLinks = () => (
+    <div className="rounded-lg border border-border bg-background/40 p-3">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Gratuit / sites whitelistés
+        {isFreeLinksLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+      </h2>
+      {isFreeLinksLoading ? (
+        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          Recherche en cours…
+        </p>
+      ) : freeLinks.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Aucun lien trouvé.</p>
+      ) : (
         <div className="flex flex-wrap gap-2">
-          {validLinks.map((link) => {
+          {freeLinks.map((link) => {
             const LinkIcon = link.icon;
             return (
               <a
@@ -78,9 +78,9 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
             );
           })}
         </div>
-      </div>
-    );
-  };
+      )}
+    </div>
+  );
 
   const renderOfficialProviders = () => {
     if (officialProviders.length === 0) return null;
@@ -222,7 +222,7 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
 
           <div className="grid gap-4 pt-2 md:grid-cols-2">
             {renderOfficialProviders()}
-            {renderLinkGroup("Gratuit / sites whitelistés", freeLinks)}
+            {renderFreeLinks()}
           </div>
         </div>
       </div>

@@ -36,6 +36,7 @@ import {
   hasActiveTitleFilters,
   YEAR_RANGE_MIN,
   YEAR_RANGE_MAX,
+  WATCHED_YEAR_RANGE_MIN,
   NOTE_IMDB_MIN,
   NOTE_IMDB_MAX,
 } from "@/lib/titleFilters";
@@ -75,7 +76,7 @@ export function Header() {
     filters.noteImdbMax ?? NOTE_IMDB_MAX,
   ]);
   const [watchedYearRange, setWatchedYearRange] = useState<[number, number]>([
-    filters.watchedYearMin ?? YEAR_RANGE_MIN,
+    filters.watchedYearMin ?? WATCHED_YEAR_RANGE_MIN,
     filters.watchedYearMax ?? YEAR_RANGE_MAX,
   ]);
 
@@ -84,7 +85,7 @@ export function Header() {
     setYearRange([filters.yearMin ?? YEAR_RANGE_MIN, filters.yearMax ?? YEAR_RANGE_MAX]);
     setNoteRange([filters.noteImdbMin ?? NOTE_IMDB_MIN, filters.noteImdbMax ?? NOTE_IMDB_MAX]);
     setWatchedYearRange([
-      filters.watchedYearMin ?? YEAR_RANGE_MIN,
+      filters.watchedYearMin ?? WATCHED_YEAR_RANGE_MIN,
       filters.watchedYearMax ?? YEAR_RANGE_MAX,
     ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,7 +198,7 @@ export function Header() {
 
   const commitWatchedYearRange = (next: [number, number]) => {
     navigateWithFilters({
-      vuAnneeMin: next[0] === YEAR_RANGE_MIN ? null : String(next[0]),
+      vuAnneeMin: next[0] === WATCHED_YEAR_RANGE_MIN ? null : String(next[0]),
       vuAnneeMax: next[1] === YEAR_RANGE_MAX ? null : String(next[1]),
     });
   };

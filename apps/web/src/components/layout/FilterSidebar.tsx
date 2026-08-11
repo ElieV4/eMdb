@@ -19,6 +19,7 @@ import {
   hasActiveTitleFilters,
   YEAR_RANGE_MIN,
   YEAR_RANGE_MAX,
+  WATCHED_YEAR_RANGE_MIN,
   NOTE_IMDB_MIN,
   NOTE_IMDB_MAX,
 } from "@/lib/titleFilters";
@@ -205,7 +206,7 @@ export function FilterSidebar({
               </div>
               <Slider
                 value={watchedYearRange}
-                min={YEAR_RANGE_MIN}
+                min={WATCHED_YEAR_RANGE_MIN}
                 max={YEAR_RANGE_MAX}
                 step={1}
                 onValueChange={(next) => onWatchedYearRangeChange(next as [number, number])}

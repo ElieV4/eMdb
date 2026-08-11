@@ -27,6 +27,10 @@ export type TitleFilters = {
 
 export const YEAR_RANGE_MIN = 1900;
 export const YEAR_RANGE_MAX = new Date().getFullYear() + 2;
+/** Borne basse du slider "Année de visionnage" (distincte de YEAR_RANGE_MIN,
+ * qui reste 1900 pour "Année de sortie" — un titre peut être ancien même si
+ * on ne le regarde jamais avant 2020, retour utilisateur). */
+export const WATCHED_YEAR_RANGE_MIN = 2020;
 export const NOTE_IMDB_MIN = 0;
 export const NOTE_IMDB_MAX = 10;
 

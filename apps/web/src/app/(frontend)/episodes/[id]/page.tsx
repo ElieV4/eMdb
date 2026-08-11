@@ -7,8 +7,7 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Calendar, Clock, ArrowLeft, ExternalLink, Tv } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Calendar, Clock, ArrowLeft, ExternalLink, Loader2, Tv } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { TitleCredits } from "@/components/titles/TitleCredits";
 import { WatchButton } from "@/components/watches/WatchButton";
@@ -52,7 +51,7 @@ export default function EpisodeDetailPage({
   // Appelé avant tout retour anticipé (règle des hooks) — avec des valeurs
   // de repli tant que `title` n'est pas chargé, sans effet indésirable
   // (cf. useWatchLinks : pas d'appel réseau tant que tmdbId est absent).
-  const { officialProviders, freeLinks } = useWatchLinks({
+  const { officialProviders, freeLinks, isFreeLinksLoading } = useWatchLinks({
     titreVo: title?.titre_vo ?? "",
     titreVf: title?.titre_vf,
     type: title?.type ?? "serie",
@@ -93,22 +92,22 @@ export default function EpisodeDetailPage({
 
   const seasonNumero = seasons?.numero ?? 0;
 
-  const renderLinkGroup = (
-    groupTitle: string,
-    links: Array<{ name: string; href: string; icon?: LucideIcon }>,
-  ) => {
-    if (links.length === 0) return null;
-
-    const Icon = links[0]?.icon;
-
-    return (
-      <div className="rounded-lg border border-border bg-background/40 p-3">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {Icon && <Icon className="h-4 w-4" />}
-          {groupTitle}
-        </h2>
+  // Module toujours affiché, même sans résultat (retour utilisateur) : on
+  // veut savoir si la vérification est en cours ou terminée sans rien
+  // trouver, plutôt que de faire disparaître le module dans les deux cas.
+  const renderFreeLinks = () => (
+    <div className="rounded-lg border border-border bg-background/40 p-3">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Gratuit / sites whitelistés
+        {isFreeLinksLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+      </h2>
+      {isFreeLinksLoading ? (
+        <p className="text-sm text-muted-foreground">Recherche en cours…</p>
+      ) : freeLinks.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Aucun lien trouvé.</p>
+      ) : (
         <div className="flex flex-wrap gap-2">
-          {links.map((link) => {
+          {freeLinks.map((link) => {
             const LinkIcon = link.icon;
             return (
               <a
@@ -124,9 +123,9 @@ export default function EpisodeDetailPage({
             );
           })}
         </div>
-      </div>
-    );
-  };
+      )}
+    </div>
+  );
 
   const renderOfficialProviders = () => {
     if (officialProviders.length === 0) return null;
@@ -259,7 +258,7 @@ export default function EpisodeDetailPage({
         {title && (
           <div className="grid gap-4 pt-2 md:grid-cols-2">
             {renderOfficialProviders()}
-            {renderLinkGroup("Gratuit / sites whitelistés", freeLinks)}
+            {renderFreeLinks()}
           </div>
         )}
 

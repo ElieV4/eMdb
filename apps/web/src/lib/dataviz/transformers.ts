@@ -75,11 +75,26 @@ export function formatPeriodLabel(raw: string, granularity: DatavizGranularity):
   }
 }
 
+/**
+ * Une seule série (donut, cf. BreakdownDonutChart) : si les lignes portent
+ * malgré tout un axe "Légende" (`series`), les valeurs sont sommées par
+ * catégorie plutôt que ré-affichées telles quelles — sinon une même
+ * catégorie (ex. "Lundi") reviendrait en plusieurs lignes distinctes
+ * (une par série) et le donut afficherait plusieurs parts portant le même
+ * libellé au lieu d'une seule part regroupée (retour utilisateur).
+ */
 export function transformRows(rows: DatavizRow[], groupBy: DatavizGroupBy, granularity: DatavizGranularity): DatavizChartDatum[] {
-  return rows.map((row) => ({
-    category: groupBy === "period" ? formatPeriodLabel(row.category, granularity) : row.category,
-    value: Number(row.value) || 0,
-  }));
+  const order: string[] = [];
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    const category = groupBy === "period" ? formatPeriodLabel(row.category, granularity) : row.category;
+    if (!totals.has(category)) {
+      totals.set(category, 0);
+      order.push(category);
+    }
+    totals.set(category, totals.get(category)! + (Number(row.value) || 0));
+  }
+  return order.map((category) => ({ category, value: totals.get(category)! }));
 }
 
 /**

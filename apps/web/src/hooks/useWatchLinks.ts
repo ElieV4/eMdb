@@ -54,6 +54,10 @@ export function useWatchLinks({
   const freeLinkCandidates = buildFreeWatchLinks({ title: titreVo, type });
   const [validFreeLinks, setValidFreeLinks] = useState<WatchLink[]>([]);
   const [officialProviders, setOfficialProviders] = useState<OfficialProviderLink[]>([]);
+  // Le module "Gratuit" reste affiché même vide (retour utilisateur) : ce
+  // booléen distingue "en train de vérifier les liens" de "vérifié, rien
+  // trouvé", que l'UI ne peut pas déduire d'un simple tableau vide.
+  const [isFreeLinksLoading, setIsFreeLinksLoading] = useState(true);
 
   // Streaming FR : uniquement les plateformes qui ont vraiment le titre
   // (TMDB watch/providers, données JustWatch). TMDB ne fournit pas de lien
@@ -101,6 +105,7 @@ export function useWatchLinks({
 
   useEffect(() => {
     let cancelled = false;
+    setIsFreeLinksLoading(true);
 
     const validateFreeLinks = async () => {
       const checks: Promise<WatchLink | null>[] = freeLinkCandidates.map(async (link) => {
@@ -152,6 +157,7 @@ export function useWatchLinks({
 
       if (!cancelled) {
         setValidFreeLinks(checked.filter(Boolean) as WatchLink[]);
+        setIsFreeLinksLoading(false);
       }
     };
 
@@ -162,5 +168,5 @@ export function useWatchLinks({
     };
   }, [titreVo, titreVf, type, anneeSortie]);
 
-  return { officialProviders, freeLinks: validFreeLinks };
+  return { officialProviders, freeLinks: validFreeLinks, isFreeLinksLoading };
 }

@@ -384,6 +384,16 @@ export class DatavizService {
   }
 
   /**
+   * Exclut les visionnages à la date sentinelle ("date de visionnage
+   * inconnue", cf. UNKNOWN_WATCH_DATE côté frontend) — à ajouter partout où
+   * `date_vue` sert de clé de regroupement par période (fixe : jour/mois/
+   * trimestre/année, ou agrégée : heure/jour de la semaine/mois de l'année/
+   * saison) : ces visionnages n'ont pas de date réelle, les compter dans un
+   * regroupement temporel produirait un point aberrant (1er janvier 1900).
+   */
+  private readonly excludeSentinelDate = ` AND uw.date_vue != '1900-01-01'`;
+
+  /**
    * Filtres "type header" (genre/pays/studio/année de sortie/note IMDB/
    * listes) — intégrés au menu "⋮" de chaque visuel dataviz. Les ids sont
    * validés en UUID par le DTO (`DatavizFilterQueryDto`) avant d'atteindre
@@ -664,7 +674,9 @@ export class DatavizService {
       minutesCol: this.durationExpr,
       noteCol: 't.note_imdb',
     });
-    const where = this.buildWhere(userId, dto, 't');
+    const where =
+      this.buildWhere(userId, dto, 't') +
+      (dto.groupBy === 'period' || dto.legendBy === 'period' ? this.excludeSentinelDate : '');
     const legendSelect = legend ? `, ${legend.categoryIdExpr} AS series_id, ${legend.categoryExpr} AS series` : '';
     const groupByAll = [pieces.groupByExpr, legend?.groupByExpr].filter(Boolean).join(', ');
     const orderByAll = [pieces.orderExpr, legend?.orderExpr].filter(Boolean).join(', ');
@@ -751,7 +763,7 @@ export class DatavizService {
     const granularity = dto.granularity ?? 'month';
     const trunc = this.periodCategoryExpr(granularity);
     const cntExpr = dto.metric === 'watches' ? 'COUNT(*)' : 'COUNT(DISTINCT t.id)';
-    const where = this.buildWhere(userId, dto, 't');
+    const where = this.buildWhere(userId, dto, 't') + this.excludeSentinelDate;
     const bucketsSql = `
       SELECT (${trunc}) AS bucket, ${cntExpr} AS cnt
       FROM user_watches uw
@@ -799,7 +811,7 @@ export class DatavizService {
     const trunc = this.periodCategoryExpr(granularity);
     const pieces = this.categoryPieces(dto.groupBy, granularity);
     const primaryAgg = dto.metric === 'duration' ? `SUM(${this.durationExpr})` : `AVG(t.note_imdb)`;
-    const where = this.buildWhere(userId, dto, 't');
+    const where = this.buildWhere(userId, dto, 't') + this.excludeSentinelDate;
     const sql = `
       WITH agg AS (
         SELECT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category, (${trunc}) AS bucket, ${primaryAgg} AS val
@@ -837,7 +849,7 @@ export class DatavizService {
    */
   private async rowsNoteAvg(userId: string, dto: DatavizQueryDto): Promise<DatavizRow[]> {
     const pieces = this.categoryPieces(dto.groupBy, dto.granularity ?? 'month');
-    const where = this.buildWhere(userId, dto, 't');
+    const where = this.buildWhere(userId, dto, 't') + (dto.groupBy === 'period' ? this.excludeSentinelDate : '');
     const sql = `
       WITH deduped AS (
         SELECT DISTINCT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category, t.id AS title_id, t.note_imdb
