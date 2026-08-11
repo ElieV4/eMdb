@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ListsService } from '../lists/lists.service';
 import { CreateWatchDto } from './dto/create-watch.dto';
 import { ListWatchesFilterDto } from './dto/list-watches-filter.dto';
 import { getSerieProgress } from '@emdb/db';
@@ -20,7 +21,29 @@ import { getSerieProgress } from '@emdb/db';
  */
 @Injectable()
 export class WatchesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly listsService: ListsService,
+  ) {}
+
+  /**
+   * Ajoute automatiquement une série à la watchlist dès qu'un de ses
+   * épisodes est marqué vu (retour utilisateur) — n'écrase jamais un statut
+   * de progression déjà présent (ex. "abandonnée"), ajoute seulement si la
+   * série n'y est pas encore. Non bloquant : une erreur ici ne doit pas
+   * faire échouer le "marquer comme vu" lui-même.
+   */
+  private async addSerieToWatchlist(userId: string, titleId: string): Promise<void> {
+    try {
+      const watchlist = await this.listsService.createList(userId, {
+        nom: 'Ma Watchlist',
+        type: 'watchlist',
+      });
+      await this.listsService.addItem(watchlist.id, userId, titleId);
+    } catch {
+      // non bloquant — le visionnage reste enregistré même si l'ajout échoue
+    }
+  }
 
   // ======================================================================
   // WATCHES
@@ -64,14 +87,16 @@ export class WatchesService {
       }
     }
 
+    let episodeSerieId: string | null = null;
     if (episode_id) {
       const episode = await this.prisma.episodes.findUnique({
         where: { id: episode_id },
-        select: { id: true },
+        select: { id: true, seasons: { select: { title_id: true } } },
       });
       if (!episode) {
         throw new NotFoundException('Épisode introuvable.');
       }
+      episodeSerieId = episode.seasons.title_id;
     }
 
     const watch = await this.prisma.user_watches.create({
@@ -115,6 +140,12 @@ export class WatchesService {
           user_lists: { user_id: userId, type: 'watchlist' },
         },
       });
+    }
+
+    // Voir un épisode d'une série l'ajoute automatiquement à la watchlist
+    // (retour utilisateur).
+    if (episodeSerieId) {
+      await this.addSerieToWatchlist(userId, episodeSerieId);
     }
 
     return watch;
@@ -265,6 +296,10 @@ export class WatchesService {
         date_vue: dateVueValue,
       })),
     });
+
+    // Voir un épisode d'une série l'ajoute automatiquement à la watchlist
+    // (retour utilisateur) — même comportement que createWatch.
+    await this.addSerieToWatchlist(userId, titleId);
 
     return newWatches.length;
   }

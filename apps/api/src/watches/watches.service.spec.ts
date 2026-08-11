@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { WatchesService } from './watches.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ListsService } from '../lists/lists.service';
 
 jest.mock('@emdb/db', () => ({
   getSerieProgress: jest.fn(),
@@ -34,6 +35,14 @@ const prismaServiceMock = {
   list_items: {
     deleteMany: jest.fn(),
   },
+  user_lists: {
+    findFirst: jest.fn(),
+  },
+};
+
+const listsServiceMock = {
+  createList: jest.fn().mockResolvedValue({ id: 'watchlist-1' }),
+  addItem: jest.fn().mockResolvedValue(undefined),
 };
 
 describe('WatchesService', () => {
@@ -41,7 +50,11 @@ describe('WatchesService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [WatchesService, { provide: PrismaService, useValue: prismaServiceMock }],
+      providers: [
+        WatchesService,
+        { provide: PrismaService, useValue: prismaServiceMock },
+        { provide: ListsService, useValue: listsServiceMock },
+      ],
     }).compile();
 
     service = module.get<WatchesService>(WatchesService);
@@ -109,7 +122,10 @@ describe('WatchesService', () => {
     });
 
     it('crée un watch pour un episode_id', async () => {
-      prismaServiceMock.episodes.findUnique.mockResolvedValue({ id: episodeId });
+      prismaServiceMock.episodes.findUnique.mockResolvedValue({
+        id: episodeId,
+        seasons: { title_id: titleId },
+      });
       prismaServiceMock.user_watches.create.mockResolvedValue({
         id: watchId,
         user_id: userId,
@@ -123,8 +139,24 @@ describe('WatchesService', () => {
       expect(result.id).toBe(watchId);
       expect(prismaServiceMock.episodes.findUnique).toHaveBeenCalledWith({
         where: { id: episodeId },
-        select: { id: true },
+        select: { id: true, seasons: { select: { title_id: true } } },
       });
+    });
+
+    it('ajoute automatiquement la série à la watchlist quand un épisode est marqué vu (retour utilisateur)', async () => {
+      prismaServiceMock.episodes.findUnique.mockResolvedValue({
+        id: episodeId,
+        seasons: { title_id: titleId },
+      });
+      prismaServiceMock.user_watches.create.mockResolvedValue({ id: watchId, episode_id: episodeId });
+
+      await service.createWatch(userId, { episode_id: episodeId });
+
+      expect(listsServiceMock.createList).toHaveBeenCalledWith(userId, {
+        nom: 'Ma Watchlist',
+        type: 'watchlist',
+      });
+      expect(listsServiceMock.addItem).toHaveBeenCalledWith('watchlist-1', userId, titleId);
     });
 
     it('utilise la date personnalisée si fournie', async () => {
