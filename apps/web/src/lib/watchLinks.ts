@@ -1,14 +1,4 @@
-import {
-  Apple,
-  BookOpen,
-  Clapperboard,
-  ExternalLink,
-  Film,
-  MonitorPlay,
-  Play,
-  Sparkles,
-  Tv,
-} from "lucide-react";
+import { BookOpen, Film, MonitorPlay } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type WatchLink = {
@@ -25,63 +15,28 @@ function toSlug(value: string): string {
       .trim()
       .toLowerCase()
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[̀-ͯ]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "title"
   );
 }
 
-export function buildWatchLinks({
+/**
+ * Liens "gratuits" à slug deviné, vérifiés ensuite un par un (HEAD request
+ * via /watch-links/validate, cf. TitleHero) — contrairement au module
+ * "Streaming FR", dont la disponibilité réelle par plateforme vient de TMDB
+ * watch/providers (cf. /watch-links/providers) plutôt que d'une URL devinée.
+ */
+export function buildFreeWatchLinks({
   title,
   type,
-  tmdbId,
 }: {
   title: string;
   type: WatchLinkMode;
-  tmdbId?: number | null;
-}): {
-  officialLinks: WatchLink[];
-  freeLinks: WatchLink[];
-} {
+}): WatchLink[] {
   const slug = encodeURIComponent(toSlug(title));
-  const query = encodeURIComponent(title.trim());
 
-  const officialLinks: WatchLink[] = [
-    tmdbId
-      ? {
-          name: "Voir sur TMDB",
-          href: `https://www.themoviedb.org/${type === "film" ? "movie" : "tv"}/${tmdbId}`,
-          icon: ExternalLink,
-        }
-      : null,
-    {
-      name: "Netflix",
-      href: `https://www.netflix.com/search?q=${query}`,
-      icon: Tv,
-    },
-    {
-      name: "Prime Video",
-      href: `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${query}`,
-      icon: Play,
-    },
-    {
-      name: "Canal+",
-      href: `https://www.canalplus.com/search?query=${query}`,
-      icon: Clapperboard,
-    },
-    {
-      name: "Disney+",
-      href: `https://www.disneyplus.com/search?q=${query}`,
-      icon: Sparkles,
-    },
-    {
-      name: "Apple TV",
-      href: `https://tv.apple.com/search?term=${query}`,
-      icon: Apple,
-    },
-  ].filter((link): link is WatchLink => !!link && !!link.href && link.href.trim() !== "");
-
-  const freeLinks: WatchLink[] = [
+  return [
     {
       name: "WatchTV",
       href: `https://www.watchtv.click/${type === "film" ? "movie" : "series"}/${slug}/`,
@@ -98,6 +53,4 @@ export function buildWatchLinks({
       icon: BookOpen,
     },
   ].filter((link) => !!link.href && link.href.trim() !== "");
-
-  return { officialLinks, freeLinks };
 }

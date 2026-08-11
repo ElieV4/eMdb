@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
-import { findArchiveOrgFilm } from './watch-links.util';
+import { findArchiveOrgFilm, extractOfficialProviders } from './watch-links.util';
+import { getMovieWatchProviders, getTvWatchProviders } from '@emdb/tmdb-client';
 
 const ALLOWED_WATCH_LINK_HOSTS = new Set([
   'www.watchtv.click',
@@ -88,5 +89,28 @@ export class AppController {
     }
 
     return { found: true, url: match.url, label: match.label };
+  }
+
+  // Plateformes de streaming officielles réellement disponibles pour ce
+  // titre (TMDB watch/providers, données JustWatch) — évite d'afficher des
+  // boutons vers des plateformes qui n'ont pas le titre.
+  @Get('watch-links/providers')
+  async getOfficialProviders(
+    @Query('tmdbId') tmdbId: string,
+    @Query('type') type: 'film' | 'serie',
+    @Query('region') region = 'FR',
+  ) {
+    const id = parseInt(tmdbId, 10);
+    if (!Number.isFinite(id)) {
+      return { watchUrl: null, providers: [] };
+    }
+
+    try {
+      const data =
+        type === 'serie' ? await getTvWatchProviders(id) : await getMovieWatchProviders(id);
+      return extractOfficialProviders(data, region);
+    } catch {
+      return { watchUrl: null, providers: [] };
+    }
   }
 }

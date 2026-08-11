@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Calendar, Clock, ArrowLeft } from "lucide-react";
+import { Calendar, Clock, ArrowLeft, ExternalLink, Tv } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { TitleCredits } from "@/components/titles/TitleCredits";
@@ -15,7 +15,7 @@ import { WatchButton } from "@/components/watches/WatchButton";
 import { RatingInput } from "@/components/ratings/RatingInput";
 import { useEpisode } from "@/hooks/api/useEpisode";
 import { useTitle } from "@/hooks/api/useTitles";
-import { buildWatchLinks } from "@/lib/watchLinks";
+import { useWatchLinks } from "@/hooks/useWatchLinks";
 import { useEpisodeCredits } from "@/hooks/api/useEpisodeCredits";
 import { useWatches } from "@/hooks/api/useWatches";
 import { useUpsertRating } from "@/hooks/api/useUpsertRating";
@@ -45,6 +45,20 @@ export default function EpisodeDetailPage({
   const upsertRating = useUpsertRating();
 
   const episodeWatches = watchesData?.items ?? [];
+  const episodeYear = episode?.date_sortie
+    ? new Date(episode.date_sortie).getFullYear()
+    : null;
+
+  // Appelé avant tout retour anticipé (règle des hooks) — avec des valeurs
+  // de repli tant que `title` n'est pas chargé, sans effet indésirable
+  // (cf. useWatchLinks : pas d'appel réseau tant que tmdbId est absent).
+  const { officialProviders, freeLinks } = useWatchLinks({
+    titreVo: title?.titre_vo ?? "",
+    titreVf: title?.titre_vf,
+    type: title?.type ?? "serie",
+    tmdbId: title?.tmdb_id,
+    anneeSortie: episodeYear,
+  });
 
   const handleWatchChanged = () => {
     queryClient.invalidateQueries({ queryKey: ["watches"], exact: false });
@@ -79,14 +93,6 @@ export default function EpisodeDetailPage({
 
   const seasonNumero = seasons?.numero ?? 0;
 
-  const watchLinks = title
-    ? buildWatchLinks({
-        title: title.titre_vo,
-        type: title.type,
-        tmdbId: title.tmdb_id,
-      })
-    : { officialLinks: [], freeLinks: [] };
-
   const renderLinkGroup = (
     groupTitle: string,
     links: Array<{ name: string; href: string; icon?: LucideIcon }>,
@@ -114,6 +120,39 @@ export default function EpisodeDetailPage({
               >
                 {LinkIcon && <LinkIcon className="h-3.5 w-3.5" />}
                 {link.name}
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderOfficialProviders = () => {
+    if (officialProviders.length === 0) return null;
+
+    return (
+      <div className="rounded-lg border border-border bg-background/40 p-3">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <Tv className="h-4 w-4" />
+          Streaming FR
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {officialProviders.map((provider) => {
+            const ProviderIcon = provider.icon;
+            return (
+              <a
+                key={provider.name}
+                href={provider.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex flex-col items-start gap-0.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 text-sm text-foreground hover:bg-muted/60"
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  {ProviderIcon && <ProviderIcon className="h-3.5 w-3.5" />}
+                  {provider.name}
+                </span>
+                <span className="text-xs text-muted-foreground">{provider.accessLabel}</span>
               </a>
             );
           })}
@@ -184,6 +223,18 @@ export default function EpisodeDetailPage({
             {synopsis && (
               <p className="text-sm text-muted-foreground">{synopsis}</p>
             )}
+
+            {title?.tmdb_id && (
+              <a
+                href={`https://www.themoviedb.org/tv/${title.tmdb_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground hover:underline"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Voir sur TMDB
+              </a>
+            )}
           </div>
         </div>
 
@@ -207,8 +258,8 @@ export default function EpisodeDetailPage({
 
         {title && (
           <div className="grid gap-4 pt-2 md:grid-cols-2">
-            {renderLinkGroup("Streaming FR", watchLinks.officialLinks)}
-            {renderLinkGroup("Gratuit / sites whitelistés", watchLinks.freeLinks)}
+            {renderOfficialProviders()}
+            {renderLinkGroup("Gratuit / sites whitelistés", freeLinks)}
           </div>
         )}
 

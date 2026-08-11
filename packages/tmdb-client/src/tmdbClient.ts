@@ -312,6 +312,16 @@ export async function getMovieDetails(tmdbId: number): Promise<any> {
   return fetchJson<any>(url);
 }
 
+export async function getMovieWatchProviders(tmdbId: number): Promise<any> {
+  const url = buildUrl(`/movie/${tmdbId}/watch/providers`);
+  return fetchJson<any>(url);
+}
+
+export async function getTvWatchProviders(tmdbId: number): Promise<any> {
+  const url = buildUrl(`/tv/${tmdbId}/watch/providers`);
+  return fetchJson<any>(url);
+}
+
 export async function getTvDetails(tmdbId: number): Promise<any> {
   const url = buildUrl(`/tv/${tmdbId}`, {
     append_to_response: 'credits,images,content_ratings,seasons',

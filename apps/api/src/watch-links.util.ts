@@ -160,3 +160,91 @@ export async function findArchiveOrgFilm(params: {
 
   return null;
 }
+
+/**
+ * Plateformes de streaming officielles (module "Streaming FR") — vérifiées
+ * via TMDB `watch/providers` (données JustWatch) plutôt que des liens
+ * devinés à l'aveugle : on ne propose que les plateformes qui ont vraiment
+ * le titre pour la région demandée. TMDB ne fournit pas de lien direct par
+ * plateforme (Netflix/Disney+/Canal+ n'exposent pas d'API publique pour ça),
+ * seulement un lien agrégateur précis (`results[region].link`) — chaque
+ * bouton pointe donc vers cette même page, qui liste les vrais liens.
+ */
+
+export type AccessType = 'abonnement' | 'location' | 'achat';
+
+export type OfficialProvider = {
+  key: 'netflix' | 'prime' | 'canal' | 'disney' | 'appletv';
+  name: string;
+  accessTypes: AccessType[];
+};
+
+const PROVIDER_KEYS: Array<{ key: OfficialProvider['key']; name: string; match: (n: string) => boolean }> = [
+  { key: 'netflix', name: 'Netflix', match: (n) => n.includes('netflix') },
+  {
+    key: 'prime',
+    name: 'Prime Video',
+    match: (n) => n.includes('prime video') || n.includes('amazon video'),
+  },
+  { key: 'canal', name: 'Canal+', match: (n) => n.includes('canal+') || n.includes('canal plus') },
+  { key: 'disney', name: 'Disney+', match: (n) => n.includes('disney') },
+  { key: 'appletv', name: 'Apple TV', match: (n) => n.includes('apple tv') },
+];
+
+type TmdbWatchProvidersResponse = {
+  results?: Record<
+    string,
+    {
+      link?: string;
+      flatrate?: Array<{ provider_name: string }>;
+      ads?: Array<{ provider_name: string }>;
+      free?: Array<{ provider_name: string }>;
+      rent?: Array<{ provider_name: string }>;
+      buy?: Array<{ provider_name: string }>;
+    }
+  >;
+};
+
+export function extractOfficialProviders(
+  data: TmdbWatchProvidersResponse,
+  region: string,
+): { watchUrl: string | null; providers: OfficialProvider[] } {
+  const regionData = data.results?.[region];
+  if (!regionData) {
+    return { watchUrl: null, providers: [] };
+  }
+
+  const accessByProviderName = new Map<string, Set<AccessType>>();
+  const addAll = (list: Array<{ provider_name: string }> | undefined, access: AccessType) => {
+    for (const entry of list ?? []) {
+      const normName = entry.provider_name.toLowerCase();
+      if (!accessByProviderName.has(normName)) {
+        accessByProviderName.set(normName, new Set());
+      }
+      accessByProviderName.get(normName)!.add(access);
+    }
+  };
+  addAll(regionData.flatrate, 'abonnement');
+  addAll(regionData.ads, 'abonnement');
+  addAll(regionData.free, 'abonnement');
+  addAll(regionData.rent, 'location');
+  addAll(regionData.buy, 'achat');
+
+  const providers: OfficialProvider[] = [];
+  for (const { key, name, match } of PROVIDER_KEYS) {
+    const accessTypes = new Set<AccessType>();
+    for (const [providerName, access] of accessByProviderName) {
+      if (match(providerName)) {
+        access.forEach((a) => accessTypes.add(a));
+      }
+    }
+    if (accessTypes.size > 0) {
+      providers.push({ key, name, accessTypes: [...accessTypes] });
+    }
+  }
+
+  return {
+    watchUrl: providers.length > 0 ? regionData.link ?? null : null,
+    providers,
+  };
+}

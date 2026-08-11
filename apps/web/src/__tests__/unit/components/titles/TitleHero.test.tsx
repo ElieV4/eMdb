@@ -47,13 +47,34 @@ describe("TitleHero", () => {
   beforeEach(() => {
     global.fetch = jest.fn((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
-      const isValidationCall = url.includes("/watch-links/validate?");
 
-      if (isValidationCall) {
+      if (url.includes("/watch-links/validate?")) {
         return Promise.resolve({
           ok: true,
           status: 200,
           json: async () => ({ valid: true, status: 200 }),
+        } as Response);
+      }
+
+      if (url.includes("/watch-links/providers?")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            watchUrl: "https://www.themoviedb.org/movie/123-inception/watch?locale=FR",
+            providers: [
+              { key: "netflix", name: "Netflix", accessTypes: ["abonnement"] },
+              { key: "prime", name: "Prime Video", accessTypes: ["location", "achat"] },
+            ],
+          }),
+        } as Response);
+      }
+
+      if (url.includes("/watch-links/archive-org?")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ found: false }),
         } as Response);
       }
 
@@ -108,22 +129,35 @@ describe("TitleHero", () => {
     expect(screen.getByText("Un film de science-fiction.")).toBeInTheDocument();
   });
 
-  it("affiche les liens directs vers les services de streaming en France et les liens libres valides", async () => {
+  it("affiche le lien TMDB sous le synopsis", () => {
     render(<TitleHero title={mockTitle} />);
 
-    expect(screen.getByText("Streaming FR")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Voir sur TMDB/i })).toHaveAttribute(
       "href",
       "https://www.themoviedb.org/movie/123",
     );
-    expect(screen.getByRole("link", { name: /Netflix/i })).toHaveAttribute(
-      "href",
-      "https://www.netflix.com/search?q=Inception",
-    );
+  });
+
+  it("n'affiche que les plateformes de streaming confirmées par TMDB watch/providers, toutes vers la même page TMDB précise", async () => {
+    render(<TitleHero title={mockTitle} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Streaming FR")).toBeInTheDocument();
+    });
+
+    const tmdbWatchUrl = "https://www.themoviedb.org/movie/123-inception/watch?locale=FR";
+    expect(screen.getByRole("link", { name: /Netflix/i })).toHaveAttribute("href", tmdbWatchUrl);
     expect(screen.getByRole("link", { name: /Prime Video/i })).toHaveAttribute(
       "href",
-      "https://www.primevideo.com/search/ref=atv_nb_sr?phrase=Inception",
+      tmdbWatchUrl,
     );
+    expect(screen.getByText("Abonnement")).toBeInTheDocument();
+    expect(screen.getByText("Location / Achat")).toBeInTheDocument();
+    // Ni Canal+, Disney+, ni Apple TV ne sont dans la réponse mockée —
+    // aucune plateforme sans le titre ne doit apparaître (module "sans faux
+    // lien").
+    expect(screen.queryByRole("link", { name: /Canal\+/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Disney\+/i })).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
@@ -137,6 +171,31 @@ describe("TitleHero", () => {
       "href",
       "https://www.hydraflix.cc/inception/",
     );
+  });
+
+  it("ne montre aucune plateforme de streaming si TMDB watch/providers ne renvoie rien pour la région", async () => {
+    (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/watch-links/providers?")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ watchUrl: null, providers: [] }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ valid: true, status: 200 }),
+      } as Response);
+    });
+
+    render(<TitleHero title={mockTitle} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Streaming FR")).not.toBeInTheDocument();
   });
 
   it("n'affiche pas les liens libres quand le site renvoie 404", async () => {
