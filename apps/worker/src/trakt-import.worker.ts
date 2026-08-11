@@ -89,7 +89,7 @@ function collectReferencedTmdbIds(dir: string): { movieIds: Set<number>; showIds
   for (const item of loadJson(dir, 'ratings-seasons.json')) {
     if (item.show?.ids?.tmdb) showIds.add(item.show.ids.tmdb);
   }
-  for (const file of ['lists-watchlist.json', 'collection-movies.json', 'collection-shows.json', 'collection-episodes.json']) {
+  for (const file of ['lists-watchlist.json', 'lists-favorites.json', 'collection-movies.json', 'collection-shows.json', 'collection-episodes.json']) {
     for (const item of loadJson(dir, file)) {
       if (item.movie?.ids?.tmdb) movieIds.add(item.movie.ids.tmdb);
       if (item.show?.ids?.tmdb) showIds.add(item.show.ids.tmdb);
@@ -341,16 +341,17 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
     const data = loadJson(extractDir, fileName);
     if (data.length === 0) return 0;
 
-    // La watchlist est cherchée par TYPE, pas par nom : chaque utilisateur a
-    // déjà une watchlist unique créée à l'inscription ("Ma Watchlist", cf.
-    // auth.service.ts) — la chercher par nom exact ("Watchlist") en créait
-    // une SECONDE, dont les items n'étaient jamais vus par les pages qui
-    // cherchent la watchlist de l'utilisateur par type (bug remonté :
-    // "Watchlist" et "Ma Watchlist" coexistaient après import).
-    let list =
-      type === 'watchlist'
-        ? await prisma.user_lists.findFirst({ where: { user_id: userId, type: 'watchlist' } })
-        : await prisma.user_lists.findFirst({ where: { user_id: userId, nom: listName } });
+    // Watchlist et Favoris sont cherchées par TYPE, pas par nom : chaque
+    // utilisateur a déjà une watchlist et une liste Favoris uniques créées à
+    // l'inscription ("Ma Watchlist"/"Mes Favoris", cf. auth.service.ts) — les
+    // chercher par nom exact ("Watchlist") en créait une SECONDE, dont les
+    // items n'étaient jamais vus par les pages qui cherchent ces listes par
+    // type (bug remonté : "Watchlist" et "Ma Watchlist" coexistaient après
+    // import).
+    const findByType = type === 'watchlist' || type === 'favoris';
+    let list = findByType
+      ? await prisma.user_lists.findFirst({ where: { user_id: userId, type } })
+      : await prisma.user_lists.findFirst({ where: { user_id: userId, nom: listName } });
     if (!list) {
       list = await prisma.user_lists.create({
         data: { user_id: userId, nom: listName, type, description: `Imported from Trakt ${listName}` },
@@ -394,6 +395,7 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
 
   let listsImported = 0;
   listsImported += await importList('Watchlist', 'watchlist', 'lists-watchlist.json');
+  listsImported += await importList('Favoris', 'favoris', 'lists-favorites.json');
   listsImported += await importList('Collection', 'collection', 'collection-movies.json');
   listsImported += await importList('Collection shows', 'collection', 'collection-shows.json');
   listsImported += await importList('Collection episodes', 'collection', 'collection-episodes.json');
