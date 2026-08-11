@@ -189,7 +189,7 @@ CREATE TABLE user_watches (
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title_id    UUID REFERENCES titles(id) ON DELETE CASCADE,
     episode_id  UUID REFERENCES episodes(id) ON DELETE CASCADE,
-    date_vue    DATE NOT NULL,
+    date_vue    TIMESTAMPTZ NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT chk_watch_target CHECK (
         (title_id IS NOT NULL AND episode_id IS NULL) OR
@@ -267,6 +267,9 @@ CREATE TABLE list_items (
     title_id    UUID NOT NULL REFERENCES titles(id) ON DELETE CASCADE,
     position    INT,
     added_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Statut de progression pour la watchlist : "en_cours" (défaut), "a_jour", "abandonnee".
+    -- Validé côté API (DTO @IsEnum), pas de CHECK ici (cf. packages/db/prisma/schema.prisma).
+    statut      TEXT NOT NULL DEFAULT 'en_cours',
     PRIMARY KEY (list_id, title_id)
 );
 
