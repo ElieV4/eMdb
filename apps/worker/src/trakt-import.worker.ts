@@ -112,6 +112,12 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
 
   const titleCache = new Map<string, { id: string; type: string } | null>();
   const toppedUpShows = new Set<string>();
+  // Toute série rencontrée pendant l'import (historique, watchlist,
+  // collection, notes) est ajoutée à `user_follows_serie` en fin d'import —
+  // Calendrier et "Continuer à regarder" reposent sur ce suivi, pas sur
+  // l'appartenance à la watchlist, et l'import ne le renseignait jamais :
+  // les séries importées n'y apparaissaient donc pas (retour utilisateur).
+  const encounteredSeriesIds = new Set<string>();
 
   // Comparaison existant vs import prévu (avant toute écriture) : charge
   // tous les visionnages déjà en base pour cet utilisateur, pour repérer
@@ -147,6 +153,10 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
         titlesFailed++;
         title = null;
       }
+    }
+
+    if (title && title.type === 'serie') {
+      encounteredSeriesIds.add(title.id);
     }
 
     titleCache.set(cacheKey, title);
@@ -331,7 +341,16 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
     const data = loadJson(extractDir, fileName);
     if (data.length === 0) return 0;
 
-    let list = await prisma.user_lists.findFirst({ where: { user_id: userId, nom: listName } });
+    // La watchlist est cherchée par TYPE, pas par nom : chaque utilisateur a
+    // déjà une watchlist unique créée à l'inscription ("Ma Watchlist", cf.
+    // auth.service.ts) — la chercher par nom exact ("Watchlist") en créait
+    // une SECONDE, dont les items n'étaient jamais vus par les pages qui
+    // cherchent la watchlist de l'utilisateur par type (bug remonté :
+    // "Watchlist" et "Ma Watchlist" coexistaient après import).
+    let list =
+      type === 'watchlist'
+        ? await prisma.user_lists.findFirst({ where: { user_id: userId, type: 'watchlist' } })
+        : await prisma.user_lists.findFirst({ where: { user_id: userId, nom: listName } });
     if (!list) {
       list = await prisma.user_lists.create({
         data: { user_id: userId, nom: listName, type, description: `Imported from Trakt ${listName}` },
@@ -378,6 +397,16 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
   listsImported += await importList('Collection', 'collection', 'collection-movies.json');
   listsImported += await importList('Collection shows', 'collection', 'collection-shows.json');
   listsImported += await importList('Collection episodes', 'collection', 'collection-episodes.json');
+
+  // Suit automatiquement toute série rencontrée pendant l'import (historique,
+  // watchlist, collection, notes) — c'est ce suivi, pas l'appartenance à la
+  // watchlist, que Calendrier et "Continuer à regarder" consomment.
+  if (encounteredSeriesIds.size > 0) {
+    await prisma.user_follows_serie.createMany({
+      data: [...encounteredSeriesIds].map((titleId) => ({ user_id: userId, title_id: titleId })),
+      skipDuplicates: true,
+    });
+  }
 
   // Toujours finir à 100 % même si certains tmdb_id référencés ne sont
   // jamais réellement rencontrés dans les fichiers parcourus (écarts
