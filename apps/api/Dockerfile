@@ -21,11 +21,12 @@ RUN cd /app/packages/db && npx prisma generate --schema=./prisma/schema.prisma
 # Compiler packages/db
 RUN cd /app/packages/db && npx tsc --skipLibCheck
 
-# Compiler packages/tmdb-client, tmdb-mapper, wikidata-client
+# Compiler packages/tmdb-client, tmdb-mapper, wikidata-client, recommender
 RUN cd /app/packages/tmdb-client && npx tsc --skipLibCheck
 RUN cd /app/packages/tmdb-mapper && npx tsc --skipLibCheck
 RUN cd /app/packages/wikidata-client && npx tsc --skipLibCheck
 RUN cd /app/packages/tmdb-sync && npx tsc --skipLibCheck
+RUN cd /app/packages/recommender && npx tsc -p tsconfig.json
 
 # Créer des symlinks pour les packages dans node_modules
 RUN mkdir -p /app/node_modules/@emdb && \
