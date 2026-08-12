@@ -122,13 +122,40 @@ export type UserWatch = {
   };
 };
 
+/** Titre tel que renvoyé par GET /ratings (forme brute Prisma, pas le
+ * TitleSearchResult camelCase des autres endpoints) — utilisé pour le
+ * filtrage par type/genre/pays/note/année sur la page /ratings. */
+export type RatingTitleSummary = {
+  id: string;
+  tmdb_id: number | null;
+  titre_vo: string;
+  titre_vf: string | null;
+  affiche_url: string | null;
+  type: "film" | "serie";
+  date_sortie: string | null;
+  note_imdb: number | null;
+  title_genres: { genre_id: string }[];
+  title_countries: { country_id: string }[];
+};
+
+/** Épisode tel que renvoyé par GET /ratings — forme brute (id/numero/titre
+ * + season.numero), distincte du type Episode (camelCase, saison complète)
+ * utilisé ailleurs. */
+export type RatingEpisodeSummary = {
+  id: string;
+  numero: number;
+  titre: string | null;
+  season?: { numero: number };
+};
+
 export type UserRating = {
   id: string;
-  note: number;
-  commentaire?: string;
-  createdAt: string;
-  title?: Title;
-  episode?: Episode;
+  note_perso: number | null;
+  commentaire: string | null;
+  created_at: string;
+  updated_at: string;
+  title?: RatingTitleSummary;
+  episode?: RatingEpisodeSummary;
 };
 
 /** Métadonnées allégées d'un item de liste, suffisantes pour le filtrage par

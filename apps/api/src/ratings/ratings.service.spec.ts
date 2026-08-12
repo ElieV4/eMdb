@@ -46,6 +46,10 @@ describe('RatingsService', () => {
         titre_vf: true,
         affiche_url: true,
         type: true,
+        date_sortie: true,
+        note_imdb: true,
+        title_genres: { select: { genre_id: true } },
+        title_countries: { select: { country_id: true } },
       },
     },
     episodes: {
@@ -280,11 +284,12 @@ describe('RatingsService', () => {
 
       const result = await service.listUserRatings(userId, {});
 
-      expect(result.data).toHaveLength(1);
-      expect(result.data[0].id).toBe(ratingId);
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].id).toBe(ratingId);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
       expect(result.limit).toBe(20);
+      expect(result.totalPages).toBe(1);
     });
 
     it('filtre par type (film)', async () => {

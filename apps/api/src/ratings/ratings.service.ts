@@ -12,7 +12,7 @@ import { ListRatingsFilterDto } from './dto/list-ratings-filter.dto';
  * Interface pour le retour paginé des notes.
  */
 export interface PaginatedRatings {
-  data: Array<{
+  items: Array<{
     id: string;
     note_perso: number | null;
     commentaire: string | null;
@@ -25,6 +25,10 @@ export interface PaginatedRatings {
       titre_vf: string | null;
       affiche_url: string | null;
       type: string;
+      date_sortie: Date | null;
+      note_imdb: any;
+      title_genres: { genre_id: string }[];
+      title_countries: { country_id: string }[];
     };
     episode?: {
       id: string;
@@ -36,6 +40,7 @@ export interface PaginatedRatings {
   total: number;
   page: number;
   limit: number;
+  totalPages: number;
 }
 
 /**
@@ -64,6 +69,10 @@ interface RawRating {
     titre_vf: string | null;
     affiche_url: string | null;
     type: string;
+    date_sortie: Date | null;
+    note_imdb: any;
+    title_genres: { genre_id: string }[];
+    title_countries: { country_id: string }[];
   } | null;
   episodes: {
     id: string;
@@ -199,6 +208,10 @@ export class RatingsService {
           titre_vf: true,
           affiche_url: true,
           type: true,
+          date_sortie: true,
+          note_imdb: true,
+          title_genres: { select: { genre_id: true } },
+          title_countries: { select: { country_id: true } },
         },
       },
       episodes: {
@@ -298,6 +311,10 @@ export class RatingsService {
           titre_vf: true,
           affiche_url: true,
           type: true,
+          date_sortie: true,
+          note_imdb: true,
+          title_genres: { select: { genre_id: true } },
+          title_countries: { select: { country_id: true } },
         },
       },
       episodes: {
@@ -321,9 +338,13 @@ export class RatingsService {
       this.prisma.user_ratings.count({ where }),
     ]);
 
-    const data = (rawData as unknown as RawRating[]).map((r) => this.formatRating(r));
+    const items = (rawData as unknown as RawRating[]).map((r) => this.formatRating(r));
 
-    return { data, total, page, limit };
+    // `items`/`totalPages` : même forme que PaginationResult<T> côté
+    // frontend, utilisée par tous les autres endpoints paginés — celui-ci
+    // renvoyait `data` sans `totalPages`, un décalage qui faisait planter
+    // la page /ratings dès qu'une note existait (`data.items` undefined).
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   // ======================================================================
