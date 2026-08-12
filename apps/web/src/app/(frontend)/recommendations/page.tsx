@@ -3,19 +3,22 @@
  * recommandations de l'accueil (qui n'affiche plus qu'une ligne + "Voir
  * davantage" pointant ici), cible où le résultat peut s'étaler sur
  * plusieurs lignes.
- * Correspondance backend : `useRecommendations` (stub, cf.
- * `hooks/api/useDashboard.ts` — à implémenter côté backend avec un
- * endpoint dédié ; cette page reflète donc le même état vide que le module
- * de l'accueil tant que ce n'est pas branché).
+ * Correspondance backend : GET /recommendations/user — agrège les
+ * recommandations par-titre (title_recommendations) des titres bien notés
+ * ou vus par l'utilisateur. Supporte le filtre "Apprécié en France" du
+ * header (paramètre `fr`, cf. lib/titleFilters.ts).
  */
 
 "use client";
 
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { useRecommendations } from "@/hooks/api/useDashboard";
 import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { useAuthStore } from "@/store/authStore";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { parseTitleFilters } from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
 
 function titleToSearchResult(title: Title): TitleSearchResult {
@@ -35,9 +38,10 @@ function titleToSearchResult(title: Title): TitleSearchResult {
   };
 }
 
-export default function RecommendationsPage() {
+function RecommendationsPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
-  const { data: recommendations, isLoading } = useRecommendations(24);
+  const filters = parseTitleFilters(useSearchParams());
+  const { data: recommendations, isLoading } = useRecommendations(24, filters.appreciesFr);
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
 
@@ -97,5 +101,13 @@ export default function RecommendationsPage() {
         </p>
       )}
     </div>
+  );
+}
+
+export default function RecommendationsPage() {
+  return (
+    <Suspense fallback={null}>
+      <RecommendationsPageContent />
+    </Suspense>
   );
 }

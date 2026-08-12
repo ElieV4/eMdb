@@ -117,6 +117,10 @@ export function Header() {
   // utilisateur) : Favoris n'est plus filtrable ainsi, et les visuels
   // dataviz ont leur propre filtre dans leur menu "⋮".
   const isProfilePage = pathname === "/profile";
+  // "Apprécié en France" — n'a de sens que sur Découvrir (page + sous-pages
+  // /discover/:module) et Titres recommandés, seules pages dont les modules
+  // savent l'appliquer côté backend.
+  const showAppreciesFrFilter = pathname.startsWith("/discover") || pathname === "/recommendations";
 
   // Filtrer les tabs selon la page
   const visibleTabs = isSearchPage
@@ -182,6 +186,10 @@ export function Header() {
     navigateWithFilters({ vu: status === "tout" ? null : status });
   };
 
+  const toggleAppreciesFr = () => {
+    navigateWithFilters({ fr: filters.appreciesFr ? null : "1" });
+  };
+
   const commitYearRange = (next: [number, number]) => {
     navigateWithFilters({
       yearMin: next[0] === YEAR_RANGE_MIN ? null : String(next[0]),
@@ -217,6 +225,7 @@ export function Header() {
       vu: null,
       vuAnneeMin: null,
       vuAnneeMax: null,
+      fr: null,
     });
   };
 
@@ -284,6 +293,8 @@ export function Header() {
         watchedYearRange={watchedYearRange}
         onWatchedYearRangeChange={setWatchedYearRange}
         onWatchedYearRangeCommit={commitWatchedYearRange}
+        showAppreciesFrFilter={showAppreciesFrFilter}
+        onToggleAppreciesFr={toggleAppreciesFr}
         onToggleGenre={toggleGenre}
         onToggleCountry={toggleCountry}
         onToggleStudio={toggleStudio}

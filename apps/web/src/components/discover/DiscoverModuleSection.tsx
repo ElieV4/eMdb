@@ -54,13 +54,17 @@ export function DiscoverModuleSection({
   variant?: "row" | "grid";
   moreHref?: string;
 }) {
-  const { data, isLoading, error } = useDiscoverModule(moduleKey, variant === "grid" ? 100 : 20);
+  const filters = parseTitleFilters(useSearchParams());
+  const { data, isLoading, error } = useDiscoverModule(
+    moduleKey,
+    variant === "grid" ? 100 : 20,
+    filters.appreciesFr,
+  );
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
   const { isAuthenticated } = useAuth();
   const { data: userLists } = useLists(isAuthenticated);
   const listIdsByTitle = buildListIdsByTitle(userLists);
-  const filters = parseTitleFilters(useSearchParams());
 
   const toFilterable = (t: TitleSearchResult): FilterableTitle => ({
     id: t.id,

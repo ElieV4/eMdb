@@ -113,7 +113,7 @@ function HomePageContent() {
     useContinueWatching(isAuthenticated);
 
   const { data: recommendations, isLoading: isLoadingRecommendations } =
-    useRecommendations(10);
+    useRecommendations(10, filters.appreciesFr);
 
   const { data: followedPeople, isLoading: isLoadingFollowedPeople } =
     useFollowedPeople(isAuthenticated);

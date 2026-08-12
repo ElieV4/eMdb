@@ -23,6 +23,11 @@ export type TitleFilters = {
    * ne s'applique jamais aux titres eux-mêmes (cf. `titleMatchesFilters`). */
   watchedYearMin: number | null;
   watchedYearMax: number | null;
+  /** "Apprécié en France" — n'a de sens que sur Découvrir et Titres
+   * recommandés (envoyé au backend comme paramètre de requête, pas évalué
+   * localement par `titleMatchesFilters` : ces deux pages consomment des
+   * données TMDB brutes/agrégées, pas les `pays` locaux des autres pages). */
+  appreciesFr: boolean;
 };
 
 export const YEAR_RANGE_MIN = 1900;
@@ -57,6 +62,7 @@ export function parseTitleFilters(searchParams: URLSearchParams): TitleFilters {
     watchedStatus: watchedStatus === "vu" || watchedStatus === "non_vu" ? watchedStatus : "tout",
     watchedYearMin: watchedYearMin ? Number(watchedYearMin) : null,
     watchedYearMax: watchedYearMax ? Number(watchedYearMax) : null,
+    appreciesFr: searchParams.get("fr") === "1",
   };
 }
 
@@ -73,7 +79,8 @@ export function hasActiveTitleFilters(filters: TitleFilters) {
     filters.listIds.length > 0 ||
     filters.watchedStatus !== "tout" ||
     filters.watchedYearMin !== null ||
-    filters.watchedYearMax !== null
+    filters.watchedYearMax !== null ||
+    filters.appreciesFr
   );
 }
 

@@ -61,6 +61,8 @@ interface FilterSidebarProps {
   watchedYearRange?: [number, number];
   onWatchedYearRangeChange?: (next: [number, number]) => void;
   onWatchedYearRangeCommit?: (next: [number, number]) => void;
+  showAppreciesFrFilter?: boolean;
+  onToggleAppreciesFr?: () => void;
   onToggleGenre: (id: string) => void;
   onToggleCountry: (id: string) => void;
   onToggleStudio: (id: string) => void;
@@ -94,6 +96,8 @@ export function FilterSidebar({
   watchedYearRange,
   onWatchedYearRangeChange,
   onWatchedYearRangeCommit,
+  showAppreciesFrFilter,
+  onToggleAppreciesFr,
   onToggleGenre,
   onToggleCountry,
   onToggleStudio,
@@ -176,6 +180,24 @@ export function FilterSidebar({
               ))}
             </div>
           </div>
+
+          {showAppreciesFrFilter && onToggleAppreciesFr && (
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Origine</label>
+              <button
+                type="button"
+                onClick={onToggleAppreciesFr}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+                  filters.appreciesFr
+                    ? "bg-primary/20 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border",
+                )}
+              >
+                Apprécié en France
+              </button>
+            </div>
+          )}
 
           <div className="space-y-1">
             <div className="flex items-center justify-between text-xs text-muted-foreground">

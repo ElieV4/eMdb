@@ -138,6 +138,125 @@ export class RecommenderService {
     return Number(result[0]?.count ?? 0);
   }
 
+  /**
+   * Recommandations personnalisées pour un utilisateur — agrège les
+   * recommandations par-titre déjà calculées (`title_recommendations`,
+   * similarité genres/acteurs/réalisateurs) pour chaque titre que
+   * l'utilisateur a bien noté (note_perso >= 7), pondérées par cette note.
+   * Sans note, retombe sur les titres vus (poids égal). Exclut les titres
+   * déjà vus ou notés (pas de sens à recommander ce qui est déjà connu).
+   *
+   * `appreciesFr` applique un boost (pas un filtre dur) aux titres dont un
+   * pays de production est FR/BE/CH — un filtre dur réduirait trop souvent
+   * le nombre de résultats disponibles vu le peu de données par utilisateur.
+   * Approximation : la BDD n'a pas de colonne "langue d'origine" par titre,
+   * seulement les pays de production (table title_countries).
+   *
+   * @param userId - UUID de l'utilisateur connecté
+   * @param options.limit - Nombre de titres à retourner (défaut 20)
+   * @param options.appreciesFr - Applique le boost France
+   */
+  async getUserRecommendations(
+    userId: string,
+    options: { limit?: number; appreciesFr?: boolean } = {},
+  ) {
+    const limit = options.limit ?? 20;
+
+    const ratedTitles = await this.prisma.user_ratings.findMany({
+      where: { user_id: userId, title_id: { not: null }, note_perso: { gte: 7 } },
+      select: { title_id: true, note_perso: true },
+      orderBy: { updated_at: 'desc' },
+      take: 30,
+    });
+
+    let sourceTitles: { titleId: string; weight: number }[];
+    if (ratedTitles.length > 0) {
+      sourceTitles = ratedTitles.map((r) => ({
+        titleId: r.title_id as string,
+        weight: Number(r.note_perso) / 10,
+      }));
+    } else {
+      const watched = await this.prisma.user_watches.findMany({
+        where: { user_id: userId, title_id: { not: null } },
+        select: { title_id: true },
+        distinct: ['title_id'],
+        orderBy: { date_vue: 'desc' },
+        take: 30,
+      });
+      sourceTitles = watched.map((w) => ({ titleId: w.title_id as string, weight: 1 }));
+    }
+
+    if (sourceTitles.length === 0) {
+      return [];
+    }
+
+    const [watchedRows, ratedRows] = await Promise.all([
+      this.prisma.user_watches.findMany({
+        where: { user_id: userId, title_id: { not: null } },
+        select: { title_id: true },
+        distinct: ['title_id'],
+      }),
+      this.prisma.user_ratings.findMany({
+        where: { user_id: userId, title_id: { not: null } },
+        select: { title_id: true },
+      }),
+    ]);
+    const excludeIds = new Set<string>([
+      ...watchedRows.map((w) => w.title_id as string),
+      ...ratedRows.map((r) => r.title_id as string),
+    ]);
+
+    const weightByTitleId = new Map(sourceTitles.map((s) => [s.titleId, s.weight]));
+    const recs = await this.prisma.title_recommendations.findMany({
+      where: { title_id: { in: sourceTitles.map((s) => s.titleId) } },
+      select: { title_id: true, recommended_id: true, score: true },
+    });
+
+    const aggregated = new Map<string, number>();
+    for (const rec of recs) {
+      if (excludeIds.has(rec.recommended_id)) continue;
+      const weight = weightByTitleId.get(rec.title_id) ?? 1;
+      const contribution = Number(rec.score) * weight;
+      aggregated.set(rec.recommended_id, (aggregated.get(rec.recommended_id) ?? 0) + contribution);
+    }
+
+    if (aggregated.size === 0) {
+      return [];
+    }
+
+    // Sur-échantillonne avant le boost France : le tri final peut faire
+    // remonter des candidats hors du top brut une fois le boost appliqué.
+    const candidateIds = [...aggregated.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit * 3)
+      .map(([id]) => id);
+
+    const titleRows = await this.prisma.titles.findMany({
+      where: { id: { in: candidateIds } },
+      include: {
+        title_genres: { include: { genres: { select: { id: true, nom: true } } } },
+        title_countries: { include: { countries: { select: { id: true, code: true, nom: true } } } },
+      },
+    });
+
+    const FRENCH_COUNTRY_CODES = new Set(['FR', 'BE', 'CH']);
+
+    const scored = titleRows.map((title) => {
+      let score = aggregated.get(title.id) ?? 0;
+      if (options.appreciesFr) {
+        const isFrench = title.title_countries.some((tc) =>
+          FRENCH_COUNTRY_CODES.has(tc.countries.code),
+        );
+        if (isFrench) score *= 1.3;
+      }
+      return { title, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    return scored.slice(0, limit).map((s) => s.title);
+  }
+
   private async getLastRun() {
     const queue = this.getQueue();
     const jobs = await queue.getJobs(['completed', 'failed'], 0, 0);

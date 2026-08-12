@@ -37,12 +37,18 @@ function mapBackendDiscoverResult(item: BackendDiscoverResult): TitleSearchResul
   };
 }
 
-export function useDiscoverModule(module: DiscoverModuleKey, limit: number = 20) {
+export function useDiscoverModule(
+  module: DiscoverModuleKey,
+  limit: number = 20,
+  appreciesFr: boolean = false,
+) {
   return useQuery({
-    queryKey: ["discover", module, limit],
+    queryKey: ["discover", module, limit, appreciesFr],
     queryFn: async (): Promise<TitleSearchResult[]> => {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (appreciesFr) params.set("appreciesFr", "1");
       const data = await apiFetch<BackendDiscoverResult[]>(
-        `/discover/${module}?limit=${limit}`,
+        `/discover/${module}?${params.toString()}`,
       );
       return data.map(mapBackendDiscoverResult);
     },

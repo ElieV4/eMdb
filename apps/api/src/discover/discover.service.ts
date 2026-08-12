@@ -34,6 +34,7 @@ type RawTmdbItem = {
   poster_path?: string | null;
   vote_average?: number;
   popularity?: number;
+  original_language?: string;
 };
 
 /**
@@ -75,16 +76,20 @@ export class DiscoverService {
     return pages.flatMap((p) => p.results ?? []);
   }
 
-  async getModule(module: string, limit: number): Promise<DiscoverTitleResult[]> {
+  async getModule(
+    module: string,
+    limit: number,
+    appreciesFr: boolean = false,
+  ): Promise<DiscoverTitleResult[]> {
     switch (module as DiscoverModule) {
       case 'tendances':
-        return this.getTrending(limit);
+        return this.getTrending(limit, appreciesFr);
       case 'populaires':
-        return this.getPopular(limit);
+        return this.getPopular(limit, appreciesFr);
       case 'attendus':
-        return this.getUpcoming(limit);
+        return this.getUpcoming(limit, appreciesFr);
       case 'sorties':
-        return this.getReleases(limit);
+        return this.getReleases(limit, appreciesFr);
       default:
         throw new BadRequestException(
           `Module de découverte invalide. Valeurs possibles : ${DISCOVER_MODULES.join(', ')}.`,
@@ -92,13 +97,28 @@ export class DiscoverService {
     }
   }
 
-  private async getTrending(limit: number): Promise<DiscoverTitleResult[]> {
+  /**
+   * "Apprécié en France" — /trending n'a pas de paramètre de filtre côté
+   * TMDB (contrairement à /discover), donc filtrage a posteriori sur
+   * `original_language` (présent sur les réponses trending, vérifié en
+   * direct contre l'API TMDB).
+   */
+  private filterFrench(items: RawTmdbItem[]): RawTmdbItem[] {
+    return items.filter((item) => item.original_language === 'fr');
+  }
+
+  private async getTrending(limit: number, appreciesFr: boolean): Promise<DiscoverTitleResult[]> {
     const pagesNeeded = this.pagesNeededFor(limit);
-    const [movies, tv] = await Promise.all([
+    let [movies, tv] = await Promise.all([
       this.fetchPages<RawTmdbItem>((page) => getTrending('movie', 'week', page), pagesNeeded),
       this.fetchPages<RawTmdbItem>((page) => getTrending('tv', 'week', page), pagesNeeded),
     ]);
 
+    if (appreciesFr) {
+      movies = this.filterFrench(movies);
+      tv = this.filterFrench(tv);
+    }
+
     return this.mergeAndFinalize(
       [...this.mapItems(movies, 'film'), ...this.mapItems(tv, 'serie')],
       (a, b) => b.popularity - a.popularity,
@@ -106,15 +126,18 @@ export class DiscoverService {
     );
   }
 
-  private async getPopular(limit: number): Promise<DiscoverTitleResult[]> {
+  private async getPopular(limit: number, appreciesFr: boolean): Promise<DiscoverTitleResult[]> {
     const pagesNeeded = this.pagesNeededFor(limit);
+    // "Apprécié en France" — with_original_language=fr filtre côté TMDB
+    // (vérifié en direct : ~76k résultats films, pas trop restrictif).
+    const frParam = appreciesFr ? { with_original_language: 'fr' } : {};
     const [movies, tv] = await Promise.all([
       this.fetchPages<RawTmdbItem>(
-        (page) => getDiscoverMovie({ sort_by: 'popularity.desc', page }),
+        (page) => getDiscoverMovie({ sort_by: 'popularity.desc', ...frParam, page }),
         pagesNeeded,
       ),
       this.fetchPages<RawTmdbItem>(
-        (page) => getDiscoverTv({ sort_by: 'popularity.desc', page }),
+        (page) => getDiscoverTv({ sort_by: 'popularity.desc', ...frParam, page }),
         pagesNeeded,
       ),
     ]);
@@ -126,11 +149,12 @@ export class DiscoverService {
     );
   }
 
-  private async getUpcoming(limit: number): Promise<DiscoverTitleResult[]> {
+  private async getUpcoming(limit: number, appreciesFr: boolean): Promise<DiscoverTitleResult[]> {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowIso = tomorrow.toISOString().slice(0, 10);
     const pagesNeeded = this.pagesNeededFor(limit);
+    const frParam = appreciesFr ? { with_original_language: 'fr' } : {};
 
     const [movies, tv] = await Promise.all([
       this.fetchPages<RawTmdbItem>(
@@ -138,6 +162,7 @@ export class DiscoverService {
           getDiscoverMovie({
             sort_by: 'popularity.desc',
             'primary_release_date.gte': tomorrowIso,
+            ...frParam,
             page,
           }),
         pagesNeeded,
@@ -147,6 +172,7 @@ export class DiscoverService {
           getDiscoverTv({
             sort_by: 'popularity.desc',
             'first_air_date.gte': tomorrowIso,
+            ...frParam,
             page,
           }),
         pagesNeeded,
@@ -160,9 +186,10 @@ export class DiscoverService {
     );
   }
 
-  private async getReleases(limit: number): Promise<DiscoverTitleResult[]> {
+  private async getReleases(limit: number, appreciesFr: boolean): Promise<DiscoverTitleResult[]> {
     const today = new Date().toISOString().slice(0, 10);
     const pagesNeeded = this.pagesNeededFor(limit);
+    const frParam = appreciesFr ? { with_original_language: 'fr' } : {};
 
     // vote_count élevé : sans ce filtre, "sorties" remonte des titres très
     // obscurs (parfois une seule note à 10) plutôt que de vraies sorties
@@ -174,6 +201,7 @@ export class DiscoverService {
             sort_by: 'primary_release_date.desc',
             'primary_release_date.lte': today,
             'vote_count.gte': 50,
+            ...frParam,
             page,
           }),
         pagesNeeded,
@@ -184,6 +212,7 @@ export class DiscoverService {
             sort_by: 'first_air_date.desc',
             'first_air_date.lte': today,
             'vote_count.gte': 50,
+            ...frParam,
             page,
           }),
         pagesNeeded,
