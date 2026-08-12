@@ -12,16 +12,23 @@
 import { useAuthStore } from "@/store/authStore";
 import { useContinueWatching } from "@/hooks/api/useContinueWatching";
 import { useListMembership } from "@/hooks/api";
+import { useSelectionMode } from "@/hooks/useSelectionMode";
 import { ContinueWatchingCard } from "@/components/watches/ContinueWatchingCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
+import { BulkActionsBar } from "@/components/common/BulkActionsBar";
+import { AlertCircle, ListChecks } from "lucide-react";
 
 export default function ContinueWatchingPage() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const { data: entries, isLoading, error } = useContinueWatching(isAuthenticated);
-  const { watchlistIds, favoriteIds, watchlistStatuses } = useListMembership();
+  const { watchlistIds, favoriteIds, watchlistStatuses, watchlistId, favorisId } =
+    useListMembership();
+  const { selectionMode, selectedIds, toggleSelectionMode, toggleSelected, clearSelection } =
+    useSelectionMode();
 
   if (isAuthLoading) {
     return (
@@ -47,12 +54,29 @@ export default function ContinueWatchingPage() {
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Continuer à regarder ({items.length})</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Vos séries suivies avec des épisodes restants
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Continuer à regarder ({items.length})</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Vos séries suivies avec des épisodes restants
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={toggleSelectionMode}>
+            <ListChecks className="mr-2 h-4 w-4" />
+            {selectionMode ? "Terminer" : "Modifier le contenu"}
+          </Button>
         </div>
+
+        {selectionMode && selectedIds.size > 0 && (
+          <BulkActionsBar
+            items={items
+              .filter((entry) => selectedIds.has(entry.title_id))
+              .map((entry) => ({ id: entry.title_id, titleId: entry.title_id, type: "serie" as const }))}
+            watchlistId={watchlistId}
+            favorisId={favorisId}
+            onDone={clearSelection}
+          />
+        )}
 
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -75,13 +99,20 @@ export default function ContinueWatchingPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {items.map((entry) => (
-              <ContinueWatchingCard
-                key={entry.title_id}
-                entry={entry}
-                inWatchlist={watchlistIds.has(entry.title_id)}
-                inFavorites={favoriteIds.has(entry.title_id)}
-                watchlistStatus={watchlistStatuses.get(entry.title_id)}
-              />
+              <div key={entry.title_id} className="relative">
+                {selectionMode && (
+                  <SelectionCheckbox
+                    selected={selectedIds.has(entry.title_id)}
+                    onToggle={() => toggleSelected(entry.title_id)}
+                  />
+                )}
+                <ContinueWatchingCard
+                  entry={entry}
+                  inWatchlist={watchlistIds.has(entry.title_id)}
+                  inFavorites={favoriteIds.has(entry.title_id)}
+                  watchlistStatus={watchlistStatuses.get(entry.title_id)}
+                />
+              </div>
             ))}
           </div>
         )}

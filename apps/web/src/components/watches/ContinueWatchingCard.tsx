@@ -54,7 +54,7 @@ export function ContinueWatchingCard({
       className={cn("group relative shrink-0", className)}
       style={{ width: `${POSTER_WIDTH}px` }}
     >
-      <Link href={`/episodes/${entry.episode_id}`}>
+      <Link href={`/titles/${entry.title_id}`}>
         <div
           className="relative overflow-hidden rounded-lg bg-muted/20"
           style={{ width: `${POSTER_WIDTH}px`, height: `${POSTER_HEIGHT}px` }}
@@ -93,6 +93,7 @@ export function ContinueWatchingCard({
         inFavorites={inFavorites}
         watched={false}
         watchlistStatus={watchlistStatus}
+        allowAbandonWithoutWatchlist
         className="absolute top-1.5 right-1.5 z-30"
       />
 

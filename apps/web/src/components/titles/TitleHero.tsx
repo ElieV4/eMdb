@@ -8,8 +8,10 @@ import Link from "next/link";
 import { ExternalLink, Loader2, Star, Tv } from "lucide-react";
 import { CreditGrouped, TitleDetail } from "@/lib/types/api";
 import { useWatchLinks } from "@/hooks/useWatchLinks";
+import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 import { TitlePoster } from "./TitlePoster";
+import { ProgressSerie } from "@/components/watches/ProgressSerie";
 
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
@@ -36,6 +38,7 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
   const directors = credits?.["Réalisateur"] ?? [];
   const year = date_sortie ? new Date(date_sortie).getFullYear() : null;
   const displayTitle = titre_vf && titre_vf !== titre_vo ? titre_vo : titre_vo;
+  const { isAuthenticated } = useAuthStore();
 
   const { officialProviders, freeLinks, isFreeLinksLoading } = useWatchLinks({
     titreVo: titre_vo,
@@ -224,6 +227,13 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
             {renderOfficialProviders()}
             {renderFreeLinks()}
           </div>
+
+          {type === "serie" && isAuthenticated && (
+            <ProgressSerie
+              titleId={title.id}
+              className="rounded-lg border border-border bg-background/40 p-3"
+            />
+          )}
         </div>
       </div>
     </div>

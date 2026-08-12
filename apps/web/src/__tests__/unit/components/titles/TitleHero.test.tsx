@@ -6,6 +6,15 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { TitleHero } from "@/components/titles/TitleHero";
 import { TitleDetail } from "@/lib/types/api";
+import { useAuthStore } from "@/store/authStore";
+
+jest.mock("@/hooks/api/useSerieProgress", () => ({
+  useSerieProgress: () => ({
+    data: [{ saison: 1, vus: 5, total: 10 }],
+    isLoading: false,
+    error: null,
+  }),
+}));
 
 const mockTitle: TitleDetail = {
   id: "1",
@@ -247,5 +256,23 @@ describe("TitleHero", () => {
     render(<TitleHero title={mockTitle} />);
     expect(screen.queryByText("Inception")).toBeInTheDocument();
     // titre_vf === titre_vo, donc pas de titre VF supplémentaire
+  });
+
+  it("n'affiche pas la barre de progression pour un film", () => {
+    render(<TitleHero title={mockTitle} />);
+    expect(screen.queryByText("Progression globale")).not.toBeInTheDocument();
+  });
+
+  it("n'affiche pas la barre de progression pour une série si non connecté", () => {
+    render(<TitleHero title={mockSerie} />);
+    expect(screen.queryByText("Progression globale")).not.toBeInTheDocument();
+  });
+
+  it("affiche la barre de progression en bas du hero pour une série connectée", () => {
+    useAuthStore.setState({ isAuthenticated: true });
+    render(<TitleHero title={mockSerie} />);
+    expect(screen.getByText("Progression globale")).toBeInTheDocument();
+    expect(screen.getByText("5/10")).toBeInTheDocument();
+    useAuthStore.setState({ isAuthenticated: false });
   });
 });

@@ -6,7 +6,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, Calendar, Clock } from "lucide-react";
 import { useSeason } from "@/hooks/api/useSeason";
 import { useWatches } from "@/hooks/api/useWatches";
 import { cn } from "@/lib/utils";
@@ -90,6 +90,9 @@ export function EpisodeSnapshot({
     <div className={cn("space-y-2", className)}>
       {episodeList.map((episode) => {
         const episodeWatches = episodeWatchMap.get(episode.id) ?? [];
+        const dateStr = episode.date_sortie
+          ? new Date(episode.date_sortie).toLocaleDateString("fr-FR")
+          : null;
         return (
           <div
             key={episode.id}
@@ -100,6 +103,22 @@ export function EpisodeSnapshot({
                 Épisode {episode.numero}
                 {episode.titre ? ` - ${episode.titre}` : ""}
               </p>
+              {(dateStr || episode.duree_minutes) && (
+                <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                  {dateStr && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {dateStr}
+                    </span>
+                  )}
+                  {episode.duree_minutes && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {episode.duree_minutes} min
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 ml-3">
               <Link

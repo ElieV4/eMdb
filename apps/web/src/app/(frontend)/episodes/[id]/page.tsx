@@ -200,6 +200,17 @@ export default function EpisodeDetailPage({
             <div>
               <h1 className="text-3xl font-bold">{titre}</h1>
               <p className="text-sm text-muted-foreground mt-1">
+                {titleId && (
+                  <>
+                    <Link
+                      href={`/titles/${titleId}`}
+                      className="hover:text-foreground hover:underline"
+                    >
+                      {title?.titre_vf || title?.titre_vo}
+                    </Link>
+                    {" • "}
+                  </>
+                )}
                 Saison {seasonNumero} • Épisode {numero}
               </p>
             </div>

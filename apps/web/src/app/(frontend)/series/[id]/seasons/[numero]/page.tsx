@@ -11,6 +11,9 @@ import { ArrowLeft } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EpisodeRow, EpisodeCard } from "@/components/seasons";
 import { useSeason } from "@/hooks/api/useSeason";
+import { useTitle } from "@/hooks/api/useTitles";
+import { useWatches } from "@/hooks/api/useWatches";
+import { useAuthStore } from "@/store/authStore";
 
 export default function SeasonDetailPage({
   params,
@@ -19,8 +22,22 @@ export default function SeasonDetailPage({
 }) {
   const { id, numero } = params;
   const seasonNumero = parseInt(numero, 10);
+  const { isAuthenticated } = useAuthStore();
 
   const { data: season, isLoading, isError } = useSeason(id, seasonNumero);
+  const { data: title } = useTitle(id);
+  // Filtrer par title_id inclut aussi les visionnages par épisode de cette
+  // série (bug #44) — un seul fetch pour toute la saison plutôt qu'un par
+  // épisode, même logique que EpisodeSnapshot.
+  const { data: watchesData } = useWatches(
+    { title_id: id, limit: 100 },
+    { enabled: isAuthenticated && !!id },
+  );
+  const watchedEpisodeIds = new Set(
+    (watchesData?.items ?? [])
+      .filter((watch) => watch.episode_id)
+      .map((watch) => watch.episode_id as string),
+  );
 
   if (isLoading) {
     return (
@@ -51,6 +68,14 @@ export default function SeasonDetailPage({
 
         {/* Header saison */}
         <div>
+          {title && (
+            <Link
+              href={`/titles/${id}`}
+              className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+            >
+              {title.titre_vf || title.titre_vo}
+            </Link>
+          )}
           <h1 className="text-3xl font-bold">
             {titre || `Saison ${seasonNumero}`}
           </h1>
@@ -86,6 +111,7 @@ export default function SeasonDetailPage({
                     episode={episode}
                     titleId={id}
                     seasonNumero={seasonNumero}
+                    isWatched={watchedEpisodeIds.has(episode.id)}
                   />
                 ))}
               </div>
@@ -98,6 +124,7 @@ export default function SeasonDetailPage({
                     episode={episode}
                     titleId={id}
                     seasonNumero={seasonNumero}
+                    isWatched={watchedEpisodeIds.has(episode.id)}
                   />
                 ))}
               </div>
