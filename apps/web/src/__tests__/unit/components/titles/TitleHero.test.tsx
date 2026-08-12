@@ -263,6 +263,24 @@ describe("TitleHero", () => {
     expect(screen.queryByText("Progression globale")).not.toBeInTheDocument();
   });
 
+  it("affiche le réalisateur en sous-titre à côté du titre, avec un lien vers sa page", () => {
+    render(
+      <TitleHero
+        title={mockTitle}
+        credits={{
+          Réalisateur: [
+            { id: "credit-1", personnage: null, ordre: null, personne: { id: "person-1", nom: "Christopher Nolan" } },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText("Réalisé par")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Christopher Nolan" })).toHaveAttribute(
+      "href",
+      "/people/person-1",
+    );
+  });
+
   it("n'affiche pas la barre de progression pour une série si non connecté", () => {
     render(<TitleHero title={mockSerie} />);
     expect(screen.queryByText("Progression globale")).not.toBeInTheDocument();

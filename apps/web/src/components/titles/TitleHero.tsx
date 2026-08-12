@@ -159,6 +159,22 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
             {titre_vf && titre_vf !== titre_vo && (
               <p className="text-lg text-muted-foreground mt-1">{titre_vf}</p>
             )}
+            {directors.length > 0 && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Réalisé par{" "}
+                {directors.map((director, index) => (
+                  <span key={director.id}>
+                    {index > 0 && ", "}
+                    <Link
+                      href={`/people/${director.personne.id}`}
+                      className="text-foreground hover:underline"
+                    >
+                      {director.personne.nom}
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
@@ -187,23 +203,6 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
               {type === "film" ? "Film" : "Série"}
             </span>
           </div>
-
-          {directors.length > 0 && (
-            <p className="text-sm text-muted-foreground">
-              Réalisé par{" "}
-              {directors.map((director, index) => (
-                <span key={director.id}>
-                  {index > 0 && ", "}
-                  <Link
-                    href={`/people/${director.personne.id}`}
-                    className="text-foreground hover:underline"
-                  >
-                    {director.personne.nom}
-                  </Link>
-                </span>
-              ))}
-            </p>
-          )}
 
           {title.synopsis && (
             <p className="text-sm text-muted-foreground line-clamp-3">
