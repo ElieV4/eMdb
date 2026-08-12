@@ -5,8 +5,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Calendar, Clock, CheckCircle2, Circle } from "lucide-react";
+import { Calendar, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TitleWatchedButton } from "@/components/titles/TitleWatchedButton";
 
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
@@ -43,74 +44,76 @@ export function EpisodeRow({
     : null;
 
   return (
-    <Link
-      href={`/episodes/${episode.id}`}
+    <div
       className={cn(
         "flex items-center gap-4 p-3 rounded-lg transition-colors duration-200",
         "hover:bg-muted/50",
         className,
       )}
     >
-      {/* Still / placeholder */}
-      <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded">
-        {image_url ? (
-          <Image
-            src={`${TMDB_IMAGE_BASE_URL}/w92${image_url}`}
-            alt={titre}
-            fill
-            className="object-cover"
-            sizes="112px"
-          />
-        ) : (
-          <div className="h-full w-full bg-muted flex items-center justify-center">
-            <span className="text-xs text-muted-foreground">Pas image</span>
+      {/* Le bouton "marquer comme vu" ne peut pas être imbriqué dans le
+          <Link> ci-dessous (HTML invalide, cf. bug #45), donc le lien ne
+          couvre plus que still+infos, et le bouton est un sibling. */}
+      <Link
+        href={`/episodes/${episode.id}`}
+        className="flex flex-1 min-w-0 items-center gap-4"
+      >
+        {/* Still / placeholder */}
+        <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded">
+          {image_url ? (
+            <Image
+              src={`${TMDB_IMAGE_BASE_URL}/w92${image_url}`}
+              alt={titre}
+              fill
+              className="object-cover"
+              sizes="112px"
+            />
+          ) : (
+            <div className="h-full w-full bg-muted flex items-center justify-center">
+              <span className="text-xs text-muted-foreground">Pas image</span>
+            </div>
+          )}
+        </div>
+
+        {/* Infos */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">
+              S{seasonNumero} E{numero.toString().padStart(2, "0")}
+            </span>
+            <span
+              className={cn(
+                "text-sm font-medium",
+                isWatched ? "text-primary" : "text-foreground",
+              )}
+            >
+              {titre}
+            </span>
           </div>
-        )}
-      </div>
 
-      {/* Infos */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">
-            S{seasonNumero} E{numero.toString().padStart(2, "0")}
-          </span>
-          <span
-            className={cn(
-              "text-sm font-medium",
-              isWatched ? "text-primary" : "text-foreground",
+          <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
+            {year && (
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                {dateStr}
+              </span>
             )}
-          >
-            {titre}
-          </span>
+            {duree_minutes && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {duree_minutes} min
+              </span>
+            )}
+          </div>
         </div>
+      </Link>
 
-        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
-          {year && (
-            <span className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              {dateStr}
-            </span>
-          )}
-          {duree_minutes && (
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {duree_minutes} min
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Statut vu */}
-      <div className="flex items-center justify-center">
-        {isWatched ? (
-          <CheckCircle2
-            className="h-5 w-5 text-primary"
-            data-testid="check-icon"
-          />
-        ) : (
-          <Circle className="h-5 w-5 text-muted-foreground/50" />
-        )}
-      </div>
-    </Link>
+      {/* Marquer comme vu */}
+      <TitleWatchedButton
+        episodeId={episode.id}
+        watched={isWatched}
+        className="h-8 w-8 shrink-0"
+      />
+    </div>
   );
 }
