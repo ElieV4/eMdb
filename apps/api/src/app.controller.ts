@@ -71,30 +71,47 @@ export class AppController {
     @Query('type') type: 'film' | 'serie' = 'film',
     @Query('afficheUrl') afficheUrl?: string,
     @Query('anneeSortie') anneeSortie?: string,
+    @Query('debug') debug?: string,
   ) {
     if (!titreVo) {
       return { links: [] };
     }
 
+    const isDebug = debug === '1';
     const annee = anneeSortie ? parseInt(anneeSortie, 10) : undefined;
+    const debugTraces: Record<string, string[]> = {};
+
     const results = await Promise.all(
       FREE_SITES.map(async ({ key, name }) => {
+        const trace = isDebug ? [] : undefined;
         try {
-          const match = await findFreeWatchLink(key, {
-            titreVo,
-            titreVf,
-            type,
-            afficheUrl,
-            anneeSortie: Number.isFinite(annee) ? annee : undefined,
-          });
+          const match = await findFreeWatchLink(
+            key,
+            {
+              titreVo,
+              titreVf,
+              type,
+              afficheUrl,
+              anneeSortie: Number.isFinite(annee) ? annee : undefined,
+            },
+            trace,
+          );
+          if (trace) debugTraces[key] = trace;
           return match ? { name, href: match.url } : null;
-        } catch {
+        } catch (error) {
+          if (trace) {
+            trace.push(`EXCEPTION ${error instanceof Error ? error.message : String(error)}`);
+            debugTraces[key] = trace;
+          }
           return null;
         }
       }),
     );
 
-    return { links: results.filter(Boolean) };
+    return {
+      links: results.filter(Boolean),
+      ...(isDebug ? { debug: debugTraces } : {}),
+    };
   }
 
   // Plateformes de streaming officielles réellement disponibles pour ce

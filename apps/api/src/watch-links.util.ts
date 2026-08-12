@@ -217,12 +217,23 @@ export function extractPosterHash(url: string | null | undefined): string | null
   return match ? match[1] : null;
 }
 
-async function fetchHtml(url: string): Promise<{ status: number; html: string } | null> {
+/**
+ * `trace`, si fourni, accumule une ligne par requête (statut ou erreur
+ * réseau) — utilisé uniquement pour le diagnostic (`?debug=1` sur
+ * GET /watch-links/free), permet de distinguer "aucun résultat" de "bloqué
+ * par le site avant même d'avoir pu chercher" sans accès aux logs Render.
+ */
+async function fetchHtml(
+  url: string,
+  trace?: string[],
+): Promise<{ status: number; html: string } | null> {
   try {
     const res = await fetch(url, { headers: BROWSER_HEADERS, redirect: 'follow' });
+    trace?.push(`GET ${url} -> ${res.status}`);
     const html = res.ok ? await res.text() : '';
     return { status: res.status, html };
-  } catch {
+  } catch (error) {
+    trace?.push(`GET ${url} -> ERROR ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
@@ -270,10 +281,10 @@ type FreeSiteQuery = {
   year: number | null;
 };
 
-async function findOnWatchTv(params: FreeSiteQuery): Promise<FreeSiteMatch | null> {
+async function findOnWatchTv(params: FreeSiteQuery, trace?: string[]): Promise<FreeSiteMatch | null> {
   const typeSegment = params.type === 'film' ? 'movie' : 'series';
   const directUrl = `https://www.watchtv.click/${typeSegment}/${slugify(params.titreVo)}/`;
-  const direct = await fetchHtml(directUrl);
+  const direct = await fetchHtml(directUrl, trace);
   if (direct && direct.status === 200) {
     const $ = cheerio.load(direct.html);
     if (!isSoftNotFound($('title').first().text())) {
@@ -286,7 +297,7 @@ async function findOnWatchTv(params: FreeSiteQuery): Promise<FreeSiteMatch | nul
     : [params.titreVo];
 
   for (const query of queries) {
-    const search = await fetchHtml(`https://www.watchtv.click/?s=${encodeURIComponent(query)}`);
+    const search = await fetchHtml(`https://www.watchtv.click/?s=${encodeURIComponent(query)}`, trace);
     if (!search || search.status !== 200) continue;
 
     const $ = cheerio.load(search.html);
@@ -313,9 +324,9 @@ async function findOnWatchTv(params: FreeSiteQuery): Promise<FreeSiteMatch | nul
   return null;
 }
 
-async function findOnHydraflix(params: FreeSiteQuery): Promise<FreeSiteMatch | null> {
+async function findOnHydraflix(params: FreeSiteQuery, trace?: string[]): Promise<FreeSiteMatch | null> {
   const directUrl = `https://www.hydraflix.cc/${slugify(params.titreVo)}/`;
-  const direct = await fetchHtml(directUrl);
+  const direct = await fetchHtml(directUrl, trace);
   if (direct && direct.status === 200) {
     const $ = cheerio.load(direct.html);
     if (!isSoftNotFound($('title').first().text())) {
@@ -328,7 +339,7 @@ async function findOnHydraflix(params: FreeSiteQuery): Promise<FreeSiteMatch | n
     : [params.titreVo];
 
   for (const query of queries) {
-    const search = await fetchHtml(`https://www.hydraflix.cc/?s=${encodeURIComponent(query)}`);
+    const search = await fetchHtml(`https://www.hydraflix.cc/?s=${encodeURIComponent(query)}`, trace);
     if (!search || search.status !== 200) continue;
 
     const $ = cheerio.load(search.html);
@@ -355,10 +366,10 @@ async function findOnHydraflix(params: FreeSiteQuery): Promise<FreeSiteMatch | n
   return null;
 }
 
-async function findOnMoviedbWiki(params: FreeSiteQuery): Promise<FreeSiteMatch | null> {
+async function findOnMoviedbWiki(params: FreeSiteQuery, trace?: string[]): Promise<FreeSiteMatch | null> {
   const typeSegment = params.type === 'film' ? 'movies' : 'tv';
   const directUrl = `https://www.moviedb.wiki/${typeSegment}/${slugify(params.titreVo)}/`;
-  const direct = await fetchHtml(directUrl);
+  const direct = await fetchHtml(directUrl, trace);
   if (direct && direct.status === 200) {
     const $ = cheerio.load(direct.html);
     if (!isSoftNotFound($('title').first().text())) {
@@ -371,7 +382,7 @@ async function findOnMoviedbWiki(params: FreeSiteQuery): Promise<FreeSiteMatch |
     : [params.titreVo];
 
   for (const query of queries) {
-    const search = await fetchHtml(`https://www.moviedb.wiki/?s=${encodeURIComponent(query)}`);
+    const search = await fetchHtml(`https://www.moviedb.wiki/?s=${encodeURIComponent(query)}`, trace);
     if (!search || search.status !== 200) continue;
 
     const $ = cheerio.load(search.html);
@@ -401,7 +412,10 @@ async function findOnMoviedbWiki(params: FreeSiteQuery): Promise<FreeSiteMatch |
 
 export type FreeSiteKey = 'watchtv' | 'hydraflix' | 'moviedbwiki';
 
-const FREE_SITE_FINDERS: Record<FreeSiteKey, (params: FreeSiteQuery) => Promise<FreeSiteMatch | null>> = {
+const FREE_SITE_FINDERS: Record<
+  FreeSiteKey,
+  (params: FreeSiteQuery, trace?: string[]) => Promise<FreeSiteMatch | null>
+> = {
   watchtv: findOnWatchTv,
   hydraflix: findOnHydraflix,
   moviedbwiki: findOnMoviedbWiki,
@@ -416,14 +430,18 @@ export async function findFreeWatchLink(
     afficheUrl?: string | null;
     anneeSortie?: number | null;
   },
+  trace?: string[],
 ): Promise<FreeSiteMatch | null> {
-  return FREE_SITE_FINDERS[site]({
-    titreVo: params.titreVo,
-    titreVf: params.titreVf,
-    type: params.type,
-    posterHash: extractPosterHash(params.afficheUrl),
-    year: params.anneeSortie ?? null,
-  });
+  return FREE_SITE_FINDERS[site](
+    {
+      titreVo: params.titreVo,
+      titreVf: params.titreVf,
+      type: params.type,
+      posterHash: extractPosterHash(params.afficheUrl),
+      year: params.anneeSortie ?? null,
+    },
+    trace,
+  );
 }
 
 /**
