@@ -388,6 +388,10 @@ RETURNS INT AS $$
 $$ LANGUAGE sql STABLE;
 
 -- Progression (vus / total) par saison pour un user et une serie donnee
+-- Spéciaux (saison 0) et épisodes pas encore sortis (date_sortie future ou
+-- inconnue) exclus du calcul : même règle que getContinueWatching (bug
+-- House of the Dragon, saison 0 pleine de making-of/recaps gonflait le
+-- total, cf. watches.service.ts).
 CREATE OR REPLACE FUNCTION fn_progress_serie(p_user_id UUID, p_title_id UUID)
 RETURNS TABLE(saison INT, vus INT, total INT) AS $$
     SELECT
@@ -398,6 +402,8 @@ RETURNS TABLE(saison INT, vus INT, total INT) AS $$
     JOIN episodes e ON e.season_id = s.id
     LEFT JOIN user_watches uw ON uw.episode_id = e.id AND uw.user_id = p_user_id
     WHERE s.title_id = p_title_id
+      AND s.numero != 0
+      AND e.date_sortie <= CURRENT_DATE
     GROUP BY s.numero
     ORDER BY s.numero;
 $$ LANGUAGE sql STABLE;

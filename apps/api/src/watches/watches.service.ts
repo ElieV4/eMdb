@@ -593,9 +593,17 @@ export class WatchesService {
     // pour une série donnée, dans cet ordre, est son prochain épisode à
     // voir (ordre de visionnage naturel, pas l'ordre de sortie — un
     // épisode spécial "saison 0" antérieur à la sortie ne doit pas
-    // perturber la progression narrative).
+    // perturber la progression narrative). Spéciaux (saison 0) et épisodes
+    // pas encore sortis (date_sortie future ou inconnue) exclus : ils ne
+    // comptent ni dans le total ni comme prochain épisode, sinon le badge
+    // "X/Y" affiche un max que l'utilisateur ne peut pas encore atteindre.
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
     const episodes = await this.prisma.episodes.findMany({
-      where: { seasons: { title_id: { in: activeTitleIds } } },
+      where: {
+        seasons: { title_id: { in: activeTitleIds }, numero: { not: 0 } },
+        date_sortie: { lte: today },
+      },
       select: {
         id: true,
         numero: true,

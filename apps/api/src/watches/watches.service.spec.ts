@@ -641,6 +641,23 @@ describe('WatchesService', () => {
       expect(result).toEqual([]);
       expect(prismaServiceMock.episodes.findMany).not.toHaveBeenCalled();
     });
+
+    it('exclut les spéciaux (saison 0) et les épisodes pas encore sortis du total', async () => {
+      prismaServiceMock.user_follows_serie.findMany.mockResolvedValue([
+        { title_id: 'serie', titles: { id: 'serie', titre_vo: 'Serie', titre_vf: null, affiche_url: null } },
+      ]);
+
+      await service.getContinueWatching(userId);
+
+      expect(prismaServiceMock.episodes.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            seasons: expect.objectContaining({ numero: { not: 0 } }),
+            date_sortie: expect.objectContaining({ lte: expect.any(Date) }),
+          }),
+        }),
+      );
+    });
   });
 
   // ======================================================================
