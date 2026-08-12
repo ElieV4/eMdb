@@ -7,6 +7,7 @@
 "use client";
 
 import { useState } from "react";
+import { Bookmark, BookmarkCheck } from "lucide-react";
 import { useFollow } from "@/hooks/api/useFollow";
 import { useUnfollow } from "@/hooks/api/useUnfollow";
 import { Button } from "@/components/ui/button";
@@ -17,12 +18,15 @@ type FollowButtonProps = {
   titleId: string;
   initialFollowed?: boolean;
   className?: string;
+  /** Bouton icône seule (label accessible mais visuellement masqué) — contexte compact, ex. sous l'affiche du TitleHero. */
+  compact?: boolean;
 };
 
 export function FollowButton({
   titleId,
   initialFollowed = false,
   className,
+  compact = false,
 }: FollowButtonProps) {
   const { user } = useAuth();
   const follow = useFollow();
@@ -48,16 +52,24 @@ export function FollowButton({
   };
 
   if (follow.isPending || unfollow.isPending) {
-    return <Skeleton className="h-9 w-32" />;
+    return <Skeleton className={compact ? "h-8 w-8" : "h-9 w-32"} />;
   }
+
+  const label = followed ? "Ne plus suivre" : "Suivre";
 
   return (
     <Button
       variant={followed ? "outline" : "default"}
+      size={compact ? "icon" : "default"}
+      aria-label={label}
       onClick={toggle}
       className={className}
     >
-      {followed ? "Ne plus suivre" : "Suivre"}
+      {compact ? (
+        followed ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />
+      ) : (
+        label
+      )}
     </Button>
   );
 }

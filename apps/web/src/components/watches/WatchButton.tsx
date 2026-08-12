@@ -63,6 +63,8 @@ type WatchButtonProps = {
   className?: string;
   /** Appelé après toute mutation réussie (marquer/revoir/jusqu'ici/annuler). */
   onChanged?: () => void;
+  /** Bouton icône seule (label accessible mais visuellement masqué) — contexte compact, ex. sous l'affiche du TitleHero. */
+  compact?: boolean;
 };
 
 export function WatchButton({
@@ -72,6 +74,7 @@ export function WatchButton({
   watches = [],
   className,
   onChanged,
+  compact = false,
 }: WatchButtonProps) {
   const watched = watches.length > 0;
   const watchCount = watches.length;
@@ -158,17 +161,19 @@ export function WatchButton({
         <DropdownMenuTrigger
           render={
             <Button
+              size={compact ? "icon" : "default"}
+              aria-label={watched ? (watchCount > 1 ? `Vu x${watchCount}` : "Vu") : "Marquer comme vu"}
               className={cn(className, watched && "bg-primary text-primary-foreground")}
             >
               {watched ? (
                 <>
-                  <Eye className="mr-2 h-4 w-4" />
-                  {watchCount > 1 ? `Vu x${watchCount}` : "Vu"}
+                  <Eye className={compact ? "h-4 w-4" : "mr-2 h-4 w-4"} />
+                  {!compact && (watchCount > 1 ? `Vu x${watchCount}` : "Vu")}
                 </>
               ) : (
                 <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Marquer comme vu
+                  <Check className={compact ? "h-4 w-4" : "mr-2 h-4 w-4"} />
+                  {!compact && "Marquer comme vu"}
                 </>
               )}
             </Button>

@@ -13,20 +13,24 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type ProgressSerieProps = {
   titleId: string;
   className?: string;
+  /** "bar" : bande fine (label + %) sans détail par saison — pied du TitleHero. */
+  variant?: "full" | "bar";
 };
 
-export function ProgressSerie({ titleId, className }: ProgressSerieProps) {
+export function ProgressSerie({ titleId, className, variant = "full" }: ProgressSerieProps) {
   const { data: progress, isLoading, error } = useSerieProgress(titleId);
+  const compact = variant === "bar";
 
   if (isLoading) {
     return (
       <div className={className}>
         <Skeleton className="h-4 w-full mb-2" />
-        <Skeleton className="h-4 w-3/4" />
+        {!compact && <Skeleton className="h-4 w-3/4" />}
       </div>
     );
   }
@@ -43,7 +47,7 @@ export function ProgressSerie({ titleId, className }: ProgressSerieProps) {
   }
 
   if (!progress || progress.length === 0) {
-    return (
+    return compact ? null : (
       <p className="text-sm text-muted-foreground">
         Aucune donnée de progression.
       </p>
@@ -54,6 +58,17 @@ export function ProgressSerie({ titleId, className }: ProgressSerieProps) {
   const totalEpisodes = progress.reduce((sum, s) => sum + s.total, 0);
   const percentage =
     totalEpisodes > 0 ? Math.round((totalVus / totalEpisodes) * 100) : 0;
+
+  if (compact) {
+    return (
+      <div className={cn("flex items-center gap-3", className)}>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {totalVus}/{totalEpisodes} épisodes ({percentage}%)
+        </span>
+        <Progress value={percentage} className="h-1.5" />
+      </div>
+    );
+  }
 
   return (
     <div className={className}>

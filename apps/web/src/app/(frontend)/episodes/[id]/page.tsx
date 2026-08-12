@@ -7,9 +7,10 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Calendar, Clock, ArrowLeft, ExternalLink, Loader2, Tv } from "lucide-react";
+import { Calendar, Clock, ArrowLeft, ExternalLink } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { TitleCredits } from "@/components/titles/TitleCredits";
+import { WatchLinksSection } from "@/components/titles/WatchLinksSection";
 import { WatchButton } from "@/components/watches/WatchButton";
 import { RatingInput } from "@/components/ratings/RatingInput";
 import { useEpisode } from "@/hooks/api/useEpisode";
@@ -92,74 +93,6 @@ export default function EpisodeDetailPage({
     : null;
 
   const seasonNumero = seasons?.numero ?? 0;
-
-  // Module toujours affiché, même sans résultat (retour utilisateur) : on
-  // veut savoir si la vérification est en cours ou terminée sans rien
-  // trouver, plutôt que de faire disparaître le module dans les deux cas.
-  const renderFreeLinks = () => (
-    <div className="rounded-lg border border-border bg-background/40 p-3">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Gratuit / sites whitelistés
-        {isFreeLinksLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-      </h2>
-      {isFreeLinksLoading ? (
-        <p className="text-sm text-muted-foreground">Recherche en cours…</p>
-      ) : freeLinks.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucun lien trouvé.</p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {freeLinks.map((link) => {
-            const LinkIcon = link.icon;
-            return (
-              <a
-                key={link.name}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm text-foreground hover:bg-muted/60"
-              >
-                {LinkIcon && <LinkIcon className="h-3.5 w-3.5" />}
-                {link.name}
-              </a>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-
-  const renderOfficialProviders = () => {
-    if (officialProviders.length === 0) return null;
-
-    return (
-      <div className="rounded-lg border border-border bg-background/40 p-3">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Tv className="h-4 w-4" />
-          Streaming FR
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {officialProviders.map((provider) => {
-            const ProviderIcon = provider.icon;
-            return (
-              <a
-                key={provider.name}
-                href={provider.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex flex-col items-start gap-0.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 text-sm text-foreground hover:bg-muted/60"
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  {ProviderIcon && <ProviderIcon className="h-3.5 w-3.5" />}
-                  {provider.name}
-                </span>
-                <span className="text-xs text-muted-foreground">{provider.accessLabel}</span>
-              </a>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -268,10 +201,11 @@ export default function EpisodeDetailPage({
         )}
 
         {title && (
-          <div className="grid gap-4 pt-2 md:grid-cols-2">
-            {renderOfficialProviders()}
-            {renderFreeLinks()}
-          </div>
+          <WatchLinksSection
+            officialProviders={officialProviders}
+            freeLinks={freeLinks}
+            isFreeLinksLoading={isFreeLinksLoading}
+          />
         )}
 
         {/* Crédits de l'épisode */}

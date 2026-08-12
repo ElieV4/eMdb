@@ -37,8 +37,6 @@ const PROVIDER_ICONS: Record<string, LucideIcon> = {
   appletv: Apple,
 };
 
-export type OfficialProviderLink = WatchLink & { accessLabel: string };
-
 export function useWatchLinks({
   titreVo,
   titreVf,
@@ -55,7 +53,7 @@ export function useWatchLinks({
   afficheUrl?: string | null;
 }) {
   const [validFreeLinks, setValidFreeLinks] = useState<WatchLink[]>([]);
-  const [officialProviders, setOfficialProviders] = useState<OfficialProviderLink[]>([]);
+  const [officialProviders, setOfficialProviders] = useState<WatchLink[]>([]);
   // Le module "Gratuit" reste affiché même vide (retour utilisateur) : ce
   // booléen distingue "en train de vérifier les liens" de "vérifié, rien
   // trouvé", que l'UI ne peut pas déduire d'un simple tableau vide.
@@ -90,7 +88,7 @@ export function useWatchLinks({
             name: p.name,
             href: data.watchUrl as string,
             icon: PROVIDER_ICONS[p.key] ?? Tv,
-            accessLabel: p.accessTypes.map((a) => ACCESS_LABELS[a]).join(" / "),
+            subtitle: p.accessTypes.map((a) => ACCESS_LABELS[a]).join(" / "),
           })),
         );
       } catch {
@@ -125,12 +123,13 @@ export function useWatchLinks({
               cache: "no-store",
             });
             const data = (await res.json()) as {
-              links?: Array<{ name: string; href: string }>;
+              links?: Array<{ name: string; href: string; verified?: boolean }>;
             };
             return (data.links ?? []).map((link) => ({
               name: link.name,
               href: link.href,
               icon: iconForFreeSite(link.name),
+              subtitle: link.verified === false ? "Lien non vérifié" : "Vérifié",
             }));
           } catch {
             return [];
@@ -162,6 +161,7 @@ export function useWatchLinks({
                 name: data.label ? `Internet Archive (${data.label})` : "Internet Archive",
                 href: data.url,
                 icon: Archive,
+                subtitle: "Vérifié",
               };
             } catch {
               return null;

@@ -176,7 +176,7 @@ describe("TitleHero", () => {
     renderHero(<TitleHero title={mockTitle} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Streaming FR")).toBeInTheDocument();
+      expect(screen.getByText("Streaming officiel")).toBeInTheDocument();
     });
 
     const tmdbWatchUrl = "https://www.themoviedb.org/movie/123-inception/watch?locale=FR";
@@ -194,7 +194,7 @@ describe("TitleHero", () => {
     expect(screen.queryByRole("link", { name: /Disney\+/i })).not.toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
+      expect(screen.getByText("Streaming libre")).toBeInTheDocument();
     });
 
     expect(screen.getByRole("link", { name: /WatchTV/i })).toHaveAttribute(
@@ -207,7 +207,7 @@ describe("TitleHero", () => {
     );
   });
 
-  it("ne montre aucune plateforme de streaming si TMDB watch/providers ne renvoie rien pour la région", async () => {
+  it("ne montre aucune plateforme de streaming si TMDB watch/providers ne renvoie rien pour la région (le module reste affiché, avec un message)", async () => {
     (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/watch-links/providers?")) {
@@ -227,9 +227,12 @@ describe("TitleHero", () => {
     renderHero(<TitleHero title={mockTitle} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
+      expect(screen.getByText("Streaming libre")).toBeInTheDocument();
     });
-    expect(screen.queryByText("Streaming FR")).not.toBeInTheDocument();
+    // Les deux modules restent côte à côte même vides (retour utilisateur :
+    // jamais l'un sans l'autre, sinon la mise en page 50/50 casse).
+    expect(screen.getByText("Streaming officiel")).toBeInTheDocument();
+    expect(screen.getByText("Aucune plateforme disponible.")).toBeInTheDocument();
   });
 
   it("n'affiche que les sites que le backend renvoie (recherche + vérification server-side)", async () => {
@@ -260,7 +263,7 @@ describe("TitleHero", () => {
     expect(screen.queryByRole("link", { name: /HydraFlix/i })).not.toBeInTheDocument();
   });
 
-  it("garde le bloc 'Gratuit / sites whitelistés' visible avec un message quand rien n'est trouvé (retour utilisateur : jamais masqué)", async () => {
+  it("garde le bloc 'Streaming libre' visible avec un message quand rien n'est trouvé (retour utilisateur : jamais masqué)", async () => {
     (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/watch-links/free?")) {
@@ -279,13 +282,13 @@ describe("TitleHero", () => {
 
     renderHero(<TitleHero title={mockTitle} />);
 
-    expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
+    expect(screen.getByText("Streaming libre")).toBeInTheDocument();
     expect(screen.getByText("Recherche en cours…")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText("Aucun lien trouvé.")).toBeInTheDocument();
     });
-    expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
+    expect(screen.getByText("Streaming libre")).toBeInTheDocument();
   });
 
   it("n'affiche pas le titre VF quand identique au VO", () => {
@@ -296,7 +299,7 @@ describe("TitleHero", () => {
 
   it("n'affiche pas la barre de progression pour un film", () => {
     renderHero(<TitleHero title={mockTitle} />);
-    expect(screen.queryByText("Progression globale")).not.toBeInTheDocument();
+    expect(screen.queryByText(/épisodes \(\d+%\)/)).not.toBeInTheDocument();
   });
 
   it("affiche le réalisateur en sous-titre à côté du titre, avec un lien vers sa page", () => {
@@ -319,14 +322,13 @@ describe("TitleHero", () => {
 
   it("n'affiche pas la barre de progression pour une série si non connecté", () => {
     renderHero(<TitleHero title={mockSerie} />);
-    expect(screen.queryByText("Progression globale")).not.toBeInTheDocument();
+    expect(screen.queryByText(/épisodes \(\d+%\)/)).not.toBeInTheDocument();
   });
 
-  it("affiche la barre de progression en bas du hero pour une série connectée", () => {
+  it("affiche la barre de progression fine en pied du hero pour une série connectée", () => {
     useAuthStore.setState({ isAuthenticated: true });
     renderHero(<TitleHero title={mockSerie} />);
-    expect(screen.getByText("Progression globale")).toBeInTheDocument();
-    expect(screen.getByText("5/10")).toBeInTheDocument();
+    expect(screen.getByText("5/10 épisodes (50%)")).toBeInTheDocument();
     useAuthStore.setState({ isAuthenticated: false });
   });
 });

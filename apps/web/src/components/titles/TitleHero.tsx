@@ -5,12 +5,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ExternalLink, Loader2, Star, Tv } from "lucide-react";
+import { ExternalLink, Star } from "lucide-react";
 import { CreditGrouped, TitleDetail } from "@/lib/types/api";
 import { useWatchLinks } from "@/hooks/useWatchLinks";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 import { TitlePoster } from "./TitlePoster";
+import { WatchLinksSection } from "./WatchLinksSection";
 import { ProgressSerie } from "@/components/watches/ProgressSerie";
 import { TitleActions } from "./TitleActions";
 
@@ -50,76 +51,6 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
     afficheUrl: affiche_url,
   });
 
-  // Module toujours affiché, même sans résultat (retour utilisateur) : on
-  // veut savoir si la vérification est en cours ou terminée sans rien
-  // trouver, plutôt que de faire disparaître le module dans les deux cas.
-  const renderFreeLinks = () => (
-    <div className="rounded-lg border border-border bg-background/40 p-3">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Gratuit / sites whitelistés
-        {isFreeLinksLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-      </h2>
-      {isFreeLinksLoading ? (
-        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          Recherche en cours…
-        </p>
-      ) : freeLinks.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucun lien trouvé.</p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {freeLinks.map((link) => {
-            const LinkIcon = link.icon;
-            return (
-              <a
-                key={link.name}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1.5 text-sm text-foreground hover:bg-muted/60"
-              >
-                {LinkIcon && <LinkIcon className="h-3.5 w-3.5" />}
-                {link.name}
-              </a>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-
-  const renderOfficialProviders = () => {
-    if (officialProviders.length === 0) return null;
-
-    return (
-      <div className="rounded-lg border border-border bg-background/40 p-3">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Tv className="h-4 w-4" />
-          Streaming FR
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {officialProviders.map((provider) => {
-            const ProviderIcon = provider.icon;
-            return (
-              <a
-                key={provider.name}
-                href={provider.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex flex-col items-start gap-0.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 text-sm text-foreground hover:bg-muted/60"
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  {ProviderIcon && <ProviderIcon className="h-3.5 w-3.5" />}
-                  {provider.name}
-                </span>
-                <span className="text-xs text-muted-foreground">{provider.accessLabel}</span>
-              </a>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div
       className={cn(
@@ -140,9 +71,10 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
         </div>
       )}
 
-      <div className="relative flex flex-col md:flex-row gap-6 p-6">
-        {/* Poster */}
-        <div className="mx-auto md:mx-0 shrink-0">
+      <div className="relative p-6 space-y-4">
+        <div className="flex flex-col md:flex-row gap-6">
+        {/* Poster + actions utilisateur (compactes, sous l'affiche) */}
+        <div className="mx-auto md:mx-0 shrink-0 flex flex-col items-center gap-3">
           <TitlePoster
             src={affiche_url}
             alt={titre_vo}
@@ -152,6 +84,7 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
             height={300}
             priority
           />
+          <TitleActions titleId={title.id} type={type} releaseDate={date_sortie} />
         </div>
 
         {/* Infos */}
@@ -224,26 +157,24 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
             </a>
           )}
 
-          <div className="grid gap-4 pt-2 md:grid-cols-2">
-            {renderOfficialProviders()}
-            {renderFreeLinks()}
-          </div>
-
-          {type === "serie" && isAuthenticated && (
-            <ProgressSerie
-              titleId={title.id}
-              className="rounded-lg border border-border bg-background/40 p-3"
+          <div className="pt-2">
+            <WatchLinksSection
+              officialProviders={officialProviders}
+              freeLinks={freeLinks}
+              isFreeLinksLoading={isFreeLinksLoading}
             />
-          )}
-
-          {/* Actions utilisateur — regroupées en bas du hero */}
-          <TitleActions
-            titleId={title.id}
-            type={type}
-            releaseDate={date_sortie}
-            className="pt-2 border-t border-border/50"
-          />
+          </div>
         </div>
+        </div>
+
+        {/* Barre de progression série — fine, pleine largeur, pied du hero */}
+        {type === "serie" && isAuthenticated && (
+          <ProgressSerie
+            titleId={title.id}
+            variant="bar"
+            className="border-t border-border/50 pt-3"
+          />
+        )}
       </div>
     </div>
   );

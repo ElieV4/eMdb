@@ -97,7 +97,10 @@ export class AppController {
             trace,
           );
           if (trace) debugTraces[key] = trace;
-          return match ? { name, href: match.url } : null;
+          // `verified` : false uniquement pour les liens devinés sans
+          // confirmation possible (matchedBy 'unverified', cf.
+          // watch-links.util.ts — sites bloquant les requêtes depuis Render).
+          return match ? { name, href: match.url, verified: match.matchedBy !== 'unverified' } : null;
         } catch (error) {
           if (trace) {
             trace.push(`EXCEPTION ${error instanceof Error ? error.message : String(error)}`);

@@ -138,19 +138,20 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
   };
 
   return (
-    <div className={cn("space-y-3", className)}>
-      {/* Ligne 1 : vu / suivi / burger */}
-      <div className="flex flex-wrap items-center gap-2">
+    <div className={cn("flex flex-col items-center gap-2", className)}>
+      {/* Ligne 1 : vu / suivi / burger — icônes seules, tient sous l'affiche */}
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
         {type === "film" && (
           <WatchButton
             titleId={titleId}
             releaseDate={releaseDate}
             watches={watches}
             onChanged={handleWatchChanged}
+            compact
           />
         )}
         {type === "serie" && (
-          <FollowButton titleId={titleId} initialFollowed={isFollowed} />
+          <FollowButton titleId={titleId} initialFollowed={isFollowed} compact />
         )}
 
         {/* Menu burger */}
@@ -161,9 +162,8 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
               empêchait le clic d'ouvrir le menu, bug #45). */}
           <DropdownMenuTrigger
             render={
-              <Button variant="outline" size="sm">
-                <ListPlus className="mr-2 h-4 w-4" />
-                Listes
+              <Button variant="outline" size="icon" aria-label="Listes">
+                <ListPlus className="h-4 w-4" />
               </Button>
             }
           />
@@ -231,15 +231,15 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
         </div>
 
         {/* Historique */}
-        <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>
-          <History className="mr-2 h-4 w-4" />
-          Historique
+        <Button variant="ghost" size="icon" aria-label="Historique" onClick={() => setHistoryOpen(true)}>
+          <History className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Ligne 2 : rating + favori */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
         <RatingInput
+          size="sm"
           value={ratingsSummary?.moyenne ?? null}
           onChange={(value) =>
             upsertRating.mutate({ title_id: titleId, note_perso: value })
@@ -247,13 +247,14 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
         />
         <Button
           variant="ghost"
-          size="sm"
+          size="icon-sm"
+          aria-label="Favoris"
           onClick={handleToggleFavorite}
           disabled={!favoriteList}
         >
           <Heart
             className={cn(
-              "h-5 w-5",
+              "h-4 w-4",
               favoriteList &&
                 isInList(favoriteList.id) &&
                 "text-red-500 fill-red-500",

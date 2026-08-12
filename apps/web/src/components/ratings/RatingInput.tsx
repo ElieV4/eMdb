@@ -13,13 +13,16 @@ import { cn } from "@/lib/utils";
 type RatingInputProps = {
   value?: number | null;
   onChange: (value: number) => void;
+  /** "sm" : étoiles réduites (contexte compact, ex. sous l'affiche du TitleHero). */
+  size?: "default" | "sm";
   className?: string;
 };
 
-export function RatingInput({ value, onChange, className }: RatingInputProps) {
+export function RatingInput({ value, onChange, size = "default", className }: RatingInputProps) {
   const [hover, setHover] = useState<number | null>(null);
 
   const rating = hover ?? value ?? 0;
+  const compact = size === "sm";
 
   const handleClick = (star: number) => {
     onChange(star);
@@ -35,7 +38,7 @@ export function RatingInput({ value, onChange, className }: RatingInputProps) {
 
   return (
     <div
-      className={cn("flex items-center gap-1", className)}
+      className={cn("flex items-center", compact ? "gap-0.5" : "gap-1", className)}
       onMouseLeave={handleMouseLeave}
     >
       {Array.from({ length: 10 }).map((_, i) => {
@@ -53,7 +56,8 @@ export function RatingInput({ value, onChange, className }: RatingInputProps) {
           >
             <Star
               className={cn(
-                "h-5 w-5 transition-colors",
+                compact ? "h-3.5 w-3.5" : "h-5 w-5",
+                "transition-colors",
                 filled
                   ? "fill-yellow-400 text-yellow-400"
                   : halfFilled
@@ -64,7 +68,7 @@ export function RatingInput({ value, onChange, className }: RatingInputProps) {
           </button>
         );
       })}
-      <span className="ml-2 text-sm text-muted-foreground">
+      <span className={cn("text-muted-foreground", compact ? "ml-1 text-xs" : "ml-2 text-sm")}>
         {value !== undefined && value !== null ? `${value}/10` : ""}
       </span>
     </div>

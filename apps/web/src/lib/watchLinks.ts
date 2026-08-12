@@ -5,6 +5,8 @@ export type WatchLink = {
   name: string;
   href: string;
   icon: LucideIcon;
+  /** Sous-titre affiché sous le nom (mode d'accès pour le streaming officiel, statut de vérification pour le gratuit). */
+  subtitle?: string;
 };
 
 export type WatchLinkMode = "film" | "serie";
