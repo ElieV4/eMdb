@@ -15,9 +15,14 @@ export function useRefreshPerson(personId: string) {
         method: "PATCH",
         timeoutMs: 30_000,
       }),
-    onSuccess: () => {
+    // `exact: true` avec la mauvaise clé (["people", personId]) n'invalidait
+    // jamais réellement usePerson (clé réelle : ["people", "detail", id]) —
+    // corrigé. `onSettled` (pas seulement `onSuccess`) pour la même raison
+    // que useRefreshTitle/useRefreshFilmography : ne pas rester périmé si le
+    // refresh dépasse le timeout côté client.
+    onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: ["people", personId],
+        queryKey: ["people", "detail", personId],
         exact: true,
       });
     },

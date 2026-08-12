@@ -19,9 +19,15 @@ export function useRefreshTitle(titleId: string) {
         method: "PATCH",
         timeoutMs: 120_000,
       }),
-    onSuccess: () => {
+    // `onSettled` (pas seulement `onSuccess`) : un import long peut dépasser
+    // le timeout côté client (mutation en erreur) alors que l'import a bien
+    // continué et fini côté serveur — sans ça, le contenu affiché restait
+    // périmé tant que la page n'était pas rechargée manuellement (retour
+    // utilisateur : "souvent pas visible direct, faut recharger la page").
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["titles", "detail", titleId] });
       queryClient.invalidateQueries({ queryKey: ["titles", titleId, "credits"] });
+      queryClient.invalidateQueries({ queryKey: ["titles", titleId, "seasons"] });
     },
   });
 }

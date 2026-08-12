@@ -18,8 +18,11 @@ export function useRefreshFilmography(personId: string) {
         method: "POST",
         timeoutMs: 120_000,
       }),
-    onSuccess: () => {
-      // Invalider le cache de la filmographie pour forcer le re-fetch
+    // `onSettled` (pas seulement `onSuccess`) : un refresh long peut dépasser
+    // le timeout côté client (mutation en erreur) alors que l'import a
+    // continué et fini côté serveur — sans ça, la filmographie affichée
+    // restait périmée tant que la page n'était pas rechargée manuellement.
+    onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: ["people", "filmography", personId],
         exact: true,
