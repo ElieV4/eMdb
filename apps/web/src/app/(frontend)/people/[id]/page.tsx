@@ -25,6 +25,7 @@ import {
 import { PersonCard } from "@/components/people/PersonCard";
 import { CardSlider } from "@/components/common/CardSlider";
 import { FollowPersonButton } from "@/components/people/FollowPersonButton";
+import { dedupeGroupedByEntity } from "@/lib/creditGrouping";
 
 export default function PersonDetailPage({
   params,
@@ -47,6 +48,13 @@ export default function PersonDetailPage({
   } = usePersonRecommendations(id);
   const { data: followedPeople } = useFollowedPeople(isAuthenticated);
   const isFollowed = followedPeople?.some((p) => p.id === id) ?? false;
+
+  const filmographyCount = filmography
+    ? dedupeGroupedByEntity(
+        filmography as unknown as FilmographyGrouped,
+        (item) => item.titre.id,
+      ).length
+    : 0;
 
   // Bug 27 — déclenche le refresh TMDB de la filmographie au chargement de la
   // page (fire-and-forget) : la liste affichée se met à jour automatiquement
@@ -84,7 +92,9 @@ export default function PersonDetailPage({
         {/* Filmographie */}
         <section>
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <h2 className="text-2xl font-bold">Filmographie</h2>
+            <h2 className="text-2xl font-bold">
+              Filmographie {!isFilmographyLoading && `(${filmographyCount})`}
+            </h2>
             <RefreshDataButton
               onRefresh={() => refreshFilmography.mutate()}
               isPending={refreshFilmography.isPending}
@@ -106,7 +116,9 @@ export default function PersonDetailPage({
 
         {/* Recommendations */}
         <section>
-          <h2 className="text-2xl font-bold mb-4">Personnes connexes</h2>
+          <h2 className="text-2xl font-bold mb-4">
+            Personnes connexes {!isRecsLoading && `(${recommendations?.length ?? 0})`}
+          </h2>
           {isRecsLoading ? (
             <LoadingSpinner className="h-6 w-6" />
           ) : isRecsError ||

@@ -23,6 +23,7 @@ import { useSeasons } from "@/hooks/api/useSeasons";
 import { useSerieProgress } from "@/hooks/api/useSerieProgress";
 import { useRefreshTitle } from "@/hooks/api/useRefreshTitle";
 import { useAuthStore } from "@/store/authStore";
+import { dedupeGroupedByEntity } from "@/lib/creditGrouping";
 
 export default function SeriesDetailPage({
   params,
@@ -58,6 +59,9 @@ export default function SeriesDetailPage({
   const isCreditsPartial =
     creditRoles.length > 0 &&
     creditRoles.every((role) => role === "Acteur" || role === "Réalisateur");
+  const creditsCount = credits
+    ? dedupeGroupedByEntity(credits, (item) => item.personne.id).length
+    : 0;
 
   if (isLoading) {
     return (
@@ -83,7 +87,9 @@ export default function SeriesDetailPage({
         {/* Distribution (crédits) */}
         <section>
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <h2 className="text-2xl font-bold">Distribution & Équipe</h2>
+            <h2 className="text-2xl font-bold">
+              Distribution & Équipe {!isCreditsLoading && `(${creditsCount})`}
+            </h2>
             <RefreshDataButton
               onRefresh={() => refreshTitle.mutate()}
               isPending={refreshTitle.isPending}
