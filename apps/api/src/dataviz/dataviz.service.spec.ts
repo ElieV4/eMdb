@@ -462,12 +462,12 @@ describe('DatavizService', () => {
       expect(distinctCountSql).toContain('COUNT(DISTINCT t.id) AS value');
     });
 
-    it('metric=note : count/min/max directement sur t.note_imdb', async () => {
+    it('metric=note : count/min/max directement sur ur.note_perso', async () => {
       mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
 
       await service.query(userId, { metric: 'note', aggregation: 'max', groupBy: 'none' } as any);
       expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
-        expect.stringContaining('MAX(t.note_imdb) AS value'),
+        expect.stringContaining('MAX(ur.note_perso) AS value'),
       );
     });
 
@@ -478,7 +478,7 @@ describe('DatavizService', () => {
 
       const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
       expect(sql).toContain('SELECT DISTINCT');
-      expect(sql).toContain('AVG(note_imdb) AS value');
+      expect(sql).toContain('AVG(note_perso) AS value');
     });
 
     it('watches/titles + min/max/avg : groupement ignoré, bucketé par période puis agrégé (ex Stats perso)', async () => {

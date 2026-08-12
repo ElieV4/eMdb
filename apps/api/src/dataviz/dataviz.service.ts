@@ -328,6 +328,16 @@ export class DatavizService {
   private readonly durationExpr = 'COALESCE(e.duree_minutes, t.duree_minutes, 0)';
 
   /**
+   * Métrique "note" : note perso de l'utilisateur (user_ratings.note_perso),
+   * pas la note TMDB (t.note_imdb) — retour utilisateur. Notée au niveau du
+   * titre (film ou série dans son ensemble, cf. RatingInput sur la fiche
+   * titre) : un visionnage d'épisode retombe donc sur la note de SA série,
+   * pas une note par épisode — même granularité que l'ancienne métrique
+   * (une valeur par titre, cf. dédoublonnage dans rowsNoteAvg).
+   */
+  private readonly noteJoin = 'LEFT JOIN user_ratings ur ON ur.user_id = uw.user_id AND ur.title_id = t.id';
+
+  /**
    * Expression SQL de catégorie pour la granularité "période" demandée
    * — deux familles :
    * - Fixe (day/month/quarter/year) : un point par tranche de calendrier
@@ -672,7 +682,7 @@ export class DatavizService {
     const val = this.valueAggExpr(dto.metric, dto.aggregation, {
       idCol: 't.id',
       minutesCol: this.durationExpr,
-      noteCol: 't.note_imdb',
+      noteCol: 'ur.note_perso',
     });
     const where =
       this.buildWhere(userId, dto, 't') +
@@ -686,6 +696,7 @@ export class DatavizService {
       LEFT JOIN episodes e ON e.id = uw.episode_id
       LEFT JOIN seasons s ON s.id = e.season_id
       JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      ${this.noteJoin}
       ${pieces.joinSql}
       ${legend?.joinSql ?? ''}
       WHERE ${where}
@@ -721,10 +732,12 @@ export class DatavizService {
     }
 
     const pieces = this.categoryPieces(dto.groupBy, dto.granularity ?? 'month');
+    // noteCol jamais réellement utilisé ici : validCombo exclut déjà 'note'
+    // ci-dessus (valeur passée uniquement pour satisfaire le type de valueAggExpr).
     const val = this.valueAggExpr(dto.metric, dto.aggregation, {
       idCol: 't.id',
       minutesCol: this.durationExpr,
-      noteCol: 't.note_imdb',
+      noteCol: 'ur.note_perso',
     });
     const where = this.buildWhere(userId, dto, 't');
 
@@ -810,7 +823,7 @@ export class DatavizService {
     const granularity = dto.granularity ?? 'month';
     const trunc = this.periodCategoryExpr(granularity);
     const pieces = this.categoryPieces(dto.groupBy, granularity);
-    const primaryAgg = dto.metric === 'duration' ? `SUM(${this.durationExpr})` : `AVG(t.note_imdb)`;
+    const primaryAgg = dto.metric === 'duration' ? `SUM(${this.durationExpr})` : `AVG(ur.note_perso)`;
     const where = this.buildWhere(userId, dto, 't') + this.excludeSentinelDate;
     const sql = `
       WITH agg AS (
@@ -819,6 +832,7 @@ export class DatavizService {
         LEFT JOIN episodes e ON e.id = uw.episode_id
         LEFT JOIN seasons s ON s.id = e.season_id
         JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+        ${dto.metric === 'note' ? this.noteJoin : ''}
         ${pieces.joinSql}
         WHERE ${where}
         GROUP BY ${pieces.groupByExpr ? `${pieces.groupByExpr}, ` : ''}(${trunc})
@@ -840,27 +854,30 @@ export class DatavizService {
   }
 
   /**
-   * Agrégation `avg` pour la métrique `note` : dédoublonne d'abord par
-   * titre (un titre a une seule note IMDB, quel que soit le nombre de fois
-   * qu'il a été regardé ou d'épisodes vus) avant de moyenner — sinon un
-   * titre revisionné plusieurs fois biaiserait la moyenne. Le groupement
-   * `studio` y est en version "simple" (sans repli "Autre", cf.
-   * `categoryPieces`) — même simplification documentée que `rowsEvolution`.
+   * Agrégation `avg` pour la métrique `note` (note perso de l'utilisateur,
+   * user_ratings.note_perso — pas la note TMDB, retour utilisateur) :
+   * dédoublonne d'abord par titre (une note perso par titre, quel que soit
+   * le nombre de fois qu'il a été regardé ou d'épisodes vus) avant de
+   * moyenner — sinon un titre revisionné plusieurs fois biaiserait la
+   * moyenne. Le groupement `studio` y est en version "simple" (sans repli
+   * "Autre", cf. `categoryPieces`) — même simplification documentée que
+   * `rowsEvolution`.
    */
   private async rowsNoteAvg(userId: string, dto: DatavizQueryDto): Promise<DatavizRow[]> {
     const pieces = this.categoryPieces(dto.groupBy, dto.granularity ?? 'month');
     const where = this.buildWhere(userId, dto, 't') + (dto.groupBy === 'period' ? this.excludeSentinelDate : '');
     const sql = `
       WITH deduped AS (
-        SELECT DISTINCT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category, t.id AS title_id, t.note_imdb
+        SELECT DISTINCT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category, t.id AS title_id, ur.note_perso
         FROM user_watches uw
         LEFT JOIN episodes e ON e.id = uw.episode_id
         LEFT JOIN seasons s ON s.id = e.season_id
         JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+        ${this.noteJoin}
         ${pieces.joinSql}
-        WHERE ${where} AND t.note_imdb IS NOT NULL
+        WHERE ${where} AND ur.note_perso IS NOT NULL
       )
-      SELECT category_id, category, AVG(note_imdb) AS value
+      SELECT category_id, category, AVG(note_perso) AS value
       FROM deduped
       GROUP BY category_id, category
       ${pieces.orderExpr ? `ORDER BY ${pieces.orderExpr}` : ''}
