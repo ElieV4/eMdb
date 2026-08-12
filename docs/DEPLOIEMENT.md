@@ -69,7 +69,7 @@ Le workflow lit la variable de repo `RENDER_URL` (Settings > Secrets and variabl
    - `EMBED_WORKER` = `true`
    - `CORS_ORIGIN` = URL du frontend Vercel (ex. `https://emdb.vercel.app`)
    - `PORT` = `3001` (ou la valeur imposée par Render)
-4. Une fois déployé, noter l'URL du service (ex. `https://emdb-api.onrender.com`).
+4. Une fois déployé, noter l'URL du service (ex. `https://emdb.onrender.com`).
 
 ### 4. Vercel (frontend)
 
@@ -80,7 +80,7 @@ Le workflow lit la variable de repo `RENDER_URL` (Settings > Secrets and variabl
 ### 5. Keep-alive GitHub Actions
 
 Dans le repo GitHub : Settings > Secrets and variables > Actions > Variables > New repository variable :
-- `RENDER_URL` = URL Render (ex. `https://emdb-api.onrender.com`, sans slash final)
+- `RENDER_URL` = URL Render (ex. `https://emdb.onrender.com`, sans slash final)
 
 Le workflow `.github/workflows/keep-alive.yml` tourne ensuite automatiquement toutes les 10 min.
 

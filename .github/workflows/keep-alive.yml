@@ -1,16 +1,26 @@
 name: Keep-alive backend
 
-# Ping l'API en prod toutes les ~10 min pour :
+# Ping l'API en prod toutes les ~5 min pour :
 # - empêcher le spin-down du Web Service Render (free) après 15 min d'inactivité
 # - empêcher la mise en pause du projet Supabase (free) après 1 semaine sans requête DB
 #
+# Intervalle resserré à 5 min (au lieu de 10) : le déclencheur `schedule` de
+# GitHub Actions n'est pas garanti à l'heure pile (peut être retardé de
+# 10-20+ min en période de charge, cf. doc GitHub) — un intervalle nominal de
+# 10 min laissait donc parfois passer plus de 15 min réels entre deux pings,
+# suffisant pour que Render mette le service en veille. Ce spin-down répété
+# forçait le worker BullMQ embarqué (EMBED_WORKER=true) à se reconnecter à
+# Redis à chaque réveil, gonflant fortement la conso de commandes Redis
+# (confirmé via le dashboard Upstash : connexions TCP qui retombent à zéro
+# puis remontent en cycle, plutôt qu'une connexion stable).
+#
 # Nécessite la variable de repo RENDER_URL (Settings > Secrets and variables >
-# Actions > Variables), ex: https://emdb-api.onrender.com — cf. docs/DEPLOIEMENT.md.
+# Actions > Variables), ex: https://emdb.onrender.com — cf. docs/DEPLOIEMENT.md.
 # Tant que RENDER_URL n'est pas configurée, ce workflow ne fait rien.
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
