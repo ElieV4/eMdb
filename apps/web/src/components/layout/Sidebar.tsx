@@ -36,6 +36,7 @@ function buildNavTree(userLists: UserList[] | undefined): { main: NavItem[]; pro
           { href: "/calendar", label: "Calendrier" },
           { href: "/history", label: "Historique" },
           { href: "/recommendations", label: "Recommandés" },
+          { href: "/people/followed", label: "Personnes suivies" },
         ],
       },
       {

@@ -509,6 +509,15 @@ export type PersonRecommendation = {
   bio?: string | null;
 };
 
+/** Personne suivie (GET /people/followed) */
+export type FollowedPerson = {
+  id: string;
+  tmdb_id?: number | null;
+  nom: string;
+  photo_url?: string | null;
+  followed_at: string;
+};
+
 /** Titre recommandé (GET /titles/:id/recommendations) */
 export type TitleRecommendation = {
   id: string;

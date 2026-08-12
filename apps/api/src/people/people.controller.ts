@@ -1,5 +1,16 @@
-import { Controller, Get, Param, Patch, Post, Query, UseGuards, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  NotFoundException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PeopleService } from './people.service';
 import { SearchPeopleDto } from './dto/search-people.dto';
 
@@ -9,10 +20,13 @@ import { SearchPeopleDto } from './dto/search-people.dto';
  * Endpoints :
  * - GET    /people/search?q=         — recherche TMDB + local fusionnée
  * - GET    /people/tmdb/:tmdbId      — get or import par TMDB ID
+ * - GET    /people/followed          — personnes suivies (authentifié)
  * - GET    /people/:id               — détail complet d'une personne
  * - GET    /people/:id/filmography   — filmographie groupée par rôle
  * - GET    /people/:id/recommendations — recommandations
  * - PATCH  /people/:id/refresh       — rafraîchissement TMDB (authentifié)
+ * - POST   /people/:id/follow        — suivre (authentifié)
+ * - DELETE /people/:id/follow        — ne plus suivre (authentifié)
  */
 @Controller('people')
 export class PeopleController {
@@ -38,6 +52,17 @@ export class PeopleController {
       throw new NotFoundException('ID TMDB invalide.');
     }
     return this.peopleService.getOrImportByTmdbId(id);
+  }
+
+  /**
+   * GET /people/followed
+   * Liste des personnes suivies par l'utilisateur connecté.
+   * Placé avant `:id` pour ne pas être intercepté par ce paramètre générique.
+   */
+  @Get('followed')
+  @UseGuards(JwtAuthGuard)
+  async getFollowed(@CurrentUser() user: any) {
+    return this.peopleService.getFollowedPeople(user.id);
   }
 
   /**
@@ -99,5 +124,26 @@ export class PeopleController {
   @UseGuards(JwtAuthGuard)
   async refreshFilmography(@Param('id') id: string) {
     return this.peopleService.refreshFilmography(id);
+  }
+
+  /**
+   * POST /people/:id/follow
+   * Suit une personne : ses futurs titres sont ajoutés automatiquement à la
+   * watchlist (cf. checkFollowedPersonsForNewTitles, cron quotidien).
+   */
+  @Post(':id/follow')
+  @UseGuards(JwtAuthGuard)
+  async follow(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.peopleService.followPerson(user.id, id);
+  }
+
+  /**
+   * DELETE /people/:id/follow
+   * Ne plus suivre une personne.
+   */
+  @Delete(':id/follow')
+  @UseGuards(JwtAuthGuard)
+  async unfollow(@CurrentUser() user: any, @Param('id') id: string): Promise<void> {
+    await this.peopleService.unfollowPerson(user.id, id);
   }
 }

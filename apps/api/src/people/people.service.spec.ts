@@ -31,6 +31,12 @@ const prismaServiceMock = {
   person_recommendations: {
     findMany: jest.fn(),
   },
+  user_follows_person: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    delete: jest.fn(),
+    findMany: jest.fn(),
+  },
 };
 
 describe('PeopleService', () => {
@@ -214,6 +220,8 @@ describe('PeopleService', () => {
       prismaServiceMock.credits.findMany.mockResolvedValue([
         {
           id: 'credit-1',
+          title_id: 'title-1',
+          role_id: 'role-acteur',
           personnage: 'Role A',
           ordre: 0,
           episode_id: null,
@@ -231,6 +239,8 @@ describe('PeopleService', () => {
         },
         {
           id: 'credit-2',
+          title_id: 'title-2',
+          role_id: 'role-realisateur',
           personnage: null,
           ordre: null,
           episode_id: null,
@@ -373,6 +383,71 @@ describe('PeopleService', () => {
       prismaServiceMock.people.findUnique.mockResolvedValue(null);
 
       await expect(service.refresh('nonexistent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('followPerson', () => {
+    it('crée le suivi si la personne existe', async () => {
+      prismaServiceMock.people.findUnique.mockResolvedValue({ id: 'person-1' });
+      prismaServiceMock.user_follows_person.create.mockResolvedValue({
+        user_id: 'user-1',
+        person_id: 'person-1',
+        followed_at: new Date('2026-01-01'),
+      });
+
+      const result = await service.followPerson('user-1', 'person-1');
+
+      expect(prismaServiceMock.user_follows_person.create).toHaveBeenCalledWith({
+        data: { user_id: 'user-1', person_id: 'person-1' },
+      });
+      expect(result.person_id).toBe('person-1');
+    });
+
+    it('lève NotFoundException si la personne n’existe pas', async () => {
+      prismaServiceMock.people.findUnique.mockResolvedValue(null);
+
+      await expect(service.followPerson('user-1', 'nonexistent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('unfollowPerson', () => {
+    it('supprime le suivi existant', async () => {
+      prismaServiceMock.user_follows_person.findUnique.mockResolvedValue({
+        user_id: 'user-1',
+        person_id: 'person-1',
+      });
+
+      await service.unfollowPerson('user-1', 'person-1');
+
+      expect(prismaServiceMock.user_follows_person.delete).toHaveBeenCalledWith({
+        where: { user_id_person_id: { user_id: 'user-1', person_id: 'person-1' } },
+      });
+    });
+
+    it('lève NotFoundException si le suivi n’existe pas', async () => {
+      prismaServiceMock.user_follows_person.findUnique.mockResolvedValue(null);
+
+      await expect(service.unfollowPerson('user-1', 'person-1')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getFollowedPeople', () => {
+    it('retourne les personnes suivies triées par date de suivi', async () => {
+      prismaServiceMock.user_follows_person.findMany.mockResolvedValue([
+        {
+          followed_at: new Date('2026-02-01'),
+          people: { id: 'person-1', tmdb_id: 12345, nom: 'Jean Dupont', photo_url: null },
+        },
+      ]);
+
+      const result = await service.getFollowedPeople('user-1');
+
+      expect(prismaServiceMock.user_follows_person.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { user_id: 'user-1' } }),
+      );
+      expect(result).toEqual([
+        { id: 'person-1', tmdb_id: 12345, nom: 'Jean Dupont', photo_url: null, followed_at: new Date('2026-02-01') },
+      ]);
     });
   });
 });

@@ -8,6 +8,7 @@ import {
   dailySyncNewEpisodes,
   weeklyResyncChanges,
   generateNewEpisodeNotifications,
+  checkFollowedPersonsForNewTitles,
 } from '@emdb/tmdb-sync';
 
 export type ImportJobData =
@@ -20,7 +21,8 @@ export type CronJobData =
   | { type: 'weekly-resync-changes'; startDate?: string; endDate?: string }
   | { type: 'refresh-materialized-views' }
   | { type: 'generate-notifications' }
-  | { type: 'clean-notifications' };
+  | { type: 'clean-notifications' }
+  | { type: 'check-followed-persons' };
 
 export const IMPORT_QUEUE_NAME = 'tmdb-import';
 export const CRON_QUEUE_NAME = 'tmdb-cron';
@@ -148,6 +150,16 @@ export function getCronRepeatJobs() {
         removeOnFail: true,
       } as JobsOptions,
     },
+    {
+      name: 'check-followed-persons',
+      data: {},
+      options: {
+        jobId: 'check-followed-persons',
+        repeat: { cron: '30 2 * * *' },
+        removeOnComplete: true,
+        removeOnFail: true,
+      } as JobsOptions,
+    },
   ];
 }
 
@@ -233,6 +245,11 @@ export function createCronWorker(redisUrl: string) {
             old_notifications_deleted: oldDeleted,
             stale_notifications_deleted: staleDeleted,
           };
+        }
+        case 'check-followed-persons': {
+          const result = await checkFollowedPersonsForNewTitles();
+          console.log(`Personnes suivies : ${result.titlesAdded} ajouts à des watchlists`);
+          return result;
         }
         default:
           throw new Error(`Unsupported cron job type: ${(data as any).type}`);

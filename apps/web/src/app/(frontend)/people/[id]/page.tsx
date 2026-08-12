@@ -15,12 +15,15 @@ import { usePerson } from "@/hooks/api/usePeople";
 import { usePersonFilmography } from "@/hooks/api/usePeople";
 import { usePersonRecommendations } from "@/hooks/api/usePersonRecommendations";
 import { useRefreshFilmography } from "@/hooks/api/useRefreshFilmography";
+import { useFollowedPeople } from "@/hooks/api/useFollowedPeople";
+import { useAuthStore } from "@/store/authStore";
 import { RefreshDataButton } from "@/components/common/RefreshDataButton";
 import {
   FilmographyGrouped,
   PersonRecommendation,
 } from "@/lib/types/api";
 import { PersonCard } from "@/components/people/PersonCard";
+import { FollowPersonButton } from "@/components/people/FollowPersonButton";
 
 export default function PersonDetailPage({
   params,
@@ -28,6 +31,7 @@ export default function PersonDetailPage({
   params: { id: string };
 }) {
   const { id } = params;
+  const { isAuthenticated } = useAuthStore();
 
   const { data: person, isLoading, isError } = usePerson(id);
   const {
@@ -40,6 +44,8 @@ export default function PersonDetailPage({
     isLoading: isRecsLoading,
     isError: isRecsError,
   } = usePersonRecommendations(id);
+  const { data: followedPeople } = useFollowedPeople(isAuthenticated);
+  const isFollowed = followedPeople?.some((p) => p.id === id) ?? false;
 
   // Bug 27 — déclenche le refresh TMDB de la filmographie au chargement de la
   // page (fire-and-forget) : la liste affichée se met à jour automatiquement
@@ -70,6 +76,9 @@ export default function PersonDetailPage({
       <div className="space-y-10">
         {/* Hero */}
         <PersonHero person={person} />
+
+        {/* Actions utilisateur */}
+        <FollowPersonButton personId={id} initialFollowed={isFollowed} />
 
         {/* Filmographie */}
         <section>

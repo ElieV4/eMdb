@@ -553,4 +553,58 @@ export class PeopleService {
     // 5. Retourner la filmographie mise à jour
     return this.getFilmography(id);
   }
+
+  // ======================================================================
+  // SUIVI DE PERSONNES
+  // ======================================================================
+
+  /**
+   * Suit une personne : ses futurs titres seront ajoutés automatiquement à
+   * la watchlist de l'utilisateur (cf. checkFollowedPersonsForNewTitles,
+   * appelée par le cron quotidien du worker).
+   */
+  async followPerson(userId: string, personId: string) {
+    const person = await this.prisma.people.findUnique({
+      where: { id: personId },
+      select: { id: true },
+    });
+    if (!person) {
+      throw new NotFoundException('Personne introuvable.');
+    }
+
+    return this.prisma.user_follows_person.create({
+      data: { user_id: userId, person_id: personId },
+    });
+  }
+
+  async unfollowPerson(userId: string, personId: string): Promise<void> {
+    const follow = await this.prisma.user_follows_person.findUnique({
+      where: { user_id_person_id: { user_id: userId, person_id: personId } },
+    });
+    if (!follow) {
+      throw new NotFoundException('Vous ne suivez pas cette personne.');
+    }
+
+    await this.prisma.user_follows_person.delete({
+      where: { user_id_person_id: { user_id: userId, person_id: personId } },
+    });
+  }
+
+  /**
+   * Liste des personnes suivies par l'utilisateur — alimente la sous-page
+   * dédiée et le module "Personnes suivies" de l'accueil.
+   */
+  async getFollowedPeople(userId: string) {
+    const follows = await this.prisma.user_follows_person.findMany({
+      where: { user_id: userId },
+      include: {
+        people: {
+          select: { id: true, tmdb_id: true, nom: true, photo_url: true },
+        },
+      },
+      orderBy: { followed_at: 'desc' },
+    });
+
+    return follows.map((f) => ({ ...f.people, followed_at: f.followed_at }));
+  }
 }

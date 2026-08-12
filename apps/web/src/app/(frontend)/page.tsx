@@ -26,6 +26,8 @@ import { ContinueWatchingCard } from "@/components/watches/ContinueWatchingCard"
 import { useLists } from "@/hooks/api/useLists";
 import { useList } from "@/hooks/api/useList";
 import { useWatchedTitles, useListMembership } from "@/hooks/api";
+import { useFollowedPeople } from "@/hooks/api/useFollowedPeople";
+import { PersonCard } from "@/components/people/PersonCard";
 import {
   parseTitleFilters,
   titleMatchesFilters,
@@ -112,6 +114,9 @@ function HomePageContent() {
 
   const { data: recommendations, isLoading: isLoadingRecommendations } =
     useRecommendations(10);
+
+  const { data: followedPeople, isLoading: isLoadingFollowedPeople } =
+    useFollowedPeople(isAuthenticated);
 
   const { data: userLists } = useLists(isAuthenticated);
   const watchlistId = userLists?.find((list) => list.type === "watchlist")?.id;
@@ -333,6 +338,54 @@ function HomePageContent() {
               </p>
             )}
           </DashboardSection>
+
+          {/* Personnes suivies */}
+          {(isLoadingFollowedPeople || (followedPeople && followedPeople.length > 0)) && (
+            <DashboardSection
+              title={`Personnes suivies (${followedPeople?.length ?? 0})`}
+              subtitle="Leurs prochains films et séries rejoignent votre watchlist"
+              actionLabel={
+                followedPeople && followedPeople.length > 10
+                  ? "Voir plus"
+                  : undefined
+              }
+              actionHref="/people/followed"
+            >
+              {isLoadingFollowedPeople ? (
+                <div className="flex gap-4 overflow-hidden">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="shrink-0 w-24 sm:w-28 aspect-square rounded-lg bg-muted/50 animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <CardSlider
+                  moreHref={
+                    followedPeople && followedPeople.length > 10
+                      ? "/people/followed"
+                      : undefined
+                  }
+                >
+                  {(followedPeople ?? []).slice(0, 10).map((person) => (
+                    <PersonCard
+                      key={person.id}
+                      person={{
+                        id: person.id,
+                        tmdbId: person.tmdb_id ?? undefined,
+                        nom: person.nom,
+                        photoUrl: person.photo_url ?? undefined,
+                        local: true,
+                      }}
+                      compact
+                      className="shrink-0 w-24 sm:w-28"
+                    />
+                  ))}
+                </CardSlider>
+              )}
+            </DashboardSection>
+          )}
 
           {/* Calendrier — en bas de page, juste au-dessus de Historique (retour utilisateur) */}
           <DashboardSection

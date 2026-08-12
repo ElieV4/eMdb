@@ -300,6 +300,19 @@ CREATE TABLE user_follows_serie (
 CREATE INDEX idx_follows_title ON user_follows_serie(title_id);
 
 -- ============================================================
+-- SUIVI DE PERSONNES (auto-watchlist des futurs titres + module accueil)
+-- ============================================================
+
+CREATE TABLE user_follows_person (
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    person_id   UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    followed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, person_id)
+);
+
+CREATE INDEX idx_follows_person_person ON user_follows_person(person_id);
+
+-- ============================================================
 -- RECOMMANDATIONS ALGO ("connexes") - precalculees en batch
 -- ============================================================
 

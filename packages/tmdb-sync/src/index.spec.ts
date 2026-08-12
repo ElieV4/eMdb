@@ -17,6 +17,9 @@ const prismaMock: any = {
   tmdb_sync_log: { create: jest.fn() },
   person_recommendations: { deleteMany: jest.fn(), createMany: jest.fn() },
   user_follows_serie: { findMany: jest.fn() },
+  user_follows_person: { findMany: jest.fn() },
+  user_lists: { findFirst: jest.fn(), create: jest.fn() },
+  list_items: { upsert: jest.fn() },
   notifications: { findMany: jest.fn(), findFirst: jest.fn(), createMany: jest.fn() },
   $transaction: jest.fn(),
 };
@@ -67,6 +70,7 @@ const {
   dailySyncNewEpisodes,
   generateNewEpisodeNotifications,
   generateSeasonPremiereNotification,
+  checkFollowedPersonsForNewTitles,
 } = require('./index');
 
 const tmdbClient = require('@emdb/tmdb-client') as any;
@@ -527,6 +531,69 @@ describe('tmdb-sync', () => {
       const result = (await dailySyncNewEpisodes()) as any;
 
       expect(result.notificationsCreated).toBe(1);
+    });
+  });
+
+  describe('checkFollowedPersonsForNewTitles', () => {
+    it('ajoute les titres à venir à la watchlist des abonnés', async () => {
+      asMock(prismaMock.user_follows_person.findMany)
+        .mockResolvedValueOnce([{ person_id: 'person-1' }])
+        .mockResolvedValueOnce([{ user_id: 'user-1' }]);
+      asMock(prismaMock.people.findUnique).mockResolvedValue({ id: 'person-1', tmdb_id: 12345 });
+      asMock(getPersonCombinedCredits).mockResolvedValue({
+        cast: [{ id: 999, media_type: 'movie', release_date: '2099-01-01' }],
+        crew: [],
+      });
+      asMock(prismaMock.titles.findUnique).mockResolvedValue(null);
+      asMock(prismaMock.user_lists.findFirst).mockResolvedValue(null);
+      asMock(prismaMock.user_lists.create).mockResolvedValue({ id: 'watchlist-1' });
+      asMock(prismaMock.list_items.upsert).mockResolvedValue({});
+
+      // importTitleByTmdbId fait ses propres appels prisma en interne ; on
+      // mocke ses dépendances minimales pour un import "film" simple.
+      const { mapTmdbMovieToTitle, mapTmdbGenres, mapTmdbCountries } = require('@emdb/tmdb-mapper');
+      asMock(mapTmdbMovieToTitle).mockReturnValue({ titre_vo: 'Film 999', tmdb_id: 999, type: 'film' });
+      asMock(mapTmdbGenres).mockReturnValue([]);
+      asMock(mapTmdbCountries).mockReturnValue([]);
+      const { getMovieDetails } = require('@emdb/tmdb-client');
+      asMock(getMovieDetails).mockResolvedValue({ id: 999, credits: { cast: [], crew: [] } });
+      asMock(prismaMock.titles.upsert).mockResolvedValue({ id: 'title-999' });
+
+      const result = (await checkFollowedPersonsForNewTitles()) as any;
+
+      expect(prismaMock.user_lists.create).toHaveBeenCalledWith({
+        data: { user_id: 'user-1', nom: 'Ma Watchlist', type: 'watchlist' },
+      });
+      expect(prismaMock.list_items.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { list_id_title_id: { list_id: 'watchlist-1', title_id: 'title-999' } },
+        }),
+      );
+      expect(result.titlesAdded).toBe(1);
+    });
+
+    it('ignore les personnes sans abonnés', async () => {
+      asMock(prismaMock.user_follows_person.findMany)
+        .mockResolvedValueOnce([{ person_id: 'person-1' }])
+        .mockResolvedValueOnce([]);
+      asMock(prismaMock.people.findUnique).mockResolvedValue({ id: 'person-1', tmdb_id: 12345 });
+
+      const result = (await checkFollowedPersonsForNewTitles()) as any;
+
+      expect(getPersonCombinedCredits).not.toHaveBeenCalled();
+      expect(result.titlesAdded).toBe(0);
+    });
+
+    it('ignore silencieusement les échecs TMDB', async () => {
+      asMock(prismaMock.user_follows_person.findMany)
+        .mockResolvedValueOnce([{ person_id: 'person-1' }])
+        .mockResolvedValueOnce([{ user_id: 'user-1' }]);
+      asMock(prismaMock.people.findUnique).mockResolvedValue({ id: 'person-1', tmdb_id: 12345 });
+      asMock(getPersonCombinedCredits).mockRejectedValue(new Error('TMDB down'));
+
+      const result = (await checkFollowedPersonsForNewTitles()) as any;
+
+      expect(result.titlesAdded).toBe(0);
     });
   });
 

@@ -745,6 +745,109 @@ export async function dailySyncNewEpisodes() {
   return { titlesRefreshed, notificationsCreated };
 }
 
+/**
+ * Pour chaque personne suivie par au moins un utilisateur, vérifie ses
+ * crédits combinés TMDB (cast + équipe) et ajoute automatiquement à la
+ * watchlist de CHAQUE utilisateur qui la suit tout titre pas encore sorti
+ * (annoncé/à venir) découvert — cron quotidien, même métronome que
+ * dailySyncNewEpisodes.
+ *
+ * Ne considère que les titres "futurs" (date de sortie/diffusion dans le
+ * futur) — pas tout le catalogue déjà sorti d'une personne, qui serait
+ * redondant avec sa filmographie.
+ *
+ * @returns Nombre d'ajouts effectifs à une watchlist (déduplique déjà
+ *   gérée par l'upsert list_items, idempotent)
+ */
+export async function checkFollowedPersonsForNewTitles(): Promise<{ titlesAdded: number }> {
+  const followedPersonIds = await prisma.user_follows_person.findMany({
+    select: { person_id: true },
+    distinct: ['person_id'],
+  });
+
+  let titlesAdded = 0;
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const { person_id } of followedPersonIds) {
+    const person = await prisma.people.findUnique({
+      where: { id: person_id },
+      select: { id: true, tmdb_id: true },
+    });
+    if (!person?.tmdb_id) continue;
+
+    const followers = await prisma.user_follows_person.findMany({
+      where: { person_id },
+      select: { user_id: true },
+    });
+    if (followers.length === 0) continue;
+
+    let combined: any;
+    try {
+      combined = await getPersonCombinedCredits(person.tmdb_id);
+    } catch (error) {
+      console.warn(`[checkFollowedPersonsForNewTitles] Échec crédits TMDB personne ${person.tmdb_id}:`, error);
+      continue;
+    }
+
+    const allCredits: any[] = [...(combined.cast ?? []), ...(combined.crew ?? [])];
+    const upcoming = allCredits.filter((credit) => {
+      const releaseDate = credit.release_date || credit.first_air_date;
+      return !!releaseDate && releaseDate > today;
+    });
+    if (upcoming.length === 0) continue;
+
+    const seenTmdbIds = new Set<number>();
+
+    for (const credit of upcoming) {
+      if (seenTmdbIds.has(credit.id)) continue;
+      seenTmdbIds.add(credit.id);
+
+      const type: 'film' | 'serie' = credit.media_type === 'tv' || credit.first_air_date ? 'serie' : 'film';
+
+      let title = await prisma.titles.findUnique({
+        where: { tmdb_id: credit.id },
+        select: { id: true },
+      });
+      if (!title) {
+        try {
+          title = await importTitleByTmdbId(credit.id, type, { withCredits: false });
+        } catch (error) {
+          console.warn(`[checkFollowedPersonsForNewTitles] Échec import titre TMDB ${credit.id}:`, error);
+          continue;
+        }
+      }
+
+      for (const { user_id } of followers) {
+        try {
+          let watchlist = await prisma.user_lists.findFirst({
+            where: { user_id, type: 'watchlist' },
+            orderBy: { created_at: 'asc' },
+          });
+          if (!watchlist) {
+            watchlist = await prisma.user_lists.create({
+              data: { user_id, nom: 'Ma Watchlist', type: 'watchlist' },
+            });
+          }
+
+          await prisma.list_items.upsert({
+            where: { list_id_title_id: { list_id: watchlist.id, title_id: title.id } },
+            update: {},
+            create: { list_id: watchlist.id, title_id: title.id },
+          });
+          titlesAdded++;
+        } catch (error) {
+          console.warn(
+            `[checkFollowedPersonsForNewTitles] Échec ajout watchlist (user ${user_id}, titre ${title.id}):`,
+            error,
+          );
+        }
+      }
+    }
+  }
+
+  return { titlesAdded };
+}
+
 export async function weeklyResyncChanges(startDate: string, endDate: string) {
   const changes = await getChanges(startDate, endDate);
   const updatedTitles: Array<{ tmdbId: number; type: 'film' | 'serie' }> = [];
