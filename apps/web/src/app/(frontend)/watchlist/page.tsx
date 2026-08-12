@@ -17,11 +17,15 @@ import { useLists } from "@/hooks/api/useLists";
 import { useList } from "@/hooks/api/useList";
 import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { useProgressiveReveal } from "@/hooks/useProgressiveReveal";
+import { useSelectionMode } from "@/hooks/useSelectionMode";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
+import { BulkActionsBar } from "@/components/common/BulkActionsBar";
+import { AlertCircle, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   parseTitleFilters,
@@ -59,7 +63,9 @@ function WatchlistPageContent() {
     error,
   } = useList(watchlistId ?? "");
   const { data: watchedTitles } = useWatchedTitles();
-  const { watchlistIds, favoriteIds } = useListMembership();
+  const { watchlistIds, favoriteIds, favorisId } = useListMembership();
+  const { selectionMode, selectedIds, toggleSelectionMode, toggleSelected, clearSelection } =
+    useSelectionMode();
 
   const filters = parseTitleFilters(searchParams);
   const isLoading = isListsLoading || (!!watchlistId && isDetailLoading);
@@ -110,12 +116,29 @@ function WatchlistPageContent() {
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Watchlist ({items.length})</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Films et séries à voir
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Watchlist ({items.length})</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Films et séries à voir
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={toggleSelectionMode}>
+            <ListChecks className="mr-2 h-4 w-4" />
+            {selectionMode ? "Terminer" : "Modifier le contenu"}
+          </Button>
         </div>
+
+        {selectionMode && selectedIds.size > 0 && (
+          <BulkActionsBar
+            items={filteredItems
+              .filter((title) => selectedIds.has(title.id))
+              .map((title) => ({ id: title.id, titleId: title.id, type: title.type }))}
+            watchlistId={watchlistId}
+            favorisId={favorisId}
+            onDone={clearSelection}
+          />
+        )}
 
         {/* Filtres de progression — sélectionner une option retire les films */}
         <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
@@ -176,15 +199,22 @@ function WatchlistPageContent() {
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {visibleItems.map((title) => (
-                <TitleCard
-                  key={title.id}
-                  title={titleToSearchResult(title)}
-                  compact
-                  watched={watchedTitles?.has(title.id)}
-                  inWatchlist={watchlistIds.has(title.id)}
-                  inFavorites={favoriteIds.has(title.id)}
-                  watchlistStatus={title.statut}
-                />
+                <div key={title.id} className="relative">
+                  {selectionMode && (
+                    <SelectionCheckbox
+                      selected={selectedIds.has(title.id)}
+                      onToggle={() => toggleSelected(title.id)}
+                    />
+                  )}
+                  <TitleCard
+                    title={titleToSearchResult(title)}
+                    compact
+                    watched={watchedTitles?.has(title.id)}
+                    inWatchlist={watchlistIds.has(title.id)}
+                    inFavorites={favoriteIds.has(title.id)}
+                    watchlistStatus={title.statut}
+                  />
+                </div>
               ))}
             </div>
             <div ref={sentinelRef} />

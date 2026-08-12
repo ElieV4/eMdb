@@ -16,13 +16,17 @@ import { useInfiniteWatches } from "@/hooks/api/useInfiniteWatches";
 import { useLists } from "@/hooks/api/useLists";
 import { useWatchedTitles } from "@/hooks/api/useWatchedTitles";
 import { useListMembership } from "@/hooks/api/useListMembership";
+import { useSelectionMode } from "@/hooks/useSelectionMode";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { PeriodFilter } from "@/components/common/PeriodFilter";
 import { DateCard } from "@/components/common/DateCard";
+import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
+import { BulkActionsBar } from "@/components/common/BulkActionsBar";
 import { TitleQuickActionsMenu } from "@/components/titles/TitleQuickActionsMenu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, ListChecks } from "lucide-react";
 import { parseTitleFilters, buildListIdsByTitle } from "@/lib/titleFilters";
 import { groupByPeriod, Period } from "@/lib/periodGrouping";
 import { UserWatch } from "@/lib/types/api";
@@ -50,7 +54,9 @@ function HistoryPageContent() {
   const { data: lists } = useLists(isAuthenticated);
   const listIdsByTitle = buildListIdsByTitle(lists);
   const { data: watchedTitles } = useWatchedTitles();
-  const { watchlistIds, favoriteIds } = useListMembership();
+  const { watchlistIds, favoriteIds, watchlistId, favorisId } = useListMembership();
+  const { selectionMode, selectedIds, toggleSelectionMode, toggleSelected, clearSelection } =
+    useSelectionMode();
 
   // Charge la page suivante dès que la sentinelle en bas de liste entre
   // dans le viewport — l'historique complet se charge ainsi au fur et à
@@ -138,15 +144,49 @@ function HistoryPageContent() {
     filters.watchedYearMin !== null ||
     filters.watchedYearMax !== null;
 
+  // Le titre résolu (série via l'épisode ou film direct) — nécessaire pour
+  // les actions groupées, qui portent sur le titre, pas sur le visionnage.
+  const resolveWatchTitle = (watch: UserWatch) => watch.titles ?? watch.episodes?.seasons.titles;
+
+  const selectedBulkItems = filteredWatches
+    .filter((watch) => selectedIds.has(watch.id))
+    .map((watch) => {
+      const resolvedTitle = resolveWatchTitle(watch);
+      if (!resolvedTitle) return null;
+      return {
+        id: watch.id,
+        titleId: resolvedTitle.id,
+        type: resolvedTitle.type as "film" | "serie",
+        watchId: watch.id,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Historique ({totalWatches})</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Vos derniers visionnages
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Historique ({totalWatches})</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Vos derniers visionnages
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={toggleSelectionMode}>
+            <ListChecks className="mr-2 h-4 w-4" />
+            {selectionMode ? "Terminer" : "Modifier le contenu"}
+          </Button>
         </div>
+
+        {selectionMode && selectedBulkItems.length > 0 && (
+          <BulkActionsBar
+            items={selectedBulkItems}
+            watchlistId={watchlistId}
+            favorisId={favorisId}
+            allowDeleteHistory
+            onDone={clearSelection}
+          />
+        )}
 
         <PeriodFilter value={period} onChange={setPeriod} />
 
@@ -191,29 +231,36 @@ function HistoryPageContent() {
                       : `/titles/${watch.title_id}`;
 
                     return (
-                      <DateCard
-                        key={watch.id}
-                        href={href}
-                        imageUrl={resolvedTitle?.affiche_url}
-                        title={label}
-                        date={watch.date_vue}
-                        watched={resolvedTitle ? watchedTitles?.has(resolvedTitle.id) : false}
-                        inWatchlist={resolvedTitle ? watchlistIds.has(resolvedTitle.id) : false}
-                        inFavorites={resolvedTitle ? favoriteIds.has(resolvedTitle.id) : false}
-                        quickActions={
-                          resolvedTitle && (
-                            <TitleQuickActionsMenu
-                              titleId={resolvedTitle.id}
-                              episodeId={watch.episode_id ?? undefined}
-                              tmdbId={resolvedTitle.tmdb_id ?? undefined}
-                              type={resolvedTitle.type as "film" | "serie"}
-                              inWatchlist={watchlistIds.has(resolvedTitle.id)}
-                              inFavorites={favoriteIds.has(resolvedTitle.id)}
-                              watched={watchedTitles?.has(resolvedTitle.id)}
-                            />
-                          )
-                        }
-                      />
+                      <div key={watch.id} className="relative">
+                        {selectionMode && resolvedTitle && (
+                          <SelectionCheckbox
+                            selected={selectedIds.has(watch.id)}
+                            onToggle={() => toggleSelected(watch.id)}
+                          />
+                        )}
+                        <DateCard
+                          href={href}
+                          imageUrl={resolvedTitle?.affiche_url}
+                          title={label}
+                          date={watch.date_vue}
+                          watched={resolvedTitle ? watchedTitles?.has(resolvedTitle.id) : false}
+                          inWatchlist={resolvedTitle ? watchlistIds.has(resolvedTitle.id) : false}
+                          inFavorites={resolvedTitle ? favoriteIds.has(resolvedTitle.id) : false}
+                          quickActions={
+                            resolvedTitle && (
+                              <TitleQuickActionsMenu
+                                titleId={resolvedTitle.id}
+                                episodeId={watch.episode_id ?? undefined}
+                                tmdbId={resolvedTitle.tmdb_id ?? undefined}
+                                type={resolvedTitle.type as "film" | "serie"}
+                                inWatchlist={watchlistIds.has(resolvedTitle.id)}
+                                inFavorites={favoriteIds.has(resolvedTitle.id)}
+                                watched={watchedTitles?.has(resolvedTitle.id)}
+                              />
+                            )
+                          }
+                        />
+                      </div>
                     );
                   })}
                 </div>

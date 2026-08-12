@@ -78,6 +78,14 @@ type TitleQuickActionsMenuProps = {
   watched?: boolean;
   /** Statut de progression dans la watchlist ("en_cours" / "a_jour" / "abandonnee"). */
   watchlistStatus?: WatchlistItemStatus;
+  /**
+   * Affiche "Abandonner la série" même si le titre n'est pas (encore) dans
+   * la watchlist — cas du module "Continuer à regarder", où une série
+   * suivie (`user_follows_serie`) n'a pas forcément d'item de watchlist
+   * (mécanismes découplés). L'action ajoute alors l'item à la volée avant
+   * de poser le statut "abandonnee".
+   */
+  allowAbandonWithoutWatchlist?: boolean;
   className?: string;
 };
 
@@ -92,6 +100,7 @@ export function TitleQuickActionsMenu({
   inFavorites = false,
   watched = false,
   watchlistStatus,
+  allowAbandonWithoutWatchlist = false,
   className,
 }: TitleQuickActionsMenuProps) {
   const isEpisode = !!episodeId;
@@ -157,6 +166,9 @@ export function TitleQuickActionsMenu({
     if (!watchlistId) return;
     const resolvedId = await resolveTitleId();
     if (!resolvedId) return;
+    if (!inWatchlist) {
+      await addItem.mutateAsync({ listId: watchlistId, data: { title_id: resolvedId } });
+    }
     updateItemStatus.mutate({ listId: watchlistId, titleId: resolvedId, statut });
   };
 
@@ -249,7 +261,10 @@ export function TitleQuickActionsMenu({
           {(!isEpisode && (watchlistId || favorisId)) && <DropdownMenuSeparator />}
 
           {/* Abandonner / reprendre une série de la watchlist */}
-          {!isEpisode && type === "serie" && inWatchlist && watchlistId && (
+          {!isEpisode &&
+            type === "serie" &&
+            (inWatchlist || allowAbandonWithoutWatchlist) &&
+            watchlistId && (
             <DropdownMenuItem
               onClick={() =>
                 setWatchlistStatus(watchlistStatus === "abandonnee" ? "en_cours" : "abandonnee")
