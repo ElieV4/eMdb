@@ -114,7 +114,9 @@ export function TitleCard({
           watchlistStatus={watchlistStatus}
         />
 
-        <div className="p-3 bg-background">
+        {/* Padding proportionnel à la taille d'affiche réglée (page paramètres) :
+            un poster plus petit avec le même padding fixe paraissait mal proportionné. */}
+        <div className="bg-background" style={{ padding: `${Math.round(12 * posterScale)}px` }}>
           <div className="space-y-1">
             {/* Titre — mêmes classes que DateCard/ContinueWatchingCard (uniformisation
                 typographique demandée par l'utilisateur, référence : cartes épisode du calendrier) */}

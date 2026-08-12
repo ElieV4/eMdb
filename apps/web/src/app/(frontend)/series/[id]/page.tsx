@@ -15,7 +15,6 @@ import { TitleInfo } from "@/components/titles/TitleInfo";
 import { TitleCreditsSplit } from "@/components/titles/TitleCreditsSplit";
 import { TitleRecommendations } from "@/components/titles/TitleRecommendations";
 import { SeasonCompact } from "@/components/seasons/SeasonCompact";
-import { TitleActions } from "@/components/titles/TitleActions";
 import { RefreshDataButton } from "@/components/common/RefreshDataButton";
 import { useTitle } from "@/hooks/api/useTitles";
 import { useTitleCredits } from "@/hooks/api/useTitleCredits";
@@ -75,11 +74,8 @@ export default function SeriesDetailPage({
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8">
       <div className="space-y-10">
-        {/* Hero */}
+        {/* Hero (actions utilisateur regroupées en bas du module) */}
         <TitleHero title={title} credits={credits} />
-
-        {/* Actions utilisateur */}
-        <TitleActions titleId={id} type={title.type} releaseDate={title.date_sortie} />
 
         {/* Métadonnées */}
         <TitleInfo title={title} />

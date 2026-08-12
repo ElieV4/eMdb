@@ -4,9 +4,18 @@
  */
 
 import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/api/queryClient";
 import { TitleHero } from "@/components/titles/TitleHero";
 import { TitleDetail } from "@/lib/types/api";
 import { useAuthStore } from "@/store/authStore";
+
+// TitleHero rend désormais TitleActions en bas du module (actions
+// regroupées), qui utilise useQuery/useMutation — nécessite un
+// QueryClientProvider (même convention que Filmography.test.tsx).
+function renderHero(ui: React.ReactNode) {
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 jest.mock("@/hooks/api/useSerieProgress", () => ({
   useSerieProgress: () => ({
@@ -87,6 +96,17 @@ describe("TitleHero", () => {
         } as Response);
       }
 
+      // TitleActions (regroupée en bas du hero) requête /follows et /lists,
+      // qui attendent des tableaux — le fallback générique {} ci-dessous
+      // casserait `.some()`/`.find()`.
+      if (url.includes("/follows") || url.includes("/lists")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [],
+        } as Response);
+      }
+
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -96,50 +116,50 @@ describe("TitleHero", () => {
   });
 
   it("affiche le titre VO", () => {
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
     expect(screen.getByText("Inception")).toBeInTheDocument();
   });
 
   it("affiche le titre VF quand différent du VO", () => {
     const title = { ...mockTitle, titre_vf: "Inception VF" };
-    render(<TitleHero title={title} />);
+    renderHero(<TitleHero title={title} />);
     expect(screen.getByText("Inception VF")).toBeInTheDocument();
   });
 
   it("affiche l'année de sortie", () => {
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
     expect(screen.getByText("(2010)")).toBeInTheDocument();
   });
 
   it("affiche la note IMDB", () => {
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
     expect(screen.getByText("8.7")).toBeInTheDocument();
   });
 
   it("affiche le type Film pour un film", () => {
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
     const badges = screen.getAllByText("Film");
     expect(badges.length).toBeGreaterThan(0);
   });
 
   it("affiche le type Série pour une série", () => {
-    render(<TitleHero title={mockSerie} />);
+    renderHero(<TitleHero title={mockSerie} />);
     const badges = screen.getAllByText("Série");
     expect(badges.length).toBeGreaterThan(0);
   });
 
   it("affiche le statut quand disponible", () => {
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
     expect(screen.getByText("Released")).toBeInTheDocument();
   });
 
   it("affiche le synopsis quand disponible", () => {
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
     expect(screen.getByText("Un film de science-fiction.")).toBeInTheDocument();
   });
 
   it("affiche le lien TMDB sous le synopsis", () => {
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
 
     expect(screen.getByRole("link", { name: /Voir sur TMDB/i })).toHaveAttribute(
       "href",
@@ -148,7 +168,7 @@ describe("TitleHero", () => {
   });
 
   it("n'affiche que les plateformes de streaming confirmées par TMDB watch/providers, toutes vers la même page TMDB précise", async () => {
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
 
     await waitFor(() => {
       expect(screen.getByText("Streaming FR")).toBeInTheDocument();
@@ -199,7 +219,7 @@ describe("TitleHero", () => {
       } as Response);
     });
 
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
 
     await waitFor(() => {
       expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
@@ -225,7 +245,7 @@ describe("TitleHero", () => {
       } as Response);
     });
 
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
 
     await waitFor(() => {
       expect(screen.queryByRole("link", { name: /HydraFlix/i })).not.toBeInTheDocument();
@@ -241,7 +261,7 @@ describe("TitleHero", () => {
       } as Response),
     );
 
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
 
     expect(screen.getByText("Gratuit / sites whitelistés")).toBeInTheDocument();
     expect(screen.getByText("Recherche en cours…")).toBeInTheDocument();
@@ -253,18 +273,18 @@ describe("TitleHero", () => {
   });
 
   it("n'affiche pas le titre VF quand identique au VO", () => {
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
     expect(screen.queryByText("Inception")).toBeInTheDocument();
     // titre_vf === titre_vo, donc pas de titre VF supplémentaire
   });
 
   it("n'affiche pas la barre de progression pour un film", () => {
-    render(<TitleHero title={mockTitle} />);
+    renderHero(<TitleHero title={mockTitle} />);
     expect(screen.queryByText("Progression globale")).not.toBeInTheDocument();
   });
 
   it("affiche le réalisateur en sous-titre à côté du titre, avec un lien vers sa page", () => {
-    render(
+    renderHero(
       <TitleHero
         title={mockTitle}
         credits={{
@@ -282,13 +302,13 @@ describe("TitleHero", () => {
   });
 
   it("n'affiche pas la barre de progression pour une série si non connecté", () => {
-    render(<TitleHero title={mockSerie} />);
+    renderHero(<TitleHero title={mockSerie} />);
     expect(screen.queryByText("Progression globale")).not.toBeInTheDocument();
   });
 
   it("affiche la barre de progression en bas du hero pour une série connectée", () => {
     useAuthStore.setState({ isAuthenticated: true });
-    render(<TitleHero title={mockSerie} />);
+    renderHero(<TitleHero title={mockSerie} />);
     expect(screen.getByText("Progression globale")).toBeInTheDocument();
     expect(screen.getByText("5/10")).toBeInTheDocument();
     useAuthStore.setState({ isAuthenticated: false });

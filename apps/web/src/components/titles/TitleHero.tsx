@@ -12,6 +12,7 @@ import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 import { TitlePoster } from "./TitlePoster";
 import { ProgressSerie } from "@/components/watches/ProgressSerie";
+import { TitleActions } from "./TitleActions";
 
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
@@ -233,6 +234,14 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
               className="rounded-lg border border-border bg-background/40 p-3"
             />
           )}
+
+          {/* Actions utilisateur — regroupées en bas du hero */}
+          <TitleActions
+            titleId={title.id}
+            type={type}
+            releaseDate={date_sortie}
+            className="pt-2 border-t border-border/50"
+          />
         </div>
       </div>
     </div>
