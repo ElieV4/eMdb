@@ -16,6 +16,12 @@ function toSlug(value: string): string {
       .toLowerCase()
       .normalize("NFD")
       .replace(/[̀-ͯ]/g, "")
+      // Apostrophes (droites ou typographiques) retirées avant la règle
+      // générale ci-dessous : WordPress (moteur des sites ciblés) élide les
+      // contractions ("Pan's" -> "pans"), il ne les remplace pas par un
+      // tiret ("pan-s") — confirmé en direct (404 vs 200) sur watchtv.click
+      // et hydraflix.cc pour "Pan's Labyrinth" / "Grey's Anatomy".
+      .replace(/['’]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "title"
   );
