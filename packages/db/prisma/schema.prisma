@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -240,17 +240,6 @@ model user_follows_serie {
   @@index([title_id], map: "idx_follows_title")
 }
 
-model user_follows_person {
-  user_id     String   @db.Uuid
-  person_id   String   @db.Uuid
-  followed_at DateTime @default(now()) @db.Timestamptz(6)
-  people      people   @relation(fields: [person_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users       users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@id([user_id, person_id])
-  @@index([person_id], map: "idx_follows_person_person")
-}
-
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model user_lists {
   id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -291,6 +280,9 @@ model user_watches {
   episode_id String?   @db.Uuid
   date_vue   DateTime  @db.Timestamptz(6)
   created_at DateTime  @default(now()) @db.Timestamptz(6)
+  support    String?
+  compagnie  String?
+  emotion    String[]
   episodes   episodes? @relation(fields: [episode_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   titles     titles?   @relation(fields: [title_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -308,13 +300,24 @@ model users {
   pseudo             String               @unique
   avatar_url         String?
   created_at         DateTime             @default(now()) @db.Timestamptz(6)
-  list_shares          list_shares[]
-  notifications        notifications[]
-  user_follows_serie   user_follows_serie[]
-  user_follows_person  user_follows_person[]
-  user_lists           user_lists[]
-  user_ratings         user_ratings[]
-  user_watches         user_watches[]
+  list_shares        list_shares[]
+  notifications      notifications[]
+  user_follows_serie  user_follows_serie[]
+  user_follows_person user_follows_person[]
+  user_lists          user_lists[]
+  user_ratings        user_ratings[]
+  user_watches        user_watches[]
+}
+
+model user_follows_person {
+  user_id     String   @db.Uuid
+  person_id   String   @db.Uuid
+  followed_at DateTime @default(now()) @db.Timestamptz(6)
+  people      people   @relation(fields: [person_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, person_id])
+  @@index([person_id], map: "idx_follows_person_person")
 }
 
 model roles {

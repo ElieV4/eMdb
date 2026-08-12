@@ -43,6 +43,7 @@ import { useRemoveListItem } from "@/hooks/api/useRemoveListItem";
 import { useCreateList } from "@/hooks/api/useCreateList";
 import { useUpsertRating } from "@/hooks/api/useUpsertRating";
 import { useDeleteWatch } from "@/hooks/api/useDeleteWatch";
+import { useUpdateWatchContext } from "@/hooks/api/useUpdateWatchContext";
 import { useTitleRatingsSummary } from "@/hooks/api/useTitleRatingsSummary";
 import { useWatches } from "@/hooks/api/useWatches";
 import { useAuthStore } from "@/store/authStore";
@@ -67,6 +68,7 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
   const createList = useCreateList();
   const upsertRating = useUpsertRating();
   const deleteWatch = useDeleteWatch();
+  const updateWatchContext = useUpdateWatchContext();
   const watches = watchesData?.items ?? [];
   const [historyOpen, setHistoryOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
@@ -266,6 +268,7 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
         onOpenChange={setHistoryOpen}
         watches={watches}
         onDelete={handleUnwatch}
+        onUpdateContext={(watchId, patch) => updateWatchContext.mutate({ watchId, data: patch })}
       />
 
       {/* Dialog création liste */}

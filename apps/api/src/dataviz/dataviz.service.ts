@@ -574,6 +574,62 @@ export class DatavizService {
           orderExpr: `${p}.nom`,
         };
       }
+      case 'support': {
+        // Colonne directe sur `uw` (pas de jointure) — le "JOIN" trivial ne
+        // sert qu'à exclure les visionnages sans contexte renseigné (même
+        // effet qu'un INNER JOIN vide pour genre/pays : un visionnage sans
+        // la donnée n'apparaît simplement pas dans ce groupement).
+        const alias = `supp_filt${aliasSuffix}`;
+        return {
+          categoryIdExpr: 'NULL::TEXT',
+          categoryExpr: `(CASE uw.support
+            WHEN 'ordinateur' THEN 'Ordinateur'
+            WHEN 'tv' THEN 'TV'
+            WHEN 'telephone' THEN 'Téléphone'
+            WHEN 'cinema' THEN 'Cinéma'
+          END)`,
+          joinSql: `JOIN (SELECT 1) ${alias} ON uw.support IS NOT NULL`,
+          groupByExpr: 'uw.support',
+          orderExpr: 'uw.support',
+        };
+      }
+      case 'compagnie': {
+        const alias = `comp_filt${aliasSuffix}`;
+        return {
+          categoryIdExpr: 'NULL::TEXT',
+          categoryExpr: `(CASE uw.compagnie
+            WHEN 'seul' THEN 'Seul'
+            WHEN 'accompagne' THEN 'Accompagné'
+          END)`,
+          joinSql: `JOIN (SELECT 1) ${alias} ON uw.compagnie IS NOT NULL`,
+          groupByExpr: 'uw.compagnie',
+          orderExpr: 'uw.compagnie',
+        };
+      }
+      case 'emotion': {
+        // `emotion` est un tableau (un visionnage peut avoir plusieurs
+        // émotions) — UNNEST fait le fan-out, un visionnage avec 2 émotions
+        // contribue à 2 catégories distinctes (même principe que le fan-out
+        // "genre" pour un titre multi-genres). Un visionnage sans émotion
+        // renseignée (NULL ou tableau vide) ne produit aucune ligne ici.
+        const em = `em${aliasSuffix}`;
+        return {
+          categoryIdExpr: 'NULL::TEXT',
+          categoryExpr: `(CASE ${em}.value
+            WHEN 'content' THEN 'Content'
+            WHEN 'triste' THEN 'Triste'
+            WHEN 'emu' THEN 'Ému'
+            WHEN 'enthousiaste' THEN 'Enthousiaste'
+            WHEN 'decu' THEN 'Déçu'
+            WHEN 'tendu' THEN 'Tendu'
+            WHEN 'effraye' THEN 'Effrayé'
+            WHEN 'neutre' THEN 'Neutre'
+          END)`,
+          joinSql: `CROSS JOIN LATERAL UNNEST(uw.emotion) AS ${em}(value)`,
+          groupByExpr: `${em}.value`,
+          orderExpr: `${em}.value`,
+        };
+      }
       case 'none':
       default:
         return { categoryIdExpr: 'NULL::TEXT', categoryExpr: `'Total'`, joinSql: '', groupByExpr: '', orderExpr: '' };

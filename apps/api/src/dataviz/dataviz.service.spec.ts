@@ -366,6 +366,52 @@ describe('DatavizService', () => {
       });
     });
 
+    describe('groupements contexte de visionnage (support/compagnie/émotion)', () => {
+      it('groupBy=support : colonne directe uw.support, filtre IS NOT NULL, libellés français', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'support' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain('ON uw.support IS NOT NULL');
+        expect(sql).toContain("WHEN 'cinema' THEN 'Cinéma'");
+        expect(sql).toContain('GROUP BY uw.support');
+      });
+
+      it('groupBy=compagnie : colonne directe uw.compagnie, filtre IS NOT NULL', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'compagnie' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain('ON uw.compagnie IS NOT NULL');
+        expect(sql).toContain("WHEN 'accompagne' THEN 'Accompagné'");
+        expect(sql).toContain('GROUP BY uw.compagnie');
+      });
+
+      it('groupBy=emotion : UNNEST fait le fan-out (un visionnage à plusieurs émotions compte dans chacune)', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'emotion' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain('CROSS JOIN LATERAL UNNEST(uw.emotion) AS em(value)');
+        expect(sql).toContain("WHEN 'emu' THEN 'Ému'");
+        expect(sql).toContain('GROUP BY em.value');
+      });
+
+      it('groupBy=genre + legendBy=emotion : les deux jointures coexistent avec des alias distincts', async () => {
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
+
+        await service.query(userId, { ...base, groupBy: 'genre', legendBy: 'emotion' } as any);
+
+        const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
+        expect(sql).toContain('JOIN title_genres tg ON tg.title_id = t.id');
+        expect(sql).toContain('CROSS JOIN LATERAL UNNEST(uw.emotion) AS em2(value)');
+        expect(sql).toContain('GROUP BY g.id, g.nom, em2.value');
+      });
+    });
+
     it('groupBy=genre : jointure title_genres/genres', async () => {
       mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
 

@@ -191,6 +191,16 @@ CREATE TABLE user_watches (
     episode_id  UUID REFERENCES episodes(id) ON DELETE CASCADE,
     date_vue    TIMESTAMPTZ NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Contexte de visionnage, saisi a posteriori (jamais a la creation du
+    -- watch) : support ("ordinateur"/"tv"/"telephone"/"cinema"), compagnie
+    -- ("seul"/"accompagne"), emotion (tableau, un watch peut avoir plusieurs
+    -- emotions : "content"/"triste"/"emu"/"enthousiaste"/"decu"/"tendu"/
+    -- "effraye"/"neutre"). Tous nullable (contexte optionnel). Valide cote
+    -- API (DTO @IsEnum), pas de CHECK ici (meme convention que
+    -- list_items.statut, cf. packages/db/prisma/schema.prisma).
+    support     TEXT,
+    compagnie   TEXT,
+    emotion     TEXT[],
     CONSTRAINT chk_watch_target CHECK (
         (title_id IS NOT NULL AND episode_id IS NULL) OR
         (title_id IS NULL AND episode_id IS NOT NULL)

@@ -15,7 +15,10 @@ export type DatavizGroupBy =
   | "studio"
   | "title"
   | "actor"
-  | "director";
+  | "director"
+  | "support"
+  | "compagnie"
+  | "emotion";
 export type DatavizMediaType = "film" | "serie";
 
 /**

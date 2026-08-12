@@ -22,6 +22,7 @@ const prismaServiceMock = {
   user_watches: {
     create: jest.fn(),
     findUnique: jest.fn(),
+    update: jest.fn(),
     delete: jest.fn(),
     findMany: jest.fn(),
     count: jest.fn(),
@@ -254,6 +255,85 @@ describe('WatchesService', () => {
       });
 
       await expect(service.deleteWatch(watchId, userId)).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  // ======================================================================
+  // updateWatchContext
+  // ======================================================================
+  describe('updateWatchContext', () => {
+    it('met à jour les champs de contexte fournis', async () => {
+      prismaServiceMock.user_watches.findUnique.mockResolvedValue({
+        id: watchId,
+        user_id: userId,
+      });
+      prismaServiceMock.user_watches.update.mockResolvedValue({
+        id: watchId,
+        support: 'cinema',
+        compagnie: 'accompagne',
+        emotion: ['emu', 'enthousiaste'],
+      });
+
+      const result = await service.updateWatchContext(watchId, userId, {
+        support: 'cinema',
+        compagnie: 'accompagne',
+        emotion: ['emu', 'enthousiaste'],
+      });
+
+      expect(result.support).toBe('cinema');
+      expect(prismaServiceMock.user_watches.update).toHaveBeenCalledWith({
+        where: { id: watchId },
+        data: { support: 'cinema', compagnie: 'accompagne', emotion: ['emu', 'enthousiaste'] },
+      });
+    });
+
+    it('ne modifie que les champs fournis (omis = inchangé)', async () => {
+      prismaServiceMock.user_watches.findUnique.mockResolvedValue({
+        id: watchId,
+        user_id: userId,
+      });
+      prismaServiceMock.user_watches.update.mockResolvedValue({ id: watchId });
+
+      await service.updateWatchContext(watchId, userId, { emotion: ['content'] });
+
+      expect(prismaServiceMock.user_watches.update).toHaveBeenCalledWith({
+        where: { id: watchId },
+        data: { emotion: ['content'] },
+      });
+    });
+
+    it('efface un champ envoyé explicitement à null', async () => {
+      prismaServiceMock.user_watches.findUnique.mockResolvedValue({
+        id: watchId,
+        user_id: userId,
+      });
+      prismaServiceMock.user_watches.update.mockResolvedValue({ id: watchId });
+
+      await service.updateWatchContext(watchId, userId, { support: null });
+
+      expect(prismaServiceMock.user_watches.update).toHaveBeenCalledWith({
+        where: { id: watchId },
+        data: { support: null },
+      });
+    });
+
+    it("lève NotFound si le watch n'existe pas", async () => {
+      prismaServiceMock.user_watches.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateWatchContext('nonexistent', userId, { support: 'tv' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('lève Forbidden si le watch appartient à un autre user', async () => {
+      prismaServiceMock.user_watches.findUnique.mockResolvedValue({
+        id: watchId,
+        user_id: 'other-user',
+      });
+
+      await expect(
+        service.updateWatchContext(watchId, userId, { support: 'tv' }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

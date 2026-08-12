@@ -20,6 +20,7 @@
 import { useState, useCallback } from "react";
 import { useCreateWatch } from "@/hooks/api/useCreateWatch";
 import { useDeleteWatch } from "@/hooks/api/useDeleteWatch";
+import { useUpdateWatchContext } from "@/hooks/api/useUpdateWatchContext";
 import { useDeleteAllWatches } from "@/hooks/api/useDeleteAllWatches";
 import { useDeleteAllWatchesByEpisode } from "@/hooks/api/useDeleteAllWatchesByEpisode";
 import { useMarkWatchedUntilEpisode } from "@/hooks/api/useMarkWatchedUntilEpisode";
@@ -85,6 +86,7 @@ export function WatchButton({
 
   const createWatch = useCreateWatch();
   const deleteWatch = useDeleteWatch();
+  const updateWatchContext = useUpdateWatchContext();
   const deleteAllByTitle = useDeleteAllWatches();
   const deleteAllByEpisode = useDeleteAllWatchesByEpisode();
   const markUntilHere = useMarkWatchedUntilEpisode();
@@ -231,6 +233,7 @@ export function WatchButton({
         onOpenChange={setHistoryOpen}
         watches={watches}
         onDelete={handleDeleteOne}
+        onUpdateContext={(watchId, patch) => updateWatchContext.mutate({ watchId, data: patch })}
       />
 
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>

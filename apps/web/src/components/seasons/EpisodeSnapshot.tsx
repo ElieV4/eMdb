@@ -58,7 +58,13 @@ export function EpisodeSnapshot({
   for (const watch of allWatches) {
     if (watch.episode_id) {
       const existing = episodeWatchMap.get(watch.episode_id) ?? [];
-      existing.push({ id: watch.id, date_vue: watch.date_vue });
+      existing.push({
+        id: watch.id,
+        date_vue: watch.date_vue,
+        support: watch.support,
+        compagnie: watch.compagnie,
+        emotion: watch.emotion,
+      });
       episodeWatchMap.set(watch.episode_id, existing);
     }
   }

@@ -55,6 +55,7 @@ import { useAddItem } from "@/hooks/api/useAddItem";
 import { useRemoveItem } from "@/hooks/api/useRemoveItem";
 import { useCreateWatch } from "@/hooks/api/useCreateWatch";
 import { useDeleteWatch } from "@/hooks/api/useDeleteWatch";
+import { useUpdateWatchContext } from "@/hooks/api/useUpdateWatchContext";
 import { useDeleteAllWatches } from "@/hooks/api/useDeleteAllWatches";
 import { useDeleteAllWatchesByEpisode } from "@/hooks/api/useDeleteAllWatchesByEpisode";
 import { useMarkWatchedUntilEpisode } from "@/hooks/api/useMarkWatchedUntilEpisode";
@@ -118,6 +119,7 @@ export function TitleQuickActionsMenu({
   const updateItemStatus = useUpdateListItemStatus();
   const createWatch = useCreateWatch();
   const deleteWatch = useDeleteWatch();
+  const updateWatchContext = useUpdateWatchContext();
   const deleteAllByTitle = useDeleteAllWatches();
   const deleteAllByEpisode = useDeleteAllWatchesByEpisode();
   const markUntilHere = useMarkWatchedUntilEpisode();
@@ -334,6 +336,7 @@ export function TitleQuickActionsMenu({
         onOpenChange={setHistoryOpen}
         watches={historyWatches}
         onDelete={(watchId) => deleteWatch.mutate(watchId)}
+        onUpdateContext={(watchId, patch) => updateWatchContext.mutate({ watchId, data: patch })}
       />
 
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>

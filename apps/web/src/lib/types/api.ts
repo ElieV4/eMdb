@@ -96,6 +96,9 @@ export type UserWatch = {
   date_vue: string;
   title_id: string;
   episode_id: string | null;
+  support?: string | null;
+  compagnie?: string | null;
+  emotion?: string[] | null;
   titles?: {
     id: string;
     tmdb_id: number | null;
@@ -209,6 +212,12 @@ export type WatchCreateInput = {
   title_id?: string;
   episode_id?: string;
   date_vue?: string;
+};
+
+export type WatchContextUpdateInput = {
+  support?: string | null;
+  compagnie?: string | null;
+  emotion?: string[] | null;
 };
 
 export type WatchFilters = {

@@ -44,7 +44,10 @@ export type DatavizGroupBy =
   | 'studio'
   | 'title'
   | 'actor'
-  | 'director';
+  | 'director'
+  | 'support'
+  | 'compagnie'
+  | 'emotion';
 export type DatavizMediaType = 'film' | 'serie';
 
 /** Groupements "top 20" — cf. note ci-dessus. */
@@ -76,7 +79,20 @@ export class DatavizQueryDto extends DatavizFilterQueryDto {
   @IsEnum(['sum', 'count', 'distinctCount', 'min', 'max', 'avg', 'evolution'])
   aggregation!: DatavizAggregation;
 
-  @IsEnum(['none', 'mediaType', 'period', 'genre', 'country', 'studio', 'title', 'actor', 'director'])
+  @IsEnum([
+    'none',
+    'mediaType',
+    'period',
+    'genre',
+    'country',
+    'studio',
+    'title',
+    'actor',
+    'director',
+    'support',
+    'compagnie',
+    'emotion',
+  ])
   groupBy!: DatavizGroupBy;
 
   /**
@@ -89,7 +105,7 @@ export class DatavizQueryDto extends DatavizFilterQueryDto {
    * `DatavizService.queryRows`).
    */
   @IsOptional()
-  @IsEnum(['none', 'mediaType', 'period', 'genre', 'country', 'studio'])
+  @IsEnum(['none', 'mediaType', 'period', 'genre', 'country', 'studio', 'support', 'compagnie', 'emotion'])
   legendBy?: DatavizGroupBy;
 
   @IsOptional()

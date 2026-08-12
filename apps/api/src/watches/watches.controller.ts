@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -17,6 +18,7 @@ import { CreateWatchDto } from './dto/create-watch.dto';
 import { ListWatchesFilterDto } from './dto/list-watches-filter.dto';
 import { FollowSerieDto } from './dto/follow-serie.dto';
 import { MarkWatchedUntilEpisodeDto } from './dto/mark-watched-until-episode.dto';
+import { UpdateWatchContextDto } from './dto/update-watch-context.dto';
 
 /**
  * Contrôleur du module watches (Phase 4.1).
@@ -26,6 +28,7 @@ import { MarkWatchedUntilEpisodeDto } from './dto/mark-watched-until-episode.dto
  * Endpoints :
  * - POST   /watches                  — marquer vu (titre ou épisode)
  * - POST   /watches/until-episode    — "vu jusqu'ici" (modification M)
+ * - PATCH  /watches/:id              — modifier le contexte de visionnage
  * - DELETE /watches/title/:titleId   — supprimer tous les visionnages d'un titre
  * - DELETE /watches/episode/:episodeId — supprimer tous les visionnages d'un épisode
  * - DELETE /watches/:id              — supprimer un visionnage
@@ -99,6 +102,20 @@ export class WatchesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteWatch(@CurrentUser() user: any, @Param('id') id: string): Promise<void> {
     await this.watchesService.deleteWatch(id, user.id);
+  }
+
+  /**
+   * PATCH /watches/:id
+   * Modifie le contexte de visionnage (support/compagnie/émotion) d'un
+   * visionnage existant — saisi uniquement a posteriori.
+   */
+  @Patch('watches/:id')
+  async updateWatchContext(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateWatchContextDto,
+  ) {
+    return this.watchesService.updateWatchContext(id, user.id, dto);
   }
 
   /**

@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ListsService } from '../lists/lists.service';
 import { CreateWatchDto } from './dto/create-watch.dto';
 import { ListWatchesFilterDto } from './dto/list-watches-filter.dto';
+import { UpdateWatchContextDto } from './dto/update-watch-context.dto';
 import { getSerieProgress } from '@emdb/db';
 
 /**
@@ -172,6 +173,40 @@ export class WatchesService {
     }
 
     await this.prisma.user_watches.delete({ where: { id } });
+  }
+
+  /**
+   * Modifie le contexte de visionnage (support, compagnie, émotion) d'un
+   * watch existant — saisi uniquement a posteriori, jamais à la création
+   * (cf. createWatch). Chaque champ omis reste inchangé ; envoyé à `null`,
+   * il est effacé.
+   *
+   * @param id - UUID du watch
+   * @param userId - UUID de l'utilisateur connecté (vérification d'appartenance)
+   * @param dto - Champs de contexte à mettre à jour
+   */
+  async updateWatchContext(id: string, userId: string, dto: UpdateWatchContextDto) {
+    const watch = await this.prisma.user_watches.findUnique({
+      where: { id },
+      select: { id: true, user_id: true },
+    });
+
+    if (!watch) {
+      throw new NotFoundException('Visionnage introuvable.');
+    }
+
+    if (watch.user_id !== userId) {
+      throw new ForbiddenException('Ce visionnage ne vous appartient pas.');
+    }
+
+    return this.prisma.user_watches.update({
+      where: { id },
+      data: {
+        ...(dto.support !== undefined && { support: dto.support }),
+        ...(dto.compagnie !== undefined && { compagnie: dto.compagnie }),
+        ...(dto.emotion !== undefined && { emotion: dto.emotion }),
+      },
+    });
   }
 
   /**
