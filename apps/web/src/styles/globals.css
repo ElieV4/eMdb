@@ -45,3 +45,22 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+@layer base {
+  /* Préférence "taille de police" (page /settings, store settingsStore) —
+     s'applique via la taille de police racine : les utilitaires Tailwind
+     text-* sont en rem, toujours relatifs à <html>, jamais au parent le
+     plus proche, donc impossible de la restreindre au seul contenu des
+     pages sans réécrire tout le système de tailles. Affecte donc toute
+     l'app (nav comprise), pas seulement le contenu.
+     La préférence "taille des affiches" est appliquée en JS (voir
+     hooks/usePosterScale.ts), pas ici : elle doit rester cohérente avec la
+     largeur explicite du wrapper de chaque carte (position des boutons
+     superposés), qu'une simple variable CSS ne peut pas piloter. */
+  html[data-font-size="petit"] {
+    font-size: 14px;
+  }
+  html[data-font-size="grand"] {
+    font-size: 18px;
+  }
+}

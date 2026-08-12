@@ -9,6 +9,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/api/queryClient";
 import { useAuthBootstrap } from "@/hooks/auth/useAuthBootstrap";
+import { SettingsSync } from "@/components/settings/SettingsSync";
 import "@/styles/globals.css";
 
 export default function RootLayout({
@@ -22,6 +23,7 @@ export default function RootLayout({
     <html lang="fr" className="dark">
       <body>
         <QueryClientProvider client={queryClient}>
+          <SettingsSync />
           {children}
         </QueryClientProvider>
       </body>

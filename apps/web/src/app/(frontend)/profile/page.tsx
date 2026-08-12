@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { User, Bell, BarChart3, LogOut, Upload } from "lucide-react";
+import Link from "next/link";
+import { User, Bell, BarChart3, LogOut, Upload, Settings } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useLogout } from "@/hooks/auth/useLogout";
 import { Badge } from "@/components/ui/badge";
@@ -53,14 +54,22 @@ export default function ProfilePage() {
               <p className="text-sm text-muted-foreground">{user.email}</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => logout.mutate()}
-            disabled={logout.isPending}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Déconnexion
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/settings">
+              <Button variant="outline">
+                <Settings className="mr-2 h-4 w-4" />
+                Paramètres
+              </Button>
+            </Link>
+            <Button
+              variant="outline"
+              onClick={() => logout.mutate()}
+              disabled={logout.isPending}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Déconnexion
+            </Button>
+          </div>
         </div>
 
         {/* Dataviz (modification W : placé avant Favoris ; module Favoris

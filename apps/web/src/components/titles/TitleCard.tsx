@@ -10,6 +10,7 @@ import { TitleQuickActionsMenu } from "./TitleQuickActionsMenu";
 import { TitleWatchedButton } from "./TitleWatchedButton";
 import { TitleSearchResult } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
+import { usePosterScale } from "@/hooks/usePosterScale";
 
 interface TitleCardProps {
   title: TitleSearchResult;
@@ -53,7 +54,9 @@ export function TitleCard({
     ? `/titles/${id}`
     : `/titles/tmdb/${title.tmdbId}?type=${type}`;
 
-  const posterWidth = compact ? 150 : 200;
+  const posterScale = usePosterScale();
+  const posterWidth = Math.round((compact ? 150 : 200) * posterScale);
+  const posterHeight = Math.round(posterWidth * 1.5);
 
   return (
     // Largeur alignée sur celle de l'affiche : sans ça, le wrapper (bloc)
@@ -102,8 +105,8 @@ export function TitleCard({
           alt={titre}
           title={titre}
           type={type}
-          width={compact ? 150 : 200}
-          height={compact ? 225 : 300}
+          width={posterWidth}
+          height={posterHeight}
           priority={false}
           watched={watched}
           inWatchlist={inWatchlist}
