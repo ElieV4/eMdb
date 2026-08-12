@@ -5,6 +5,7 @@ import {
   importPersonByTmdbId,
   importTitleByTmdbId,
   refreshPersonData,
+  resolvePersonWikiUrl,
   bootstrapPersonRecommendationsFromTmdb,
   ensureCreditRecord,
   resolveCrewRole,
@@ -205,6 +206,18 @@ export class PeopleService {
 
     if (!person) {
       throw new NotFoundException('Personne introuvable.');
+    }
+
+    // wiki_url résolu à la demande, ici seulement (jamais pendant un import
+    // de titre, cf. importPersonByTmdbId) : la fiche de CETTE personne vient
+    // d'être consultée, c'est le seul moment pertinent pour cet appel
+    // Wikidata. `resolvePersonWikiUrl` sert le cache déjà en base s'il
+    // existe, sinon résout et persiste pour les consultations suivantes.
+    if (!person.wiki_url) {
+      const wikiUrl = await resolvePersonWikiUrl(id);
+      if (wikiUrl) {
+        person.wiki_url = wikiUrl;
+      }
     }
 
     return person;

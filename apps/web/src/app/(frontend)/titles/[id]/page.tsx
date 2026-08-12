@@ -54,6 +54,15 @@ export default function TitleDetailPage({
 
   const refreshTitle = useRefreshTitle(id);
 
+  // Import initial limité à réalisateur + acteurs (rapide, cf. bug titres au
+  // casting nombreux) — tant qu'aucun autre rôle n'est présent, la
+  // distribution est probablement incomplète : bouton dédié pour charger le
+  // reste, plutôt que le générique "Actualiser".
+  const creditRoles = Object.keys(credits ?? {});
+  const isCreditsPartial =
+    creditRoles.length > 0 &&
+    creditRoles.every((role) => role === "Acteur" || role === "Réalisateur");
+
   if (isLoading) {
     return (
       <div className="container mx-auto max-w-4xl px-4 py-12">
@@ -88,6 +97,8 @@ export default function TitleDetailPage({
               onRefresh={() => refreshTitle.mutate()}
               isPending={refreshTitle.isPending}
               isError={refreshTitle.isError}
+              label={isCreditsPartial ? "Charger toute la distribution" : "Actualiser"}
+              pendingLabel={isCreditsPartial ? "Chargement..." : "Actualisation..."}
             />
           </div>
           {isCreditsLoading ? (

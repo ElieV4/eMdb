@@ -84,7 +84,9 @@ describe('TitlesService', () => {
 
       const result = await service.getOrImportByTmdbId(456, 'film');
 
-      expect(importTitleByTmdbId).toHaveBeenCalledWith(456, 'film');
+      expect(importTitleByTmdbId).toHaveBeenCalledWith(456, 'film', {
+        creditRoles: ['realisateur', 'acteur'],
+      });
       expect(result).toEqual(mockImported);
     });
   });

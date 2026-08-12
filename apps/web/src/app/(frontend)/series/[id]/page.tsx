@@ -16,11 +16,13 @@ import { TitleCreditsSplit } from "@/components/titles/TitleCreditsSplit";
 import { TitleRecommendations } from "@/components/titles/TitleRecommendations";
 import { SeasonCompact } from "@/components/seasons/SeasonCompact";
 import { TitleActions } from "@/components/titles/TitleActions";
+import { RefreshDataButton } from "@/components/common/RefreshDataButton";
 import { useTitle } from "@/hooks/api/useTitles";
 import { useTitleCredits } from "@/hooks/api/useTitleCredits";
 import { useTitleRecommendations } from "@/hooks/api/useTitleRecommendations";
 import { useSeasons } from "@/hooks/api/useSeasons";
 import { useSerieProgress } from "@/hooks/api/useSerieProgress";
+import { useRefreshTitle } from "@/hooks/api/useRefreshTitle";
 import { useAuthStore } from "@/store/authStore";
 
 export default function SeriesDetailPage({
@@ -49,6 +51,14 @@ export default function SeriesDetailPage({
   } = useSeasons(id);
   const { data: serieProgress } = useSerieProgress(id, { enabled: isAuthenticated });
   const progressBySeason = new Map((serieProgress ?? []).map((p) => [p.saison, p]));
+  const refreshTitle = useRefreshTitle(id);
+
+  // Import initial limité à réalisateur + acteurs (rapide) — tant qu'aucun
+  // autre rôle n'est présent, la distribution est probablement incomplète.
+  const creditRoles = Object.keys(credits ?? {});
+  const isCreditsPartial =
+    creditRoles.length > 0 &&
+    creditRoles.every((role) => role === "Acteur" || role === "Réalisateur");
 
   if (isLoading) {
     return (
@@ -76,7 +86,16 @@ export default function SeriesDetailPage({
 
         {/* Distribution (crédits) */}
         <section>
-          <h2 className="text-2xl font-bold mb-4">Distribution & Équipe</h2>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h2 className="text-2xl font-bold">Distribution & Équipe</h2>
+            <RefreshDataButton
+              onRefresh={() => refreshTitle.mutate()}
+              isPending={refreshTitle.isPending}
+              isError={refreshTitle.isError}
+              label={isCreditsPartial ? "Charger toute la distribution" : "Actualiser"}
+              pendingLabel={isCreditsPartial ? "Chargement..." : "Actualisation..."}
+            />
+          </div>
           {isCreditsLoading ? (
             <LoadingSpinner className="h-6 w-6" />
           ) : isCreditsError || !credits ? (

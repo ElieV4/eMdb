@@ -107,36 +107,27 @@ async function createSyncLog(params: {
   });
 }
 
-export async function importPersonByTmdbId(
-  tmdbId: number,
-  options: { skipWikidata?: boolean } = {},
-) {
+export async function importPersonByTmdbId(tmdbId: number) {
   // Court-circuit si la personne existe déjà localement — sans ça, importer
   // un titre au casting/équipe nombreux (parfois 100+ credits) déclenchait
-  // 2 appels TMDB (+ Wikidata) PAR personne, même pour des personnes déjà
-  // connues, ce qui pouvait dépasser n'importe quel timeout client (bug
-  // #35 : "The operation was aborted" sur les recommandations non-locales).
-  // `refreshPersonData` reste le chemin dédié pour forcer un vrai refresh.
+  // 2 appels TMDB PAR personne, même pour des personnes déjà connues, ce qui
+  // pouvait dépasser n'importe quel timeout client (bug #35 : "The operation
+  // was aborted" sur les recommandations non-locales).
   const existing = await prisma.people.findUnique({ where: { tmdb_id: tmdbId } });
   if (existing) {
     return existing;
   }
 
-  const [tmdbPerson, externalIds] = await Promise.all([
-    getPersonDetails(tmdbId),
-    getPersonExternalIds(tmdbId),
-  ]);
-  const { wikidata_id } = mapTmdbPersonExternalIds(externalIds);
-  // `skipWikidata` : pour un import de masse (des centaines/milliers de
-  // personnes), le rate-limit Wikidata (bug #5, 429) ralentit inutilement
-  // un backfill de credits — wiki_url reste nullable, complétable plus tard
-  // via le refresh normal d'une personne.
-  const wikiUrl =
-    wikidata_id && !options.skipWikidata
-      ? await getWikipediaUrlFromWikidataId(wikidata_id)
-      : null;
-
-  const mappedPerson = mapTmdbPerson(tmdbPerson, wikiUrl);
+  const tmdbPerson = await getPersonDetails(tmdbId);
+  // wiki_url n'est PLUS résolu ici : cet appel Wikidata est un enrichissement
+  // facultatif pour UNE personne parmi potentiellement 100+ credits importés
+  // en parallèle (Promise.all) — un aléa réseau Wikidata sur un seul d'entre
+  // eux faisait échouer l'import du TITRE ENTIER (bug remonté : import d'un
+  // titre au casting nombreux qui "tourne dans le vide" puis affiche une
+  // TypeError "fetch failed" côté page titre). Résolu à la demande, plus
+  // tard, par `resolvePersonWikiUrl` — appelée uniquement quand la fiche de
+  // CETTE personne est consultée, jamais pendant un import de titre.
+  const mappedPerson = mapTmdbPerson(tmdbPerson, null);
 
   const person = await prisma.people.upsert({
     where: { tmdb_id: tmdbId },
@@ -145,6 +136,42 @@ export async function importPersonByTmdbId(
   });
 
   return person;
+}
+
+/**
+ * Résout l'URL Wikipedia d'une personne à la demande — appelée uniquement
+ * quand sa fiche (GET /people/:id) est consultée, jamais pendant un import
+ * de titre (cf. importPersonByTmdbId, qui ne résout plus wiki_url du tout).
+ *
+ * `people.wiki_url` sert de cache d'écriture : déjà résolu → retourné sans
+ * appel réseau ; sinon résolu via Wikidata puis persisté pour les
+ * consultations suivantes (évite de re-frapper l'API Wikidata, sujette au
+ * rate-limit, à chaque vue de la même fiche). Toute erreur (réseau, 429,
+ * personne sans wikidata_id) est avalée : wiki_url reste null, retenté à la
+ * prochaine consultation.
+ */
+export async function resolvePersonWikiUrl(personId: string): Promise<string | null> {
+  const person = await prisma.people.findUnique({
+    where: { id: personId },
+    select: { tmdb_id: true, wiki_url: true },
+  });
+  if (!person) return null;
+  if (person.wiki_url) return person.wiki_url;
+  if (!person.tmdb_id) return null;
+
+  try {
+    const externalIds = await getPersonExternalIds(person.tmdb_id);
+    const { wikidata_id } = mapTmdbPersonExternalIds(externalIds);
+    if (!wikidata_id) return null;
+
+    const wikiUrl = await getWikipediaUrlFromWikidataId(wikidata_id);
+    if (wikiUrl) {
+      await prisma.people.update({ where: { id: personId }, data: { wiki_url: wikiUrl } });
+    }
+    return wikiUrl;
+  } catch {
+    return null;
+  }
 }
 
 export async function importEpisodeGuestCredits(
@@ -282,7 +309,7 @@ async function ensureStudioIds(
 export async function importTitleByTmdbId(
   tmdbId: number,
   type: 'film' | 'serie',
-  options: { withCredits?: boolean } = {},
+  options: { withCredits?: boolean; creditRoles?: string[] } = {},
 ) {
   const withCredits = options.withCredits ?? true;
   console.log('[importTitleByTmdbId] start', tmdbId, type);
@@ -337,18 +364,27 @@ export async function importTitleByTmdbId(
 
     if (withCredits && tmdbData.credits) {
       console.log('[importTitleByTmdbId] credits', tmdbId, tmdbData.credits?.cast?.length, tmdbData.credits?.crew?.length);
-      const creditInserts = mapTmdbCredits(tmdbData.credits, title.id, null);
+      let creditInserts = mapTmdbCredits(tmdbData.credits, title.id, null);
+      if (options.creditRoles?.length) {
+        creditInserts = creditInserts.filter((credit) => options.creditRoles!.includes(credit.role));
+      }
       // En parallèle plutôt qu'un `for` séquentiel — un titre à l'équipe
       // nombreuse (100+ credits) pouvait sinon dépasser n'importe quel
       // timeout client rien qu'en attendant chaque personne l'une après
       // l'autre (bug #35). Le `RateLimiter` de tmdb-client sérialise déjà
       // les vrais appels réseau à leur cadence configurée, donc paralléliser
       // ici ne fait que mieux utiliser ce quota au lieu de le sous-exploiter.
+      // Un credit qui échoue (aléa réseau TMDB sur cette personne précise,
+      // etc.) est journalisé et ignoré plutôt que de faire échouer tout
+      // l'import — même raisonnement que le catch duplicate-key ci-dessous,
+      // étendu à l'ensemble de l'étape (bug remonté : le bouton "Actualiser"
+      // échouait souvent sur les titres à l'équipe nombreuse, un seul aléa
+      // parmi la centaine d'appels suffisant à tout faire échouer).
       await Promise.all(
         creditInserts.map(async (credit) => {
-          const person = await importPersonByTmdbId(credit.tmdb_person_id);
-          const roleId = await ensureRoleId(credit.role, credit.role_libelle);
           try {
+            const person = await importPersonByTmdbId(credit.tmdb_person_id);
+            const roleId = await ensureRoleId(credit.role, credit.role_libelle);
             await prisma.credits.create({
               data: {
                 title_id: title.id,
@@ -364,7 +400,7 @@ export async function importTitleByTmdbId(
             if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
               return;
             }
-            throw error;
+            console.error('[importTitleByTmdbId] credit failed', tmdbId, credit.tmdb_person_id, error?.message);
           }
         }),
       );
@@ -407,7 +443,7 @@ export async function importTitleByTmdbId(
  */
 export async function importCreditsForTitle(
   titleId: string,
-  options: { creditFilter?: string[]; skipWikidata?: boolean } = {},
+  options: { creditFilter?: string[] } = {},
 ) {
   const title = await prisma.titles.findUnique({ where: { id: titleId } });
   if (!title?.tmdb_id) {
@@ -431,13 +467,14 @@ export async function importCreditsForTitle(
   // En parallèle plutôt qu'un `for` séquentiel — même raisonnement que dans
   // `importTitleByTmdbId` (bug #35) : le `RateLimiter` de tmdb-client
   // sérialise déjà les vrais appels réseau à leur cadence configurée.
+  // Un credit qui échoue (aléa réseau TMDB sur cette personne précise, etc.)
+  // est journalisé et ignoré plutôt que de faire échouer tout le backfill —
+  // même raisonnement que importTitleByTmdbId.
   await Promise.all(
     creditInserts.map(async (credit) => {
-      const person = await importPersonByTmdbId(credit.tmdb_person_id, {
-        skipWikidata: options.skipWikidata,
-      });
-      const roleId = await ensureRoleId(credit.role, credit.role_libelle);
       try {
+        const person = await importPersonByTmdbId(credit.tmdb_person_id);
+        const roleId = await ensureRoleId(credit.role, credit.role_libelle);
         await prisma.credits.create({
           data: {
             title_id: title.id,
@@ -454,7 +491,7 @@ export async function importCreditsForTitle(
         if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
           return;
         }
-        throw error;
+        console.error('[importCreditsForTitle] credit failed', titleId, credit.tmdb_person_id, error?.message);
       }
     }),
   );

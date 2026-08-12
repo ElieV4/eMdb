@@ -149,7 +149,6 @@ async function runCreditsImport(job: Job<CreditsImportJobData>): Promise<Credits
       try {
         await importCreditsForTitle(titleId, {
           creditFilter: CREDIT_FILTER,
-          skipWikidata: true,
         });
         imported++;
       } catch (e) {

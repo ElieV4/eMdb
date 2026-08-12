@@ -261,7 +261,6 @@ async function importCreditsForTitles(titles, batchName) {
           () =>
             importCreditsForTitle(titleId, {
               creditFilter: CREDIT_FILTER,
-              skipWikidata: true,
             }),
           `importCreditsForTitle(${titleId}, ${titre})`,
         );

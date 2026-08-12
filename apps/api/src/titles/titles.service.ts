@@ -225,7 +225,17 @@ export class TitlesService {
 
     try {
       console.log('[getOrImportByTmdbId] importing', tmdbId, type);
-      const result = await importTitleByTmdbId(tmdbId, type);
+      // Import initial rapide : réalisateur + acteurs seulement (souvent
+      // 10-30 personnes) plutôt que tout le casting/équipe (parfois 400+,
+      // ex. gros films américains) — chaque personne nouvelle coûte un
+      // appel TMDB, sérialisé par le RateLimiter, donc importer TOUT le
+      // casting au clic pouvait prendre plusieurs minutes et "tourner dans
+      // le vide" côté utilisateur (bug remonté sur les recommandations non
+      // locales). Le reste de la distribution se charge à la demande via
+      // PATCH /titles/:id/refresh ("Charger toute la distribution").
+      const result = await importTitleByTmdbId(tmdbId, type, {
+        creditRoles: ['realisateur', 'acteur'],
+      });
       console.log('[getOrImportByTmdbId] success', tmdbId, type, (result as any)?.id);
       return result;
     } catch (error: any) {

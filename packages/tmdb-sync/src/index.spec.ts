@@ -8,7 +8,7 @@ const prismaMock: any = {
   episodes: { upsert: jest.fn(), findMany: jest.fn(), findFirst: jest.fn() },
   roles: { upsert: jest.fn() },
   credits: { create: jest.fn(), findMany: jest.fn() },
-  genres: { upsert: jest.fn() },
+  genres: { upsert: jest.fn(), findUnique: jest.fn() },
   countries: { upsert: jest.fn() },
   studios: { upsert: jest.fn() },
   title_genres: { createMany: jest.fn() },
@@ -136,6 +136,41 @@ describe('tmdb-sync', () => {
     );
   });
 
+  it('importe une personne malgré un échec réseau Wikidata (wiki_url reste null)', async () => {
+    // Bug remonté : une seule requête Wikidata en échec (fetch failed, DNS,
+    // timeout) sur des dizaines de credits importés en parallèle faisait
+    // échouer l'import du titre entier via le Promise.all appelant.
+    asMock(getPersonDetails).mockResolvedValue({
+      id: 2,
+      name: 'Jane Doe',
+      gender: 1,
+      birthday: '1975-01-01',
+      profile_path: '/photo2.jpg',
+      biography: 'Bio',
+    });
+
+    asMock(getPersonExternalIds).mockResolvedValue({ wikidata_id: 'Q2' });
+    asMock(mapTmdbPersonExternalIds).mockImplementation((ids: any) => ids);
+    asMock(mapTmdbPerson).mockImplementation((person: any, wikiUrl: string | null) => ({
+      tmdb_id: person.id,
+      nom: person.name,
+      wiki_url: wikiUrl,
+    }));
+    asMock(getWikipediaUrlFromWikidataId).mockImplementation(async () => {
+      throw new TypeError('fetch failed');
+    });
+    asMock(prismaMock.people.upsert).mockResolvedValue({ id: 'person-uuid-2' });
+
+    const person = await importPersonByTmdbId(2);
+
+    expect(person).toEqual({ id: 'person-uuid-2' });
+    expect(prismaMock.people.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ wiki_url: null }),
+      }),
+    );
+  });
+
   it('bootstrapRecommendationsFromTmdb créé des recommandations existantes', async () => {
     asMock(prismaMock.titles.findUnique)
       .mockResolvedValueOnce({ id: 'title-uuid', tmdb_id: 42, type: 'film' })
@@ -237,6 +272,65 @@ describe('tmdb-sync', () => {
       data: [{ title_id: 'new-title-uuid', studio_id: 'studio-uuid' }],
       skipDuplicates: true,
     });
+    expect(prismaMock.credits.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("n'échoue pas l'import du titre si un seul credit échoue (aléa réseau TMDB)", async () => {
+    // Bug remonté : le bouton "Actualiser"/"Charger toute la distribution"
+    // échouait souvent sur les titres à l'équipe nombreuse — un seul credit
+    // en échec parmi la centaine faisait rejeter tout le Promise.all.
+    asMock(getMovieDetails).mockResolvedValue({
+      id: 100,
+      title: 'Film TMDB',
+      original_title: 'Original Film',
+      overview: 'Résumé',
+      release_date: '2025-01-01',
+      runtime: 100,
+      vote_average: 7.8,
+      poster_path: '/poster.jpg',
+      genres: [],
+      production_countries: [],
+      production_companies: [],
+      credits: {
+        cast: [
+          { id: 22, name: 'Acteur OK', character: 'Personnage', order: 1 },
+          { id: 24, name: 'Acteur en échec', character: 'Autre', order: 2 },
+        ],
+        crew: [],
+      },
+    });
+    asMock(mapTmdbMovieToTitle).mockImplementation((movie: any) => ({
+      tmdb_id: movie.id,
+      titre: movie.title,
+    }));
+    asMock(mapTmdbCredits).mockImplementation((credits: any) =>
+      credits.cast.map((c: any) => ({
+        tmdb_person_id: c.id,
+        role: 'acteur',
+        personnage: c.character,
+        ordre: c.order,
+      })),
+    );
+
+    asMock(prismaMock.titles.upsert).mockResolvedValue({ id: 'new-title-uuid-2' });
+    asMock(prismaMock.roles.upsert).mockResolvedValue({ id: 'role-uuid' });
+    asMock(prismaMock.credits.create).mockResolvedValue({});
+    asMock(prismaMock.people.findUnique).mockResolvedValue(null);
+    asMock(getPersonDetails).mockImplementation(async (id: number) => {
+      if (id === 24) throw new TypeError('fetch failed');
+      return { id, name: 'Acteur OK', gender: 2, birthday: null, profile_path: null, biography: null };
+    });
+    asMock(mapTmdbPerson).mockImplementation((person: any) => ({
+      tmdb_id: person.id,
+      nom: person.name,
+    }));
+    asMock(prismaMock.people.upsert).mockResolvedValue({ id: 'person-uuid' });
+
+    const title = await importTitleByTmdbId(100, 'film');
+
+    expect(title).toEqual({ id: 'new-title-uuid-2' });
+    // Un seul des deux credits (celui dont la personne s'est importée sans
+    // erreur) a été inséré — l'autre a été journalisé et ignoré.
     expect(prismaMock.credits.create).toHaveBeenCalledTimes(1);
   });
 
