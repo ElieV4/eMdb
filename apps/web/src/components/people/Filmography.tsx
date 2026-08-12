@@ -4,14 +4,16 @@
  * réalisateur sur le même film), avec badges de rôle et filtre par rôle
  * multi-sélection en haut (modification C — remplace l'ancien découpage en
  * sections séparées par rôle).
+ * Module "classique" : une seule ligne défilante horizontalement (comme les
+ * modules de l'accueil), au lieu d'une grille multi-lignes paginée.
  * Réutilise TitleCard avec le mapping filmographyToSearchResult.
  * Les filtres d'attribut (type, année, genre, pays, note IMDB) restent
  * pilotés depuis le header via les paramètres d'URL (bug #28/#33) — voir
  * @/lib/titleFilters. Le filtre par rôle est local à ce module.
  */
 
-import { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import {
   FilmographyGrouped,
   FilmographyItem,
@@ -19,6 +21,7 @@ import {
 } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 import { TitleCard } from "@/components/titles/TitleCard";
+import { CardSlider } from "@/components/common/CardSlider";
 import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { parseTitleFilters } from "@/lib/titleFilters";
 import { dedupeGroupedByEntity } from "@/lib/creditGrouping";
@@ -28,13 +31,10 @@ interface FilmographyProps {
   className?: string;
 }
 
-const MAX_VISIBLE = 10;
-
 export function Filmography({ filmography, className }: FilmographyProps) {
   const searchParams = useSearchParams();
   const filters = parseTitleFilters(searchParams);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [showAll, setShowAll] = useState(false);
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
 
@@ -117,8 +117,6 @@ export function Filmography({ filmography, className }: FilmographyProps) {
       return dateB - dateA;
     });
 
-  const displayed = showAll ? filtered : filtered.slice(0, MAX_VISIBLE);
-
   return (
     <div className={cn("space-y-4", className)}>
       <div className="flex flex-wrap gap-1">
@@ -156,42 +154,30 @@ export function Filmography({ filmography, className }: FilmographyProps) {
           Aucun titre pour ce filtre.
         </p>
       ) : (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {displayed.map((entry) => (
-              <div key={entry.entityId} className="space-y-1">
-                <TitleCard
-                  title={filmographyToSearchResult(entry.representative)}
-                  compact
-                  showType={false}
-                  watched={watchedTitles?.has(entry.representative.titre.id)}
-                  inWatchlist={watchlistIds.has(entry.representative.titre.id)}
-                  inFavorites={favoriteIds.has(entry.representative.titre.id)}
-                />
-                <div className="flex flex-wrap gap-1 px-1">
-                  {entry.roleEntries.map((re) => (
-                    <span
-                      key={re.role}
-                      className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-muted/40 text-muted-foreground"
-                    >
-                      {re.role}
-                    </span>
-                  ))}
-                </div>
+        <CardSlider>
+          {filtered.map((entry) => (
+            <div key={entry.entityId} className="shrink-0 space-y-1">
+              <TitleCard
+                title={filmographyToSearchResult(entry.representative)}
+                compact
+                showType={false}
+                watched={watchedTitles?.has(entry.representative.titre.id)}
+                inWatchlist={watchlistIds.has(entry.representative.titre.id)}
+                inFavorites={favoriteIds.has(entry.representative.titre.id)}
+              />
+              <div className="flex flex-wrap gap-1 px-1">
+                {entry.roleEntries.map((re) => (
+                  <span
+                    key={re.role}
+                    className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-muted/40 text-muted-foreground"
+                  >
+                    {re.role}
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
-          {filtered.length > MAX_VISIBLE && (
-            <button
-              onClick={() => setShowAll(!showAll)}
-              className="text-sm text-primary hover:underline"
-            >
-              {showAll
-                ? "Voir moins"
-                : `Voir plus (${filtered.length - MAX_VISIBLE} autres)`}
-            </button>
-          )}
-        </>
+            </div>
+          ))}
+        </CardSlider>
       )}
     </div>
   );

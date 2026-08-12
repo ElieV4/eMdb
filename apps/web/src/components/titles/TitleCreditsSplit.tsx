@@ -2,6 +2,9 @@
  * Composant d'affichage des crédits d'un titre : liste unique dédupliquée
  * (une personne n'apparaît qu'une fois même avec plusieurs rôles, ex. acteur
  * ET réalisateur), avec filtre par rôle multi-sélection en haut (modification C).
+ * Module "classique" : une seule ligne défilante horizontalement (même format
+ * que le module Filmographie de la page personne), avec des cartes "affiche"
+ * (tête + nom + rôle en sous-titre) plutôt que les badges compacts précédents.
  *
  * Remplace l'ancien découpage Distribution/Équipe technique : celui-ci
  * comparait les libellés de rôle stockés en base (français : "Réalisateur",
@@ -15,7 +18,8 @@
 import { useState } from "react";
 import { CreditGrouped } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
-import { PersonBadge } from "@/components/people/PersonBadge";
+import { PersonCard } from "@/components/people/PersonCard";
+import { CardSlider } from "@/components/common/CardSlider";
 import { dedupeGroupedByEntity } from "@/lib/creditGrouping";
 
 interface TitleCreditsSplitProps {
@@ -24,14 +28,11 @@ interface TitleCreditsSplitProps {
   className?: string;
 }
 
-const MAX_VISIBLE = 10;
-
 export function TitleCreditsSplit({
   credits,
   className,
 }: TitleCreditsSplitProps) {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [showAll, setShowAll] = useState(false);
 
   const allRoles = Object.keys(credits).filter(
     (role) => (credits[role]?.length ?? 0) > 0,
@@ -59,8 +60,6 @@ export function TitleCreditsSplit({
       : deduped.filter((entry) =>
           entry.roleEntries.some((re) => selectedRoles.includes(re.role)),
         );
-
-  const displayed = showAll ? filtered : filtered.slice(0, MAX_VISIBLE);
 
   const roleSubtitle = (entry: (typeof deduped)[number]) =>
     entry.roleEntries
@@ -108,32 +107,21 @@ export function TitleCreditsSplit({
           Aucun crédit pour ce filtre.
         </p>
       ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {displayed.map((entry) => (
-              <PersonBadge
-                key={entry.entityId}
-                person={{
-                  id: entry.representative.personne.id,
-                  nom: entry.representative.personne.nom,
-                  photoUrl: entry.representative.personne.photo_url ?? undefined,
-                }}
-                role={roleSubtitle(entry)}
-                size="md"
-              />
-            ))}
-          </div>
-          {filtered.length > MAX_VISIBLE && (
-            <button
-              onClick={() => setShowAll(!showAll)}
-              className="text-sm text-primary hover:underline"
-            >
-              {showAll
-                ? "Voir moins"
-                : `Voir plus (${filtered.length - MAX_VISIBLE} autres)`}
-            </button>
-          )}
-        </>
+        <CardSlider>
+          {filtered.map((entry) => (
+            <PersonCard
+              key={entry.entityId}
+              person={{
+                id: entry.representative.personne.id,
+                nom: entry.representative.personne.nom,
+                photoUrl: entry.representative.personne.photo_url ?? undefined,
+                rolePrincipal: roleSubtitle(entry),
+                local: true,
+              }}
+              className="shrink-0 w-32 sm:w-36"
+            />
+          ))}
+        </CardSlider>
       )}
     </div>
   );

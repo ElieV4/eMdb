@@ -23,6 +23,7 @@ import {
   PersonRecommendation,
 } from "@/lib/types/api";
 import { PersonCard } from "@/components/people/PersonCard";
+import { CardSlider } from "@/components/common/CardSlider";
 import { FollowPersonButton } from "@/components/people/FollowPersonButton";
 
 export default function PersonDetailPage({
@@ -115,7 +116,7 @@ export default function PersonDetailPage({
               Aucune recommandation disponible pour cette personne.
             </p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            <CardSlider>
               {recommendations.map((rec: PersonRecommendation) => (
                 <PersonCard
                   key={rec.id}
@@ -126,10 +127,10 @@ export default function PersonDetailPage({
                     photoUrl: rec.photo_url ?? undefined,
                     local: true,
                   }}
-                  compact
+                  className="shrink-0 w-32 sm:w-36"
                 />
               ))}
-            </div>
+            </CardSlider>
           )}
         </section>
       </div>

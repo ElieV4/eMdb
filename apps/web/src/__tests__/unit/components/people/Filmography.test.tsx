@@ -4,8 +4,17 @@
  */
 
 import { render, screen } from "@testing-library/react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/api/queryClient";
 import { Filmography } from "@/components/people/Filmography";
 import { FilmographyGrouped } from "@/lib/types/api";
+
+// Filmography rend TitleCard, qui utilise useWatchedTitles/useListMembership
+// (useQuery) — nécessite un QueryClientProvider (même convention que
+// TitleCard.test.tsx / EpisodeRow.test.tsx).
+function renderFilmography(ui: React.ReactNode) {
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 const mockFilmography: FilmographyGrouped = {
   Acteur: [
@@ -48,7 +57,7 @@ const mockFilmography: FilmographyGrouped = {
 
 describe("Filmography", () => {
   it("affiche les rôles (filtres + badges)", () => {
-    render(<Filmography filmography={mockFilmography} />);
+    renderFilmography(<Filmography filmography={mockFilmography} />);
     // "Acteur"/"Réalisateur" apparaissent à la fois comme bouton de filtre
     // et comme badge de rôle sur chaque titre (modification C).
     expect(screen.getAllByText("Acteur").length).toBeGreaterThan(0);
@@ -56,14 +65,14 @@ describe("Filmography", () => {
   });
 
   it("affiche un message quand la filmographie est vide", () => {
-    render(<Filmography filmography={{}} />);
+    renderFilmography(<Filmography filmography={{}} />);
     expect(
       screen.getByText("Aucune filmographie disponible pour cette personne."),
     ).toBeInTheDocument();
   });
 
   it("trie les titres par date de sortie décroissante", () => {
-    render(<Filmography filmography={mockFilmography} />);
+    renderFilmography(<Filmography filmography={mockFilmography} />);
     const titles = screen.getAllByRole("heading", { level: 3 }).map((el) => el.textContent);
     // Tenet (2020) doit précéder Inception (2010).
     expect(titles.indexOf("Tenet")).toBeLessThan(titles.indexOf("Inception"));
@@ -106,7 +115,7 @@ describe("Filmography", () => {
         },
       ],
     };
-    render(<Filmography filmography={filmo} />);
+    renderFilmography(<Filmography filmography={filmo} />);
     const titles = screen.getAllByRole("heading", { level: 3 }).map((el) => el.textContent);
     expect(titles.indexOf("Avec date")).toBeLessThan(titles.indexOf("Sans date"));
   });
@@ -133,7 +142,7 @@ describe("Filmography", () => {
         },
       ],
     };
-    render(<Filmography filmography={filmo} />);
+    renderFilmography(<Filmography filmography={filmo} />);
     expect(screen.getAllByText("Réalisateur").length).toBeGreaterThan(0);
     expect(screen.queryByText("Acteur")).not.toBeInTheDocument();
   });
