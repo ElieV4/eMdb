@@ -242,7 +242,10 @@ export function isSoftNotFound(pageTitle: string): boolean {
   return /page not found|404|not found/i.test(pageTitle);
 }
 
-export type FreeSiteMatch = { url: string; matchedBy: 'poster' | 'title-year' | 'title' };
+export type FreeSiteMatch = {
+  url: string;
+  matchedBy: 'poster' | 'title-year' | 'title' | 'unverified';
+};
 
 type SearchCandidate = {
   url: string;
@@ -281,6 +284,18 @@ type FreeSiteQuery = {
   year: number | null;
 };
 
+/**
+ * WatchTV et HydraFlix renvoient un 403 Cloudflare systématique sur TOUTE
+ * requête émise depuis Render (confirmé en direct via ?debug=1 — l'IP/ASN
+ * du serveur est bloquée avant même que la logique de recherche s'exécute,
+ * y compris pour la page de recherche elle-même), alors qu'ils répondent
+ * normalement à un navigateur classique. Pas de contournement propre côté
+ * code (proxy résidentiel = coût + zone grise, hors scope) : on retente la
+ * vérification (elle marchera si le blocage est levé un jour), et si elle
+ * échoue on affiche quand même le lien deviné, non vérifié, plutôt que rien
+ * — retour utilisateur : un lien parfois mort vaut mieux qu'un match réel
+ * manqué systématiquement.
+ */
 async function findOnWatchTv(params: FreeSiteQuery, trace?: string[]): Promise<FreeSiteMatch | null> {
   const typeSegment = params.type === 'film' ? 'movie' : 'series';
   const directUrl = `https://www.watchtv.click/${typeSegment}/${slugify(params.titreVo)}/`;
@@ -321,9 +336,11 @@ async function findOnWatchTv(params: FreeSiteQuery, trace?: string[]): Promise<F
     if (best) return best;
   }
 
-  return null;
+  return { url: directUrl, matchedBy: 'unverified' };
 }
 
+/** Même situation que WatchTV (403 Cloudflare systématique depuis Render) —
+ * cf. commentaire sur findOnWatchTv. */
 async function findOnHydraflix(params: FreeSiteQuery, trace?: string[]): Promise<FreeSiteMatch | null> {
   const directUrl = `https://www.hydraflix.cc/${slugify(params.titreVo)}/`;
   const direct = await fetchHtml(directUrl, trace);
@@ -363,7 +380,7 @@ async function findOnHydraflix(params: FreeSiteQuery, trace?: string[]): Promise
     if (best) return best;
   }
 
-  return null;
+  return { url: directUrl, matchedBy: 'unverified' };
 }
 
 async function findOnMoviedbWiki(params: FreeSiteQuery, trace?: string[]): Promise<FreeSiteMatch | null> {
