@@ -108,6 +108,7 @@ export function TitleCard({
           watched={watched}
           inWatchlist={inWatchlist}
           inFavorites={inFavorites}
+          watchlistStatus={watchlistStatus}
         />
 
         <div className="p-3 bg-background">
@@ -212,6 +213,7 @@ export function TitleCardHorizontal({
           watched={watched}
           inWatchlist={inWatchlist}
           inFavorites={inFavorites}
+          watchlistStatus={watchlistStatus}
         />
 
         <div className="flex-1 min-w-0">

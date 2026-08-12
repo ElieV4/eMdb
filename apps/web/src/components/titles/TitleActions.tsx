@@ -90,6 +90,7 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
   const favoriteList = userLists?.find((l) => l.type === "favoris");
   const watchlist = userLists?.find((l) => l.type === "watchlist");
   const customLists = userLists?.filter((l) => l.type === "custom") ?? [];
+  const listsContainingTitle = (userLists ?? []).filter((l) => l.contains_title).length;
 
   const isInList = (listId: string) => {
     const list = userLists?.find((l) => l.id === listId);
@@ -151,6 +152,7 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
         )}
 
         {/* Menu burger */}
+        <div className="relative inline-block">
         <DropdownMenu>
           {/* `render` fusionne le déclencheur du menu sur CE bouton au lieu
               d'imbriquer un <button> dans un autre <button> (HTML invalide qui
@@ -163,6 +165,18 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
               </Button>
             }
           />
+          {/* Étiquette rouge : nombre de listes contenant ce titre — sibling
+              du bouton, positionnée en absolu (même contrainte que le menu
+              actions rapides, un badge ne peut pas être imbriqué dans le
+              <button> ci-dessus proprement sans casser sa mise en page). */}
+          {listsContainingTitle > 0 && (
+            <span
+              className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white"
+              aria-label={`Dans ${listsContainingTitle} liste${listsContainingTitle > 1 ? "s" : ""}`}
+            >
+              {listsContainingTitle}
+            </span>
+          )}
           <DropdownMenuContent align="end" className="w-56">
             {/* Watchlist */}
             {watchlist && (
@@ -212,6 +226,7 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
 
         {/* Historique */}
         <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>

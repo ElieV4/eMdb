@@ -7,7 +7,7 @@
 
 import type { ReactNode } from "react";
 import Image from "next/image";
-import { Eye, Bookmark, Heart } from "lucide-react";
+import { Eye, Bookmark, Heart, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
@@ -26,6 +26,9 @@ interface TitlePosterProps {
   watched?: boolean;
   inWatchlist?: boolean;
   inFavorites?: boolean;
+  /** Statut de progression dans la watchlist — "abandonnee" remplace l'icone
+   * watchlist par un "sens interdit". */
+  watchlistStatus?: "en_cours" | "a_jour" | "abandonnee";
 }
 
 export function TitlePoster({
@@ -40,7 +43,9 @@ export function TitlePoster({
   watched = false,
   inWatchlist = false,
   inFavorites = false,
+  watchlistStatus,
 }: TitlePosterProps) {
+  const isAbandoned = watchlistStatus === "abandonnee";
   const imageSrc = src
     ? src.startsWith("http://") || src.startsWith("https://")
       ? src
@@ -93,10 +98,16 @@ export function TitlePoster({
             <Heart className="h-4 w-4 text-red-500 fill-red-500" />
           </PosterIconBadge>
         )}
-        {inWatchlist && (
-          <PosterIconBadge label="Dans la watchlist">
-            <Bookmark className="h-4 w-4 text-white fill-white" />
+        {isAbandoned ? (
+          <PosterIconBadge label="Série abandonnée">
+            <Ban className="h-4 w-4 text-red-500" />
           </PosterIconBadge>
+        ) : (
+          inWatchlist && (
+            <PosterIconBadge label="Dans la watchlist">
+              <Bookmark className="h-4 w-4 text-white fill-white" />
+            </PosterIconBadge>
+          )
         )}
         {watched && (
           <PosterIconBadge label="Déjà vu">

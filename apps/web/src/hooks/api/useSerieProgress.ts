@@ -7,12 +7,12 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/apiClient";
 import { ProgressSerieResult } from "@/lib/types/api";
 
-export function useSerieProgress(titleId: string) {
+export function useSerieProgress(titleId: string, options?: { enabled?: boolean }) {
   return useQuery<ProgressSerieResult[]>({
     queryKey: ["serie-progress", titleId],
     queryFn: () =>
       apiFetch<ProgressSerieResult[]>(`/titles/${titleId}/progress`),
-    enabled: !!titleId,
+    enabled: !!titleId && (options?.enabled ?? true),
     staleTime: 2 * 60 * 1000,
   });
 }

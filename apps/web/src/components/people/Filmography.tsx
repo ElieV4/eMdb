@@ -102,7 +102,20 @@ export function Filmography({ filmography, className }: FilmographyProps) {
       (entry) =>
         selectedRoles.length === 0 ||
         entry.roleEntries.some((re) => selectedRoles.includes(re.role)),
-    );
+    )
+    // Date de sortie décroissante — titres sans date connue relégués en fin.
+    .sort((a, b) => {
+      const dateA = a.representative.titre.date_sortie
+        ? new Date(a.representative.titre.date_sortie).getTime()
+        : null;
+      const dateB = b.representative.titre.date_sortie
+        ? new Date(b.representative.titre.date_sortie).getTime()
+        : null;
+      if (dateA === null && dateB === null) return 0;
+      if (dateA === null) return 1;
+      if (dateB === null) return -1;
+      return dateB - dateA;
+    });
 
   const displayed = showAll ? filtered : filtered.slice(0, MAX_VISIBLE);
 

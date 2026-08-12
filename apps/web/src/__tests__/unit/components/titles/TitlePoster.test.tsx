@@ -52,4 +52,37 @@ describe("TitlePoster", () => {
     const container = screen.getByTestId("poster-img").closest("div");
     expect(container).toBeInTheDocument();
   });
+
+  it("affiche l'icone watchlist quand inWatchlist est vrai", () => {
+    render(<TitlePoster src="/test.jpg" alt="Test" title="Test" inWatchlist />);
+    expect(screen.getByLabelText("Dans la watchlist")).toBeInTheDocument();
+  });
+
+  it("remplace l'icone watchlist par 'sens interdit' quand la série est abandonnée", () => {
+    render(
+      <TitlePoster
+        src="/test.jpg"
+        alt="Test"
+        title="Test"
+        inWatchlist
+        watchlistStatus="abandonnee"
+      />,
+    );
+    expect(screen.queryByLabelText("Dans la watchlist")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Série abandonnée")).toBeInTheDocument();
+  });
+
+  it("n'affiche pas l'icone 'sens interdit' pour un autre statut", () => {
+    render(
+      <TitlePoster
+        src="/test.jpg"
+        alt="Test"
+        title="Test"
+        inWatchlist
+        watchlistStatus="en_cours"
+      />,
+    );
+    expect(screen.queryByLabelText("Série abandonnée")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Dans la watchlist")).toBeInTheDocument();
+  });
 });

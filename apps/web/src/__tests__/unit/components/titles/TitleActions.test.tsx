@@ -115,4 +115,24 @@ describe("TitleActions", () => {
     expect(screen.getByTestId("follow-button")).toBeInTheDocument();
     expect(screen.getByTestId("rating-input")).toBeInTheDocument();
   });
+
+  it("n'affiche pas d'étiquette sur le bouton Listes quand le titre n'est dans aucune liste", () => {
+    renderWithClient(<TitleActions titleId="title-1" type="film" />);
+    expect(screen.queryByLabelText(/Dans \d+ liste/)).not.toBeInTheDocument();
+  });
+
+  it("affiche le nombre de listes contenant le titre en étiquette rouge", () => {
+    jest.spyOn(require("@/hooks/api/useUserLists"), "useUserLists").mockReturnValue({
+      data: [
+        { id: "fav-1", nom: "Favoris", type: "favoris", user_id: "u1", created_at: "2026-01-01", contains_title: true },
+        { id: "watch-1", nom: "Watchlist", type: "watchlist", user_id: "u1", created_at: "2026-01-01", contains_title: false },
+        { id: "custom-1", nom: "Coups de coeur", type: "custom", user_id: "u1", created_at: "2026-01-01", contains_title: true },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    renderWithClient(<TitleActions titleId="title-1" type="film" />);
+    expect(screen.getByLabelText("Dans 2 listes")).toHaveTextContent("2");
+  });
 });

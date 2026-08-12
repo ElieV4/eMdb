@@ -39,10 +39,14 @@ export function EpisodeSnapshot({
     isError,
   } = useSeason(titleId, seasonNumber);
 
-  // Fetch all watches to determine which episodes are watched — un seul
-  // appel pour toute la saison plutôt qu'un par épisode (le nombre
-  // d'épisodes rend un fetch par bouton coûteux).
+  // Fetch les visionnages de CETTE série (title_id, inclut aussi les
+  // épisodes) — un seul appel pour toute la saison plutôt qu'un par épisode.
+  // Sans le filtre title_id, seuls les 100 visionnages les PLUS RÉCENTS de
+  // tout l'historique utilisateur étaient chargés : au-delà de cette
+  // fenêtre (courant après un import Trakt), les épisodes déjà vus de cette
+  // série n'apparaissaient plus comme vus (bug remonté, module saison).
   const { data: watchesData } = useWatches({
+    title_id: titleId,
     limit: 100,
   });
 
@@ -98,7 +102,7 @@ export function EpisodeSnapshot({
             key={episode.id}
             className="flex items-center justify-between rounded-md border bg-background p-3"
           >
-            <div className="flex-1 min-w-0">
+            <Link href={`/episodes/${episode.id}`} className="flex-1 min-w-0 hover:text-primary">
               <p className="text-sm font-medium truncate">
                 Épisode {episode.numero}
                 {episode.titre ? ` - ${episode.titre}` : ""}
@@ -119,7 +123,7 @@ export function EpisodeSnapshot({
                   )}
                 </div>
               )}
-            </div>
+            </Link>
             <div className="flex items-center gap-2 ml-3">
               <Link
                 href={`/episodes/${episode.id}`}

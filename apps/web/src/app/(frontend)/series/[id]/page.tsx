@@ -20,6 +20,8 @@ import { useTitle } from "@/hooks/api/useTitles";
 import { useTitleCredits } from "@/hooks/api/useTitleCredits";
 import { useTitleRecommendations } from "@/hooks/api/useTitleRecommendations";
 import { useSeasons } from "@/hooks/api/useSeasons";
+import { useSerieProgress } from "@/hooks/api/useSerieProgress";
+import { useAuthStore } from "@/store/authStore";
 
 export default function SeriesDetailPage({
   params,
@@ -27,6 +29,7 @@ export default function SeriesDetailPage({
   params: { id: string };
 }) {
   const { id } = params;
+  const { isAuthenticated } = useAuthStore();
 
   const { data: title, isLoading, isError } = useTitle(id);
   const {
@@ -44,6 +47,8 @@ export default function SeriesDetailPage({
     isLoading: isSeasonsLoading,
     isError: isSeasonsError,
   } = useSeasons(id);
+  const { data: serieProgress } = useSerieProgress(id, { enabled: isAuthenticated });
+  const progressBySeason = new Map((serieProgress ?? []).map((p) => [p.saison, p]));
 
   if (isLoading) {
     return (
@@ -95,7 +100,12 @@ export default function SeriesDetailPage({
           ) : (
             <div className="space-y-3">
               {seasons.map((season) => (
-                <SeasonCompact key={season.id} season={season} titleId={id} />
+                <SeasonCompact
+                  key={season.id}
+                  season={season}
+                  titleId={id}
+                  progress={progressBySeason.get(season.numero)}
+                />
               ))}
             </div>
           )}

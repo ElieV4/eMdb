@@ -62,6 +62,55 @@ describe("Filmography", () => {
     ).toBeInTheDocument();
   });
 
+  it("trie les titres par date de sortie décroissante", () => {
+    render(<Filmography filmography={mockFilmography} />);
+    const titles = screen.getAllByRole("heading", { level: 3 }).map((el) => el.textContent);
+    // Tenet (2020) doit précéder Inception (2010).
+    expect(titles.indexOf("Tenet")).toBeLessThan(titles.indexOf("Inception"));
+  });
+
+  it("relègue en fin de liste les titres sans date de sortie connue", () => {
+    const filmo: FilmographyGrouped = {
+      Acteur: [
+        {
+          id: "f1",
+          personnage: null,
+          ordre: null,
+          titre: {
+            id: "t-unknown",
+            tmdb_id: 1,
+            titre_vo: "Sans date",
+            titre_vf: null,
+            affiche_url: null,
+            type: "film",
+            date_sortie: null,
+            note_imdb: null,
+          },
+          episode_id: null,
+        },
+        {
+          id: "f2",
+          personnage: null,
+          ordre: null,
+          titre: {
+            id: "t-dated",
+            tmdb_id: 2,
+            titre_vo: "Avec date",
+            titre_vf: null,
+            affiche_url: null,
+            type: "film",
+            date_sortie: "2015-01-01",
+            note_imdb: null,
+          },
+          episode_id: null,
+        },
+      ],
+    };
+    render(<Filmography filmography={filmo} />);
+    const titles = screen.getAllByRole("heading", { level: 3 }).map((el) => el.textContent);
+    expect(titles.indexOf("Avec date")).toBeLessThan(titles.indexOf("Sans date"));
+  });
+
   it("gère les rôles avec des tableaux vides", () => {
     const filmo: FilmographyGrouped = {
       Acteur: [],
