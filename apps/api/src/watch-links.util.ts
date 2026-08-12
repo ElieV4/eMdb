@@ -1,3 +1,5 @@
+import * as cheerio from 'cheerio';
+
 /**
  * Recherche + vérification d'un film complet sur Internet Archive (API
  * publique archive.org, gratuite et sans clé — contrairement à l'API de
@@ -159,6 +161,269 @@ export async function findArchiveOrgFilm(params: {
   }
 
   return null;
+}
+
+/**
+ * Sites "gratuits" whitelistés (WatchTV, HydraFlix, MovieDB Wiki) — recherche
+ * + vérification, plutôt qu'une URL devinée puis simplement testée en HEAD
+ * (ancienne approche, peu fiable : slug parfois différent, faux négatifs sur
+ * pages "introuvable" renvoyées avec un statut 200, aucune vérification que
+ * la page trouvée est vraiment LE bon titre).
+ *
+ * Stratégie en deux temps par site :
+ * 1. Essai direct sur l'URL devinée à partir du titre (rapide, fonctionne la
+ *    majorité du temps) — la page est chargée et son <title> vérifié (pas de
+ *    "page not found"/"404", ces sites renvoient parfois un statut 200 sur
+ *    une page "introuvable" générique).
+ * 2. Sinon, recherche via la barre de recherche du site (`?s=` ou
+ *    équivalent), résultats parsés (cheerio) puis scorés :
+ *    - correspondance du hash d'affiche TMDB (nom de fichier de l'image
+ *      poster, ex. "jkixsXzRh28q3PCqFoWcf7unghT.jpg") si disponible : signal
+ *      fiable à 100%, ces sites récupèrent leurs affiches directement depuis
+ *      image.tmdb.org avec le même hash que notre propre `affiche_url` ;
+ *    - sinon titre + année normalisés.
+ *
+ * La recherche essaie le titre VO puis VF (si différent) : un titre non
+ * anglophone (`titre_vo` = titre original, parfois non-anglais même pour un
+ * import francophone) peut ne matcher aucun des deux sur un site
+ * majoritairement anglophone — le hash d'affiche compense alors ce
+ * décalage linguistique en confirmant/infirmant les candidats trouvés.
+ */
+
+const BROWSER_HEADERS: Record<string, string> = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+};
+
+export function slugify(value: string): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/['’]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'title'
+  );
+}
+
+/** Nom de fichier TMDB (hash + extension) extrait d'une URL d'image
+ * image.tmdb.org — indépendant de la taille demandée (w185/w500/original). */
+export function extractPosterHash(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const match = url.match(/\/([a-zA-Z0-9]+\.(?:jpg|jpeg|png|webp))(?:[?#].*)?$/i);
+  return match ? match[1] : null;
+}
+
+async function fetchHtml(url: string): Promise<{ status: number; html: string } | null> {
+  try {
+    const res = await fetch(url, { headers: BROWSER_HEADERS, redirect: 'follow' });
+    const html = res.ok ? await res.text() : '';
+    return { status: res.status, html };
+  } catch {
+    return null;
+  }
+}
+
+export function isSoftNotFound(pageTitle: string): boolean {
+  return /page not found|404|not found/i.test(pageTitle);
+}
+
+export type FreeSiteMatch = { url: string; matchedBy: 'poster' | 'title-year' | 'title' };
+
+type SearchCandidate = {
+  url: string;
+  title: string;
+  posterHash: string | null;
+  year: number | null;
+};
+
+export function pickBestCandidate(
+  candidates: SearchCandidate[],
+  query: string,
+  posterHash: string | null,
+  year: number | null,
+): FreeSiteMatch | null {
+  if (posterHash) {
+    const posterMatch = candidates.find((c) => c.posterHash === posterHash);
+    if (posterMatch) return { url: posterMatch.url, matchedBy: 'poster' };
+  }
+
+  const normQuery = normalize(query);
+  const titleMatch = candidates.find((c) => {
+    if (normalize(c.title) !== normQuery) return false;
+    if (!year || !c.year) return true;
+    return Math.abs(c.year - year) <= 1;
+  });
+  if (titleMatch) return { url: titleMatch.url, matchedBy: 'title-year' };
+
+  return null;
+}
+
+type FreeSiteQuery = {
+  titreVo: string;
+  titreVf?: string | null;
+  type: 'film' | 'serie';
+  posterHash: string | null;
+  year: number | null;
+};
+
+async function findOnWatchTv(params: FreeSiteQuery): Promise<FreeSiteMatch | null> {
+  const typeSegment = params.type === 'film' ? 'movie' : 'series';
+  const directUrl = `https://www.watchtv.click/${typeSegment}/${slugify(params.titreVo)}/`;
+  const direct = await fetchHtml(directUrl);
+  if (direct && direct.status === 200) {
+    const $ = cheerio.load(direct.html);
+    if (!isSoftNotFound($('title').first().text())) {
+      return { url: directUrl, matchedBy: 'title' };
+    }
+  }
+
+  const queries = params.titreVf && params.titreVf !== params.titreVo
+    ? [params.titreVo, params.titreVf]
+    : [params.titreVo];
+
+  for (const query of queries) {
+    const search = await fetchHtml(`https://www.watchtv.click/?s=${encodeURIComponent(query)}`);
+    if (!search || search.status !== 200) continue;
+
+    const $ = cheerio.load(search.html);
+    const candidates: SearchCandidate[] = [];
+    $('article.TPost').each((_, el) => {
+      const $el = $(el);
+      const href = $el.find('a').first().attr('href')?.split('?')[0];
+      const title = $el.find('h2.Title, .Title').first().text().trim();
+      if (!href || !title) return;
+      const posterSrc = $el.find('img').attr('data-src') || $el.find('img').attr('src') || '';
+      const yearText = $el.find('.Qlty.Yr, .Date').first().text().trim();
+      candidates.push({
+        url: href,
+        title,
+        posterHash: extractPosterHash(posterSrc),
+        year: yearText ? parseInt(yearText, 10) || null : null,
+      });
+    });
+
+    const best = pickBestCandidate(candidates, query, params.posterHash, params.year);
+    if (best) return best;
+  }
+
+  return null;
+}
+
+async function findOnHydraflix(params: FreeSiteQuery): Promise<FreeSiteMatch | null> {
+  const directUrl = `https://www.hydraflix.cc/${slugify(params.titreVo)}/`;
+  const direct = await fetchHtml(directUrl);
+  if (direct && direct.status === 200) {
+    const $ = cheerio.load(direct.html);
+    if (!isSoftNotFound($('title').first().text())) {
+      return { url: directUrl, matchedBy: 'title' };
+    }
+  }
+
+  const queries = params.titreVf && params.titreVf !== params.titreVo
+    ? [params.titreVo, params.titreVf]
+    : [params.titreVo];
+
+  for (const query of queries) {
+    const search = await fetchHtml(`https://www.hydraflix.cc/?s=${encodeURIComponent(query)}`);
+    if (!search || search.status !== 200) continue;
+
+    const $ = cheerio.load(search.html);
+    const candidates: SearchCandidate[] = [];
+    $('[id^="post-"]').each((_, el) => {
+      const $el = $(el);
+      const href = $el.find('.poster a, .meta a').first().attr('href')?.split('?')[0];
+      const title = $el.find('.meta a').last().text().trim();
+      if (!href || !title) return;
+      const posterSrc = $el.find('img').attr('data-src') || $el.find('img').attr('src') || '';
+      const yearText = $el.find('.meta span').first().text().trim();
+      candidates.push({
+        url: href,
+        title,
+        posterHash: extractPosterHash(posterSrc),
+        year: yearText ? parseInt(yearText, 10) || null : null,
+      });
+    });
+
+    const best = pickBestCandidate(candidates, query, params.posterHash, params.year);
+    if (best) return best;
+  }
+
+  return null;
+}
+
+async function findOnMoviedbWiki(params: FreeSiteQuery): Promise<FreeSiteMatch | null> {
+  const typeSegment = params.type === 'film' ? 'movies' : 'tv';
+  const directUrl = `https://www.moviedb.wiki/${typeSegment}/${slugify(params.titreVo)}/`;
+  const direct = await fetchHtml(directUrl);
+  if (direct && direct.status === 200) {
+    const $ = cheerio.load(direct.html);
+    if (!isSoftNotFound($('title').first().text())) {
+      return { url: directUrl, matchedBy: 'title' };
+    }
+  }
+
+  const queries = params.titreVf && params.titreVf !== params.titreVo
+    ? [params.titreVo, params.titreVf]
+    : [params.titreVo];
+
+  for (const query of queries) {
+    const search = await fetchHtml(`https://www.moviedb.wiki/?s=${encodeURIComponent(query)}`);
+    if (!search || search.status !== 200) continue;
+
+    const $ = cheerio.load(search.html);
+    const candidates: SearchCandidate[] = [];
+    $('.movie-card').each((_, el) => {
+      const $el = $(el);
+      const dataTitle = $el.attr('data-title');
+      const dataYear = $el.attr('data-year');
+      const href = $el.find('a').first().attr('href');
+      const title = dataTitle || $el.find('.entry-title a').first().text().trim();
+      if (!href || !title) return;
+      const posterSrc = $el.find('img').attr('src') || $el.find('img').attr('data-src') || '';
+      candidates.push({
+        url: href,
+        title,
+        posterHash: extractPosterHash(posterSrc),
+        year: dataYear ? parseInt(dataYear, 10) || null : null,
+      });
+    });
+
+    const best = pickBestCandidate(candidates, query, params.posterHash, params.year);
+    if (best) return best;
+  }
+
+  return null;
+}
+
+export type FreeSiteKey = 'watchtv' | 'hydraflix' | 'moviedbwiki';
+
+const FREE_SITE_FINDERS: Record<FreeSiteKey, (params: FreeSiteQuery) => Promise<FreeSiteMatch | null>> = {
+  watchtv: findOnWatchTv,
+  hydraflix: findOnHydraflix,
+  moviedbwiki: findOnMoviedbWiki,
+};
+
+export async function findFreeWatchLink(
+  site: FreeSiteKey,
+  params: {
+    titreVo: string;
+    titreVf?: string | null;
+    type: 'film' | 'serie';
+    afficheUrl?: string | null;
+    anneeSortie?: number | null;
+  },
+): Promise<FreeSiteMatch | null> {
+  return FREE_SITE_FINDERS[site]({
+    titreVo: params.titreVo,
+    titreVf: params.titreVf,
+    type: params.type,
+    posterHash: extractPosterHash(params.afficheUrl),
+    year: params.anneeSortie ?? null,
+  });
 }
 
 /**

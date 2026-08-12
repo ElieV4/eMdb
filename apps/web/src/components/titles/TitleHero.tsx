@@ -47,6 +47,7 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
     type,
     tmdbId: tmdb_id,
     anneeSortie: year,
+    afficheUrl: affiche_url,
   });
 
   // Module toujours affiché, même sans résultat (retour utilisateur) : on

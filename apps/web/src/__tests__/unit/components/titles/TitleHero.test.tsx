@@ -66,11 +66,16 @@ describe("TitleHero", () => {
     global.fetch = jest.fn((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
 
-      if (url.includes("/watch-links/validate?")) {
+      if (url.includes("/watch-links/free?")) {
         return Promise.resolve({
           ok: true,
           status: 200,
-          json: async () => ({ valid: true, status: 200 }),
+          json: async () => ({
+            links: [
+              { name: "WatchTV", href: "https://www.watchtv.click/movie/inception/" },
+              { name: "HydraFlix", href: "https://www.hydraflix.cc/inception/" },
+            ],
+          }),
         } as Response);
       }
 
@@ -227,39 +232,50 @@ describe("TitleHero", () => {
     expect(screen.queryByText("Streaming FR")).not.toBeInTheDocument();
   });
 
-  it("n'affiche pas les liens libres quand le site renvoie 404", async () => {
+  it("n'affiche que les sites que le backend renvoie (recherche + vérification server-side)", async () => {
     (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("hydraflix.cc")) {
+      if (url.includes("/watch-links/free?")) {
         return Promise.resolve({
-          ok: false,
-          status: 404,
-          json: async () => ({ valid: false, status: 404 }),
+          ok: true,
+          status: 200,
+          json: async () => ({
+            links: [{ name: "WatchTV", href: "https://www.watchtv.click/movie/inception/" }],
+          }),
         } as Response);
       }
 
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: async () => ({ valid: true, status: 200 }),
+        json: async () => ({ found: false }),
       } as Response);
     });
 
     renderHero(<TitleHero title={mockTitle} />);
 
     await waitFor(() => {
-      expect(screen.queryByRole("link", { name: /HydraFlix/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /WatchTV/i })).toBeInTheDocument();
     });
+    expect(screen.queryByRole("link", { name: /HydraFlix/i })).not.toBeInTheDocument();
   });
 
-  it("garde le bloc 'Gratuit / sites whitelistés' visible avec un message quand tous les sites renvoient 404 (retour utilisateur : jamais masqué)", async () => {
-    (global.fetch as jest.Mock).mockImplementation(() =>
-      Promise.resolve({
-        ok: false,
-        status: 404,
-        json: async () => ({ valid: false, status: 404 }),
-      } as Response),
-    );
+  it("garde le bloc 'Gratuit / sites whitelistés' visible avec un message quand rien n'est trouvé (retour utilisateur : jamais masqué)", async () => {
+    (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/watch-links/free?")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ links: [] }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ found: false }),
+      } as Response);
+    });
 
     renderHero(<TitleHero title={mockTitle} />);
 

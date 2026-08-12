@@ -1,10 +1,11 @@
 /**
  * Liens "Streaming FR" (plateformes officielles réellement disponibles,
- * via TMDB watch/providers) et "Gratuit" (liens à slug deviné, validés un
- * par un) pour une fiche film/série — partagé entre TitleHero (page titre)
- * et la page détail d'épisode, qui affichaient auparavant deux copies
- * divergentes de cette logique (la version épisode n'était même pas
- * vérifiée : liens toujours affichés, qu'ils existent ou non).
+ * via TMDB watch/providers) et "Gratuit" (WatchTV/HydraFlix/MovieDB Wiki,
+ * recherchés + vérifiés côté backend) pour une fiche film/série — partagé
+ * entre TitleHero (page titre) et la page détail d'épisode, qui affichaient
+ * auparavant deux copies divergentes de cette logique (la version épisode
+ * n'était même pas vérifiée : liens toujours affichés, qu'ils existent ou
+ * non).
  */
 
 import { useEffect, useState } from "react";
@@ -18,7 +19,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api/apiClient";
-import { buildFreeWatchLinks, WatchLink, WatchLinkMode } from "@/lib/watchLinks";
+import { iconForFreeSite, WatchLink, WatchLinkMode } from "@/lib/watchLinks";
 
 type AccessType = "abonnement" | "location" | "achat";
 
@@ -44,14 +45,15 @@ export function useWatchLinks({
   type,
   tmdbId,
   anneeSortie,
+  afficheUrl,
 }: {
   titreVo: string;
   titreVf?: string | null;
   type: WatchLinkMode;
   tmdbId?: number | null;
   anneeSortie?: number | null;
+  afficheUrl?: string | null;
 }) {
-  const freeLinkCandidates = buildFreeWatchLinks({ title: titreVo, type });
   const [validFreeLinks, setValidFreeLinks] = useState<WatchLink[]>([]);
   const [officialProviders, setOfficialProviders] = useState<OfficialProviderLink[]>([]);
   // Le module "Gratuit" reste affiché même vide (retour utilisateur) : ce
@@ -107,19 +109,34 @@ export function useWatchLinks({
     let cancelled = false;
     setIsFreeLinksLoading(true);
 
-    const validateFreeLinks = async () => {
-      const checks: Promise<WatchLink | null>[] = freeLinkCandidates.map(async (link) => {
-        try {
-          const res = await fetch(
-            `${API_BASE_URL}/watch-links/validate?url=${encodeURIComponent(link.href)}`,
-            { cache: "no-store" },
-          );
-          const data = (await res.json()) as { valid?: boolean; status?: number };
-          return data.valid === false ? null : link;
-        } catch {
-          return null;
-        }
-      });
+    const fetchFreeLinks = async () => {
+      const checks: Promise<WatchLink | null | WatchLink[]>[] = [];
+
+      // WatchTV / HydraFlix / MovieDB Wiki : recherche + vérification (titre,
+      // année, hash d'affiche TMDB) côté backend — cf. watch-links.util.ts.
+      checks.push(
+        (async () => {
+          try {
+            const params = new URLSearchParams({ titreVo, type });
+            if (titreVf) params.set("titreVf", titreVf);
+            if (anneeSortie) params.set("anneeSortie", String(anneeSortie));
+            if (afficheUrl) params.set("afficheUrl", afficheUrl);
+            const res = await fetch(`${API_BASE_URL}/watch-links/free?${params.toString()}`, {
+              cache: "no-store",
+            });
+            const data = (await res.json()) as {
+              links?: Array<{ name: string; href: string }>;
+            };
+            return (data.links ?? []).map((link) => ({
+              name: link.name,
+              href: link.href,
+              icon: iconForFreeSite(link.name),
+            }));
+          } catch {
+            return [];
+          }
+        })(),
+      );
 
       // Internet Archive : pas d'URL devinable (identifiant non prévisible),
       // recherche + vérification côté API (titre + langue VO/VF détectée si
@@ -156,17 +173,17 @@ export function useWatchLinks({
       const checked = await Promise.all(checks);
 
       if (!cancelled) {
-        setValidFreeLinks(checked.filter(Boolean) as WatchLink[]);
+        setValidFreeLinks(checked.flat().filter(Boolean) as WatchLink[]);
         setIsFreeLinksLoading(false);
       }
     };
 
-    void validateFreeLinks();
+    void fetchFreeLinks();
 
     return () => {
       cancelled = true;
     };
-  }, [titreVo, titreVf, type, anneeSortie]);
+  }, [titreVo, titreVf, type, anneeSortie, afficheUrl]);
 
   return { officialProviders, freeLinks: validFreeLinks, isFreeLinksLoading };
 }

@@ -57,6 +57,7 @@ export default function EpisodeDetailPage({
     type: title?.type ?? "serie",
     tmdbId: title?.tmdb_id,
     anneeSortie: episodeYear,
+    afficheUrl: title?.affiche_url,
   });
 
   const handleWatchChanged = () => {

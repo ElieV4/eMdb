@@ -1,16 +1,18 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
-import { findArchiveOrgFilm, extractOfficialProviders } from './watch-links.util';
+import {
+  findArchiveOrgFilm,
+  extractOfficialProviders,
+  findFreeWatchLink,
+  FreeSiteKey,
+} from './watch-links.util';
 import { getMovieWatchProviders, getTvWatchProviders } from '@emdb/tmdb-client';
 
-const ALLOWED_WATCH_LINK_HOSTS = new Set([
-  'www.watchtv.click',
-  'watchtv.click',
-  'www.hydraflix.cc',
-  'hydraflix.cc',
-  'www.moviedb.wiki',
-  'moviedb.wiki',
-]);
+const FREE_SITES: { key: FreeSiteKey; name: string }[] = [
+  { key: 'watchtv', name: 'WatchTV' },
+  { key: 'hydraflix', name: 'HydraFlix' },
+  { key: 'moviedbwiki', name: 'MovieDB Wiki' },
+];
 
 @Controller()
 export class AppController {
@@ -27,40 +29,6 @@ export class AppController {
   async healthDb() {
     await this.prisma.$queryRawUnsafe('SELECT 1');
     return { status: 'ok', service: 'emdb-api', db: 'ok' };
-  }
-
-  @Get('watch-links/validate')
-  async validateWatchLink(@Query('url') url: string) {
-    if (!url) {
-      return { valid: false, status: 400 };
-    }
-
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return { valid: false, status: 400 };
-    }
-
-    const host = parsed.hostname.toLowerCase();
-    const isAllowed = [...ALLOWED_WATCH_LINK_HOSTS].some(
-      (allowedHost) =>
-        host === allowedHost || host.endsWith(`.${allowedHost}`),
-    );
-
-    if (!isAllowed) {
-      return { valid: false, status: 403 };
-    }
-
-    try {
-      const response = await fetch(url, {
-        method: 'HEAD',
-        redirect: 'follow',
-      });
-      return { valid: response.ok, status: response.status };
-    } catch {
-      return { valid: false, status: 0 };
-    }
   }
 
   // Recherche + vérification d'un film complet sur Internet Archive (VO ou
@@ -89,6 +57,44 @@ export class AppController {
     }
 
     return { found: true, url: match.url, label: match.label };
+  }
+
+  // Sites "gratuits" whitelistés (WatchTV, HydraFlix, MovieDB Wiki) —
+  // recherche + vérification (titre, année, hash d'affiche TMDB), cf.
+  // watch-links.util.ts pour le détail de la stratégie. Remplace l'ancienne
+  // approche "URL devinée côté web, validée en HEAD" (bug #59 : slugs
+  // parfois faux, pages "introuvable" renvoyées avec un statut 200).
+  @Get('watch-links/free')
+  async findFreeWatchLinks(
+    @Query('titreVo') titreVo: string,
+    @Query('titreVf') titreVf?: string,
+    @Query('type') type: 'film' | 'serie' = 'film',
+    @Query('afficheUrl') afficheUrl?: string,
+    @Query('anneeSortie') anneeSortie?: string,
+  ) {
+    if (!titreVo) {
+      return { links: [] };
+    }
+
+    const annee = anneeSortie ? parseInt(anneeSortie, 10) : undefined;
+    const results = await Promise.all(
+      FREE_SITES.map(async ({ key, name }) => {
+        try {
+          const match = await findFreeWatchLink(key, {
+            titreVo,
+            titreVf,
+            type,
+            afficheUrl,
+            anneeSortie: Number.isFinite(annee) ? annee : undefined,
+          });
+          return match ? { name, href: match.url } : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    return { links: results.filter(Boolean) };
   }
 
   // Plateformes de streaming officielles réellement disponibles pour ce

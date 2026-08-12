@@ -9,54 +9,19 @@ export type WatchLink = {
 
 export type WatchLinkMode = "film" | "serie";
 
-function toSlug(value: string): string {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      // Apostrophes (droites ou typographiques) retirées avant la règle
-      // générale ci-dessous : WordPress (moteur des sites ciblés) élide les
-      // contractions ("Pan's" -> "pans"), il ne les remplace pas par un
-      // tiret ("pan-s") — confirmé en direct (404 vs 200) sur watchtv.click
-      // et hydraflix.cc pour "Pan's Labyrinth" / "Grey's Anatomy".
-      .replace(/['’]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "title"
-  );
-}
-
 /**
- * Liens "gratuits" à slug deviné, vérifiés ensuite un par un (HEAD request
- * via /watch-links/validate, cf. TitleHero) — contrairement au module
- * "Streaming FR", dont la disponibilité réelle par plateforme vient de TMDB
- * watch/providers (cf. /watch-links/providers) plutôt que d'une URL devinée.
+ * Icône par site "gratuit" whitelisté — la recherche + vérification (titre,
+ * année, hash d'affiche TMDB) se fait désormais côté backend
+ * (GET /watch-links/free, cf. apps/api/src/watch-links.util.ts), qui ne
+ * connaît que des noms de site en string ; ce module ne fait plus que
+ * l'association nom -> icône pour l'affichage.
  */
-export function buildFreeWatchLinks({
-  title,
-  type,
-}: {
-  title: string;
-  type: WatchLinkMode;
-}): WatchLink[] {
-  const slug = encodeURIComponent(toSlug(title));
+const FREE_SITE_ICONS: Record<string, LucideIcon> = {
+  WatchTV: MonitorPlay,
+  HydraFlix: Film,
+  "MovieDB Wiki": BookOpen,
+};
 
-  return [
-    {
-      name: "WatchTV",
-      href: `https://www.watchtv.click/${type === "film" ? "movie" : "series"}/${slug}/`,
-      icon: MonitorPlay,
-    },
-    {
-      name: "HydraFlix",
-      href: `https://www.hydraflix.cc/${slug}/`,
-      icon: Film,
-    },
-    {
-      name: "MovieDB Wiki",
-      href: `https://www.moviedb.wiki/${slug}/`,
-      icon: BookOpen,
-    },
-  ].filter((link) => !!link.href && link.href.trim() !== "");
+export function iconForFreeSite(name: string): LucideIcon {
+  return FREE_SITE_ICONS[name] ?? Film;
 }
