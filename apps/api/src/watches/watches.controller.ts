@@ -111,6 +111,17 @@ export class WatchesController {
   }
 
   /**
+   * GET /watches/watched-title-ids
+   * Ensemble complet (non paginé) des title_id vus par l'utilisateur — vus
+   * directement (titles.id) ou via un épisode (episodes -> seasons.title_id)
+   * — alimente l'icone "vu" affichée sur les affiches dans toute l'app.
+   */
+  @Get('watches/watched-title-ids')
+  async getWatchedTitleIds(@CurrentUser() user: any) {
+    return this.watchesService.getWatchedTitleIds(user.id);
+  }
+
+  /**
    * GET /titles/:titleId/progress
    * Progression de visionnage par saison pour une série.
    */

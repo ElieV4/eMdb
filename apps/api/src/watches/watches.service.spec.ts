@@ -260,6 +260,29 @@ describe('WatchesService', () => {
   // ======================================================================
   // listWatches
   // ======================================================================
+  describe('getWatchedTitleIds', () => {
+    it('retourne les title_id vus directement et via un épisode, dédoublonnés', async () => {
+      prismaServiceMock.user_watches.findMany.mockResolvedValue([
+        { title_id: 'film-1', episodes: null },
+        { title_id: null, episodes: { seasons: { title_id: 'serie-1' } } },
+        { title_id: null, episodes: { seasons: { title_id: 'serie-1' } } },
+        { title_id: 'film-1', episodes: null },
+      ]);
+
+      const result = await service.getWatchedTitleIds(userId);
+
+      expect(result.sort()).toEqual(['film-1', 'serie-1']);
+    });
+
+    it('retourne un tableau vide si aucun visionnage', async () => {
+      prismaServiceMock.user_watches.findMany.mockResolvedValue([]);
+
+      const result = await service.getWatchedTitleIds(userId);
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('listWatches', () => {
     it('retourne la liste paginée', async () => {
       const mockData = [{ id: watchId, title_id: titleId, date_vue: new Date() }];

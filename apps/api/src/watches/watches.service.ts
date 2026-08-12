@@ -313,6 +313,34 @@ export class WatchesService {
    * @param filters - Filtres et pagination
    * @returns Liste paginée des watches
    */
+  /**
+   * Ensemble complet des title_id vus par l'utilisateur — vus directement
+   * (user_watches.title_id) ou via un épisode (episode -> season.title_id).
+   * Non paginé (contrairement à /watches) : l'icone "vu" sur les affiches a
+   * besoin de la vérité complète, pas seulement des 100 derniers visionnages
+   * (bug remonté : icone manquante pour les titres à l'historique volumineux,
+   * notamment après un import Trakt).
+   */
+  async getWatchedTitleIds(userId: string): Promise<string[]> {
+    const watches = await this.prisma.user_watches.findMany({
+      where: { user_id: userId },
+      select: {
+        title_id: true,
+        episodes: { select: { seasons: { select: { title_id: true } } } },
+      },
+    });
+
+    const titleIds = new Set<string>();
+    for (const watch of watches) {
+      if (watch.title_id) {
+        titleIds.add(watch.title_id);
+      } else if (watch.episodes) {
+        titleIds.add(watch.episodes.seasons.title_id);
+      }
+    }
+    return [...titleIds];
+  }
+
   async listWatches(userId: string, filters: ListWatchesFilterDto) {
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 20;
