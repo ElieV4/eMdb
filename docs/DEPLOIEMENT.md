@@ -10,7 +10,7 @@ Ce document décrit comment eMDB est déployé en cloud, entièrement sur des of
 | Backend (`apps/api` + workers) | Render (Web Service) | à compléter après création du service |
 | Base de données | Supabase (Postgres)  | dashboard.supabase.com     |
 | Redis (BullMQ)  | Upstash               | console.upstash.com        |
-| Keep-alive      | GitHub Actions (`.github/workflows/keep-alive.yml`) | onglet Actions du repo |
+| Keep-alive      | cron-job.org          | console.cron-job.org       |
 
 Le dev local (`docker-compose up -d`) n'est pas affecté par ce qui suit : il continue de tourner avec Postgres/Redis en conteneurs locaux et `api`/`worker` comme deux conteneurs séparés.
 
@@ -20,11 +20,11 @@ Les "background workers" Render dédiés ne sont plus gratuits (7$/mois min). Po
 
 ## Pourquoi le ping keep-alive
 
-- **Render (free)** : le service se met en veille après 15 min sans trafic HTTP. Un ping toutes les 10 min le maintient éveillé en continu, ce qui reste largement sous le quota de 750h/mois du compte pour un seul service.
+- **Render (free)** : le service se met en veille après 15 min sans trafic HTTP. Un ping toutes les 5 min le maintient éveillé en continu, ce qui reste largement sous le quota de 750h/mois du compte pour un seul service.
 - **Supabase (free)** : le projet est mis en pause après 1 semaine sans requête DB. Le ping keep-alive tape aussi `/health/db` (une requête `SELECT 1`) pour l'éviter.
 - Garder le service éveillé en continu a un effet de bord utile : les cron BullMQ internes du worker (sync TMDB quotidien/hebdo, notifications, recommandations mensuelles — voir `apps/worker/src/worker.ts` et `cron.ts`) se déclenchent normalement, sans avoir eu besoin de les réécrire en endpoints déclenchés manuellement.
 
-Le workflow lit la variable de repo `RENDER_URL` (Settings > Secrets and variables > Actions > Variables). Tant qu'elle n'est pas configurée, il ne fait rien.
+**Pourquoi cron-job.org et pas GitHub Actions** : le déclencheur `schedule` de GitHub Actions n'est pas fiable à l'échelle de la minute — mesuré en pratique sur ce repo, l'intervalle réel entre deux exécutions était en moyenne de ~4h (jusqu'à 6h40) pour une configuration à 5 min, largement au-delà des 15 min de tolérance de Render. cron-job.org (gratuit, jusqu'à 1 min d'intervalle) est un service dédié à ce cas d'usage et respecte l'intervalle configuré.
 
 ## Provisionnement (à faire une fois)
 
@@ -77,12 +77,15 @@ Le workflow lit la variable de repo `RENDER_URL` (Settings > Secrets and variabl
 2. Auto-deploy sur push `main` (activé par défaut).
 3. Variable d'environnement : `NEXT_PUBLIC_API_URL` = URL Render.
 
-### 5. Keep-alive GitHub Actions
+### 5. Keep-alive cron-job.org
 
-Dans le repo GitHub : Settings > Secrets and variables > Actions > Variables > New repository variable :
-- `RENDER_URL` = URL Render (ex. `https://emdb.onrender.com`, sans slash final)
+1. Créer un compte gratuit sur [cron-job.org](https://cron-job.org).
+2. Créer deux cronjobs (Create cronjob) :
+   - URL `https://emdb.onrender.com/health`, intervalle 5 minutes.
+   - URL `https://emdb.onrender.com/health/db`, intervalle 5 minutes.
+3. Laisser les réglages par défaut (timeout, notifications d'échec) — l'essentiel est l'intervalle.
 
-Le workflow `.github/workflows/keep-alive.yml` tourne ensuite automatiquement toutes les 10 min.
+Pas de variable de repo à configurer : les deux URLs sont saisies directement dans l'interface cron-job.org.
 
 ## Administration au quotidien
 

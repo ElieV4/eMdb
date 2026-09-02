@@ -24,7 +24,7 @@ Lire le contenu du dossier ../docs pour comprendre le dépôt
 | **Source de données films/séries** | API TMDB                                 | ✅ Gratuit              | Clé gratuite pour non commercial, rate limit ok                                                                                            |
 | **CI/CD**                          | GitHub Actions                           | ✅ Gratuit              | 2000 min/mois gratuites                                                                                                                    |
 | **Hébergement frontend**           | Vercel                                   | ✅ Gratuit (hobby tier) | Fait par l'éditeur de Next.js, déploiement automatique depuis GitHub, gratuit pour usage perso/non-commercial                              |
-| **Hébergement backend**            | Render (Web Service unique, Docker)      | ✅ Gratuit              | API + workers BullMQ dans le même service (pas de background worker Render payant) ; maintenu éveillé par un ping GitHub Actions — voir [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md) |
+| **Hébergement backend**            | Render (Web Service unique, Docker)      | ✅ Gratuit              | API + workers BullMQ dans le même service (pas de background worker Render payant) ; maintenu éveillé par un ping cron-job.org — voir [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md) |
 
 ## Fonctionnalités
 
