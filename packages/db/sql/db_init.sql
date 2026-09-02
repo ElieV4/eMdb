@@ -392,6 +392,35 @@ CREATE INDEX idx_sync_log_tmdb ON tmdb_sync_log(tmdb_id, type);
 CREATE INDEX idx_sync_log_status_echec ON tmdb_sync_log(created_at) WHERE status = 'failed';
 
 -- ============================================================
+-- SITES "GRATUITS" WHITELISTES (liens streaming libre)
+-- ============================================================
+
+-- Table unique partagee par tous les utilisateurs (pas de scoping par
+-- user_id) : la whitelist est une config globale de l'application, pas une
+-- preference personnelle. Remplace les 3 sites codes en dur dans
+-- watch-links.util.ts (WatchTV/HydraFlix/MovieDB Wiki) — voir commentaire
+-- sur `url_recherche`/`url_directe`/`selecteur_resultat` cote API pour le
+-- format exact des templates et du selecteur.
+CREATE TABLE free_watch_sites (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nom                 TEXT NOT NULL,
+    -- Template d'URL de recherche, `{query}` = titre a chercher (encode
+    -- automatiquement). Seul champ vraiment requis en plus du nom.
+    url_recherche       TEXT NOT NULL,
+    -- Template d'URL devinee (essai rapide avant la recherche), `{slug}` =
+    -- titre slugifie, `{type}` = "movie"/"series". Optionnel : si absent,
+    -- l'algo passe direct par la recherche.
+    url_directe         TEXT,
+    -- Selecteur CSS des elements "carte resultat" sur la page de recherche
+    -- (ex. "article.TPost"). Optionnel : si absent, heuristique generique
+    -- (tout <a> contenant une <img>) — moins precise mais fonctionne sans
+    -- configuration sur un site jamais vu.
+    selecteur_resultat  TEXT,
+    actif               BOOLEAN NOT NULL DEFAULT true,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
 -- FONCTIONS METIER [v2]
 -- ============================================================
 

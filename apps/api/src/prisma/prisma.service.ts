@@ -42,6 +42,7 @@ export class PrismaService implements OnModuleDestroy {
   user_follows_serie = prisma.user_follows_serie;
   user_follows_person = prisma.user_follows_person;
   notifications = prisma.notifications;
+  free_watch_sites = prisma.free_watch_sites;
 
   /**
    * Exécute une requête SQL brute via Prisma.

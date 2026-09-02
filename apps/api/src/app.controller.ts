@@ -1,18 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
-import {
-  findArchiveOrgFilm,
-  extractOfficialProviders,
-  findFreeWatchLink,
-  FreeSiteKey,
-} from './watch-links.util';
+import { findArchiveOrgFilm, extractOfficialProviders, findFreeWatchLink } from './watch-links.util';
 import { getMovieWatchProviders, getTvWatchProviders } from '@emdb/tmdb-client';
-
-const FREE_SITES: { key: FreeSiteKey; name: string }[] = [
-  { key: 'watchtv', name: 'WatchTV' },
-  { key: 'hydraflix', name: 'HydraFlix' },
-  { key: 'moviedbwiki', name: 'MovieDB Wiki' },
-];
 
 @Controller()
 export class AppController {
@@ -59,11 +48,10 @@ export class AppController {
     return { found: true, url: match.url, label: match.label };
   }
 
-  // Sites "gratuits" whitelistés (WatchTV, HydraFlix, MovieDB Wiki) —
-  // recherche + vérification (titre, année, hash d'affiche TMDB), cf.
-  // watch-links.util.ts pour le détail de la stratégie. Remplace l'ancienne
-  // approche "URL devinée côté web, validée en HEAD" (bug #59 : slugs
-  // parfois faux, pages "introuvable" renvoyées avec un statut 200).
+  // Sites "gratuits" whitelistés — configurables par l'utilisateur (table
+  // free_watch_sites, cf. FreeWatchSitesModule pour le CRUD), recherche +
+  // vérification (titre, année, hash d'affiche TMDB) via un algo générique,
+  // cf. watch-links.util.ts pour le détail de la stratégie.
   @Get('watch-links/free')
   async findFreeWatchLinks(
     @Query('titreVo') titreVo: string,
@@ -81,12 +69,14 @@ export class AppController {
     const annee = anneeSortie ? parseInt(anneeSortie, 10) : undefined;
     const debugTraces: Record<string, string[]> = {};
 
+    const sites = await this.prisma.free_watch_sites.findMany({ where: { actif: true } });
+
     const results = await Promise.all(
-      FREE_SITES.map(async ({ key, name }) => {
+      sites.map(async (site) => {
         const trace = isDebug ? [] : undefined;
         try {
           const match = await findFreeWatchLink(
-            key,
+            site,
             {
               titreVo,
               titreVf,
@@ -96,15 +86,15 @@ export class AppController {
             },
             trace,
           );
-          if (trace) debugTraces[key] = trace;
+          if (trace) debugTraces[site.nom] = trace;
           // `verified` : false uniquement pour les liens devinés sans
           // confirmation possible (matchedBy 'unverified', cf.
           // watch-links.util.ts — sites bloquant les requêtes depuis Render).
-          return match ? { name, href: match.url, verified: match.matchedBy !== 'unverified' } : null;
+          return match ? { name: site.nom, href: match.url, verified: match.matchedBy !== 'unverified' } : null;
         } catch (error) {
           if (trace) {
             trace.push(`EXCEPTION ${error instanceof Error ? error.message : String(error)}`);
-            debugTraces[key] = trace;
+            debugTraces[site.nom] = trace;
           }
           return null;
         }

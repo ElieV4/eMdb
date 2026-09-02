@@ -90,6 +90,13 @@ export { useUpdateList } from "./useUpdateList";
 export { useDeleteList } from "./useDeleteList";
 export { useAddItem } from "./useAddItem";
 export { useRemoveItem } from "./useRemoveItem";
+export {
+  useFreeWatchSites,
+  useCreateFreeWatchSite,
+  useUpdateFreeWatchSite,
+  useDeleteFreeWatchSite,
+  useTestFreeWatchSite,
+} from "./useFreeWatchSites";
 export { useAddListItem } from "./useAddListItem";
 export { useRemoveListItem } from "./useRemoveListItem";
 export { useReorderItems } from "./useReorderItems";

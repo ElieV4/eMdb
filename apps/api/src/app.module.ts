@@ -18,6 +18,7 @@ import { ListsModule } from './lists/lists.module';
 import { RecommenderModule } from './recommender/recommender.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ImportModule } from './import/import.module';
+import { FreeWatchSitesModule } from './settings/free-watch-sites/free-watch-sites.module';
 import * as path from 'node:path';
 
 @Module({
@@ -43,6 +44,7 @@ import * as path from 'node:path';
     RecommenderModule,
     NotificationsModule,
     ImportModule,
+    FreeWatchSitesModule,
   ],
   controllers: [AppController],
 })

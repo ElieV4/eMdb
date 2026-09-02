@@ -606,3 +606,30 @@ export function filmographyToSearchResult(
     local: true,
   };
 }
+
+// --- Sites "gratuits" whitelistés (paramètres) ---
+
+export type FreeWatchSite = {
+  id: string;
+  nom: string;
+  url_recherche: string;
+  url_directe: string | null;
+  selecteur_resultat: string | null;
+  actif: boolean;
+  created_at: string;
+};
+
+export type FreeWatchSiteInput = {
+  nom: string;
+  url_recherche: string;
+  url_directe?: string | null;
+  selecteur_resultat?: string | null;
+  actif?: boolean;
+};
+
+export type FreeWatchSiteTestResult = {
+  found: boolean;
+  url: string | null;
+  matchedBy: 'poster' | 'title-year' | 'title' | 'unverified' | null;
+  trace: string[];
+};

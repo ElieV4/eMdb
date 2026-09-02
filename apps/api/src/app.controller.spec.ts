@@ -4,6 +4,9 @@ import { PrismaService } from './prisma/prisma.service';
 
 const mockPrismaService = {
   $queryRawUnsafe: jest.fn(),
+  free_watch_sites: {
+    findMany: jest.fn(),
+  },
 };
 
 describe('AppController', () => {
@@ -28,6 +31,25 @@ describe('AppController', () => {
       status: 'ok',
       service: 'emdb-api',
       db: 'ok',
+    });
+  });
+
+  describe('findFreeWatchLinks', () => {
+    it('renvoie une liste vide sans titreVo', async () => {
+      await expect(controller.findFreeWatchLinks('')).resolves.toEqual({ links: [] });
+      expect(mockPrismaService.free_watch_sites.findMany).not.toHaveBeenCalled();
+    });
+
+    it("ne consulte que les sites actifs, et n'inclut pas debug sans ?debug=1", async () => {
+      mockPrismaService.free_watch_sites.findMany.mockResolvedValueOnce([]);
+
+      const result = await controller.findFreeWatchLinks('Inception');
+
+      expect(mockPrismaService.free_watch_sites.findMany).toHaveBeenCalledWith({
+        where: { actif: true },
+      });
+      expect(result).toEqual({ links: [] });
+      expect(result).not.toHaveProperty('debug');
     });
   });
 });

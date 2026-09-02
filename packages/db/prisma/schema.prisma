@@ -343,3 +343,13 @@ model title_studios {
 
   @@id([title_id, studio_id])
 }
+
+model free_watch_sites {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nom                String
+  url_recherche      String
+  url_directe        String?
+  selecteur_resultat String?
+  actif              Boolean  @default(true)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+}

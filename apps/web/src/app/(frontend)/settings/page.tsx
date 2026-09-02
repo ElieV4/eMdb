@@ -10,13 +10,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Type, Image as ImageIcon, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, Type, Image as ImageIcon, Upload, Trash2, Globe } from "lucide-react";
 import { useSettingsStore, SizePreference } from "@/store/settingsStore";
 import { useDeleteAccount } from "@/hooks/api/useDeleteAccount";
 import { useAuthStore } from "@/store/authStore";
 import { clearAuthCookie, clearRefreshCookie } from "@/lib/auth/authCookie";
 import { TraktImportButton } from "@/components/profile/TraktImportButton";
 import { ImportCreditsButton } from "@/components/profile/ImportCreditsButton";
+import { FreeWatchSitesSection } from "@/components/settings/FreeWatchSitesSection";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -137,6 +138,18 @@ export default function SettingsPage() {
             <TraktImportButton />
             <ImportCreditsButton />
           </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Globe className="h-5 w-5 text-primary" />
+            Sites de streaming libre
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Sites consultés pour trouver des liens gratuits sur les fiches film/série.
+            Partagés entre tous les comptes.
+          </p>
+          <FreeWatchSitesSection />
         </section>
 
         <section className="space-y-3 border-t pt-8">

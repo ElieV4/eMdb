@@ -164,24 +164,36 @@ export async function findArchiveOrgFilm(params: {
 }
 
 /**
- * Sites "gratuits" whitelistés (WatchTV, HydraFlix, MovieDB Wiki) — recherche
- * + vérification, plutôt qu'une URL devinée puis simplement testée en HEAD
- * (ancienne approche, peu fiable : slug parfois différent, faux négatifs sur
- * pages "introuvable" renvoyées avec un statut 200, aucune vérification que
- * la page trouvée est vraiment LE bon titre).
+ * Sites "gratuits" whitelistés — configurables par l'utilisateur (table
+ * `free_watch_sites`, cf. FreeWatchSitesService), plus aucun site codé en
+ * dur : l'algo doit fonctionner sur un site jamais vu, à partir d'une simple
+ * URL de recherche (+ éventuellement une URL devinée et un sélecteur CSS
+ * optionnels, cf. `FreeWatchSiteConfig`).
  *
- * Stratégie en deux temps par site :
- * 1. Essai direct sur l'URL devinée à partir du titre (rapide, fonctionne la
- *    majorité du temps) — la page est chargée et son <title> vérifié (pas de
- *    "page not found"/"404", ces sites renvoient parfois un statut 200 sur
- *    une page "introuvable" générique).
- * 2. Sinon, recherche via la barre de recherche du site (`?s=` ou
- *    équivalent), résultats parsés (cheerio) puis scorés :
+ * Stratégie en deux temps :
+ * 1. Si `url_directe` est configurée : essai direct sur l'URL devinée à
+ *    partir du titre (rapide) — la page est chargée et son <title> vérifié
+ *    (pas de "page not found"/"404", ces sites renvoient parfois un statut
+ *    200 sur une page "introuvable" générique).
+ * 2. Sinon (ou si l'essai direct est inconclusif — bloqué/erreur réseau, pas
+ *    "confirmé introuvable") : recherche via `url_recherche`, résultats
+ *    parsés (cheerio) puis scorés :
  *    - correspondance du hash d'affiche TMDB (nom de fichier de l'image
  *      poster, ex. "jkixsXzRh28q3PCqFoWcf7unghT.jpg") si disponible : signal
- *      fiable à 100%, ces sites récupèrent leurs affiches directement depuis
- *      image.tmdb.org avec le même hash que notre propre `affiche_url` ;
+ *      fiable à ~100%, ces sites récupèrent souvent leurs affiches
+ *      directement depuis image.tmdb.org avec le même hash que notre propre
+ *      `affiche_url` ;
  *    - sinon titre + année normalisés.
+ *
+ * `selecteur_resultat` (optionnel) cible les éléments "carte résultat" sur
+ * la page de recherche — sans lui, heuristique générique (tout `<a>`
+ * contenant une `<img>`, filtre déjà l'essentiel de la nav/footer). Dans les
+ * deux cas, l'extraction à l'intérieur de chaque élément candidat
+ * (`extractCandidateFromElement`) reste générique : `data-title`/`data-year`
+ * si présents (convention assez répandue), sinon alt de l'image / attribut
+ * title du lien / texte du lien — pas de sélecteur par site pour ces
+ * sous-champs, volontairement (cf. discussion : la précision par site perd
+ * face à la simplicité de configuration ici).
  *
  * La recherche essaie le titre VO puis VF (si différent) : un titre non
  * anglophone (`titre_vo` = titre original, parfois non-anglais même pour un
@@ -284,70 +296,104 @@ type FreeSiteQuery = {
   year: number | null;
 };
 
+/** Config minimale d'un site whitelisté (table `free_watch_sites`) —
+ * `url_directe`/`selecteur_resultat` optionnels, cf. commentaire ci-dessus. */
+export type FreeWatchSiteConfig = {
+  id: string;
+  nom: string;
+  url_recherche: string;
+  url_directe: string | null;
+  selecteur_resultat: string | null;
+};
+
+/** Substitution `{cle}` -> valeur dans un template d'URL — aucune clé
+ * inconnue dans le template n'est laissée en l'état (remplacée par ''). */
+export function resolveTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? '');
+}
+
 /**
- * WatchTV et HydraFlix renvoient un 403 Cloudflare systématique sur TOUTE
- * requête émise depuis Render (confirmé en direct via ?debug=1 — l'IP/ASN
- * du serveur est bloquée avant même que la logique de recherche s'exécute,
- * y compris pour la page de recherche elle-même), alors qu'ils répondent
- * normalement à un navigateur classique. Pas de contournement propre côté
- * code (proxy résidentiel = coût + zone grise, hors scope) : on retente la
- * vérification (elle marchera si le blocage est levé un jour), et si elle
- * échoue on affiche quand même le lien deviné, non vérifié, plutôt que rien
- * — retour utilisateur : un lien parfois mort vaut mieux qu'un match réel
- * manqué systématiquement.
+ * Extraction générique d'un candidat à partir d'un élément "carte résultat"
+ * — aucun sélecteur par site pour les sous-champs (href/titre/affiche/
+ * année) : `data-title`/`data-year` sur l'élément si présents (convention
+ * assez répandue chez ces sites, ex. MovieDB Wiki), sinon alt de l'image /
+ * attribut title du lien / texte du lien pour le titre. Pas d'extraction
+ * d'année hors `data-year` (trop variable d'un site à l'autre pour un
+ * sélecteur générique fiable) — le matching retombe alors sur le hash
+ * d'affiche ou le titre seul, cf. `pickBestCandidate`.
  */
-async function findOnWatchTv(params: FreeSiteQuery, trace?: string[]): Promise<FreeSiteMatch | null> {
-  const typeSegment = params.type === 'film' ? 'movie' : 'series';
-  const directUrl = `https://www.watchtv.click/${typeSegment}/${slugify(params.titreVo)}/`;
-  const direct = await fetchHtml(directUrl, trace);
-  if (direct && direct.status === 200) {
-    const $ = cheerio.load(direct.html);
-    if (!isSoftNotFound($('title').first().text())) {
-      return { url: directUrl, matchedBy: 'title' };
-    }
+export function extractCandidateFromElement(
+  $: cheerio.CheerioAPI,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  el: any,
+  pageUrl: string,
+): SearchCandidate | null {
+  const $el = $(el);
+  const $link = $el.is('a') ? $el : $el.find('a').first();
+  const hrefRaw = $link.attr('href')?.split('?')[0];
+  if (!hrefRaw) return null;
+
+  let href: string;
+  try {
+    href = new URL(hrefRaw, pageUrl).toString();
+  } catch {
+    return null;
   }
 
-  const queries = params.titreVf && params.titreVf !== params.titreVo
-    ? [params.titreVo, params.titreVf]
-    : [params.titreVo];
+  const $img = $el.is('img') ? $el : $el.find('img').first();
+  const posterSrc =
+    $img.attr('data-src') || $img.attr('data-lazy-src') || $img.attr('data-original') || $img.attr('src') || '';
 
-  for (const query of queries) {
-    const search = await fetchHtml(`https://www.watchtv.click/?s=${encodeURIComponent(query)}`, trace);
-    if (!search || search.status !== 200) continue;
+  const title =
+    $el.attr('data-title')?.trim() ||
+    $img.attr('alt')?.trim() ||
+    $link.attr('title')?.trim() ||
+    $link.text().trim();
+  if (!title) return null;
 
-    const $ = cheerio.load(search.html);
-    const candidates: SearchCandidate[] = [];
-    $('article.TPost').each((_, el) => {
-      const $el = $(el);
-      const href = $el.find('a').first().attr('href')?.split('?')[0];
-      const title = $el.find('h2.Title, .Title').first().text().trim();
-      if (!href || !title) return;
-      const posterSrc = $el.find('img').attr('data-src') || $el.find('img').attr('src') || '';
-      const yearText = $el.find('.Qlty.Yr, .Date').first().text().trim();
-      candidates.push({
-        url: href,
-        title,
-        posterHash: extractPosterHash(posterSrc),
-        year: yearText ? parseInt(yearText, 10) || null : null,
-      });
-    });
+  const yearAttr = $el.attr('data-year');
 
-    const best = pickBestCandidate(candidates, query, params.posterHash, params.year);
-    if (best) return best;
-  }
-
-  return { url: directUrl, matchedBy: 'unverified' };
+  return {
+    url: href,
+    title,
+    posterHash: extractPosterHash(posterSrc),
+    year: yearAttr ? parseInt(yearAttr, 10) || null : null,
+  };
 }
 
-/** Même situation que WatchTV (403 Cloudflare systématique depuis Render) —
- * cf. commentaire sur findOnWatchTv. */
-async function findOnHydraflix(params: FreeSiteQuery, trace?: string[]): Promise<FreeSiteMatch | null> {
-  const directUrl = `https://www.hydraflix.cc/${slugify(params.titreVo)}/`;
-  const direct = await fetchHtml(directUrl, trace);
-  if (direct && direct.status === 200) {
-    const $ = cheerio.load(direct.html);
-    if (!isSoftNotFound($('title').first().text())) {
-      return { url: directUrl, matchedBy: 'title' };
+/**
+ * Certains sites (ex. WatchTV/HydraFlix, avant leur migration vers cette
+ * table) renvoient un 403 Cloudflare systématique sur TOUTE requête émise
+ * depuis Render (l'IP/ASN du serveur est bloquée avant même que la logique
+ * de recherche s'exécute), alors qu'ils répondent normalement à un
+ * navigateur classique. Pas de contournement propre côté code (proxy
+ * résidentiel = coût + zone grise, hors scope) : si l'essai direct est
+ * inconclusif (bloqué/erreur réseau — PAS un "introuvable" confirmé, la
+ * page a bien répondu) et que la recherche ne trouve rien non plus, on
+ * affiche quand même le lien deviné, non vérifié, plutôt que rien — retour
+ * utilisateur : un lien parfois mort vaut mieux qu'un match réel manqué
+ * systématiquement.
+ */
+async function findOnGenericSite(
+  site: FreeWatchSiteConfig,
+  params: FreeSiteQuery,
+  trace?: string[],
+): Promise<FreeSiteMatch | null> {
+  let directUrl: string | null = null;
+  let directConfirmedMissing = false;
+
+  if (site.url_directe) {
+    directUrl = resolveTemplate(site.url_directe, {
+      slug: slugify(params.titreVo),
+      type: params.type === 'film' ? 'movie' : 'series',
+    });
+    const direct = await fetchHtml(directUrl, trace);
+    if (direct && direct.status === 200) {
+      const $ = cheerio.load(direct.html);
+      if (!isSoftNotFound($('title').first().text())) {
+        return { url: directUrl, matchedBy: 'title' };
+      }
+      directConfirmedMissing = true;
     }
   }
 
@@ -356,90 +402,30 @@ async function findOnHydraflix(params: FreeSiteQuery, trace?: string[]): Promise
     : [params.titreVo];
 
   for (const query of queries) {
-    const search = await fetchHtml(`https://www.hydraflix.cc/?s=${encodeURIComponent(query)}`, trace);
+    const searchUrl = resolveTemplate(site.url_recherche, { query: encodeURIComponent(query) });
+    const search = await fetchHtml(searchUrl, trace);
     if (!search || search.status !== 200) continue;
 
     const $ = cheerio.load(search.html);
+    const resultSelector = site.selecteur_resultat || 'a:has(img)';
     const candidates: SearchCandidate[] = [];
-    $('[id^="post-"]').each((_, el) => {
-      const $el = $(el);
-      const href = $el.find('.poster a, .meta a').first().attr('href')?.split('?')[0];
-      const title = $el.find('.meta a').last().text().trim();
-      if (!href || !title) return;
-      const posterSrc = $el.find('img').attr('data-src') || $el.find('img').attr('src') || '';
-      const yearText = $el.find('.meta span').first().text().trim();
-      candidates.push({
-        url: href,
-        title,
-        posterHash: extractPosterHash(posterSrc),
-        year: yearText ? parseInt(yearText, 10) || null : null,
-      });
+    $(resultSelector).each((_, el) => {
+      const candidate = extractCandidateFromElement($, el, searchUrl);
+      if (candidate) candidates.push(candidate);
     });
 
     const best = pickBestCandidate(candidates, query, params.posterHash, params.year);
     if (best) return best;
   }
 
-  return { url: directUrl, matchedBy: 'unverified' };
-}
-
-async function findOnMoviedbWiki(params: FreeSiteQuery, trace?: string[]): Promise<FreeSiteMatch | null> {
-  const typeSegment = params.type === 'film' ? 'movies' : 'tv';
-  const directUrl = `https://www.moviedb.wiki/${typeSegment}/${slugify(params.titreVo)}/`;
-  const direct = await fetchHtml(directUrl, trace);
-  if (direct && direct.status === 200) {
-    const $ = cheerio.load(direct.html);
-    if (!isSoftNotFound($('title').first().text())) {
-      return { url: directUrl, matchedBy: 'title' };
-    }
+  if (directUrl && !directConfirmedMissing) {
+    return { url: directUrl, matchedBy: 'unverified' };
   }
-
-  const queries = params.titreVf && params.titreVf !== params.titreVo
-    ? [params.titreVo, params.titreVf]
-    : [params.titreVo];
-
-  for (const query of queries) {
-    const search = await fetchHtml(`https://www.moviedb.wiki/?s=${encodeURIComponent(query)}`, trace);
-    if (!search || search.status !== 200) continue;
-
-    const $ = cheerio.load(search.html);
-    const candidates: SearchCandidate[] = [];
-    $('.movie-card').each((_, el) => {
-      const $el = $(el);
-      const dataTitle = $el.attr('data-title');
-      const dataYear = $el.attr('data-year');
-      const href = $el.find('a').first().attr('href');
-      const title = dataTitle || $el.find('.entry-title a').first().text().trim();
-      if (!href || !title) return;
-      const posterSrc = $el.find('img').attr('src') || $el.find('img').attr('data-src') || '';
-      candidates.push({
-        url: href,
-        title,
-        posterHash: extractPosterHash(posterSrc),
-        year: dataYear ? parseInt(dataYear, 10) || null : null,
-      });
-    });
-
-    const best = pickBestCandidate(candidates, query, params.posterHash, params.year);
-    if (best) return best;
-  }
-
   return null;
 }
 
-export type FreeSiteKey = 'watchtv' | 'hydraflix' | 'moviedbwiki';
-
-const FREE_SITE_FINDERS: Record<
-  FreeSiteKey,
-  (params: FreeSiteQuery, trace?: string[]) => Promise<FreeSiteMatch | null>
-> = {
-  watchtv: findOnWatchTv,
-  hydraflix: findOnHydraflix,
-  moviedbwiki: findOnMoviedbWiki,
-};
-
 export async function findFreeWatchLink(
-  site: FreeSiteKey,
+  site: FreeWatchSiteConfig,
   params: {
     titreVo: string;
     titreVf?: string | null;
@@ -449,7 +435,8 @@ export async function findFreeWatchLink(
   },
   trace?: string[],
 ): Promise<FreeSiteMatch | null> {
-  return FREE_SITE_FINDERS[site](
+  return findOnGenericSite(
+    site,
     {
       titreVo: params.titreVo,
       titreVf: params.titreVf,
