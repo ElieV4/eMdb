@@ -171,6 +171,24 @@ async function doFetch<T>(
     }
 
     return (await res.json()) as T;
+  } catch (err) {
+    // Timeout (souvent un redémarrage à froid Render free-tier — le service
+    // se met en veille après 15 min d'inactivité et met plusieurs dizaines
+    // de secondes à repartir, largement au-delà des 10s de timeout ici) ou
+    // serveur injoignable (TypeError natif de fetch) : messages génériques
+    // du navigateur ("The operation was aborted", "Failed to fetch")
+    // remplacés par quelque chose d'exploitable pour l'utilisateur — reste
+    // sans effet sur les erreurs déjà volontairement levées ci-dessus
+    // (ni AbortError ni TypeError).
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(
+        "Le serveur ne répond pas (redémarrage à froid possible) — réessaie dans quelques secondes.",
+      );
+    }
+    if (err instanceof TypeError) {
+      throw new Error("Impossible de contacter le serveur. Vérifie ta connexion.");
+    }
+    throw err;
   } finally {
     clearTimeout(timeout);
   }
