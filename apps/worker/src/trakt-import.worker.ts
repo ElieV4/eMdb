@@ -447,6 +447,7 @@ export function createTraktImportWorker(redisUrl: string) {
       connection,
       concurrency: 1,
       lockDuration: 60 * 60 * 1000, // 1h — import complet potentiellement long
+      drainDelay: 30,
     },
   );
 }

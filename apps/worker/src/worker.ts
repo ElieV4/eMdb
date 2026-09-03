@@ -199,6 +199,9 @@ export function createImportWorker(redisUrl: string) {
       connection,
       concurrency: DEFAULT_WORKER_CONCURRENCY,
       lockDuration: 600_000,
+      // Défaut BullMQ (5s) trop agressif pour un free tier Redis facturé à
+      // la commande (Upstash) — rien ici n'est urgent à la seconde près.
+      drainDelay: 30,
     },
   );
 }
@@ -259,6 +262,7 @@ export function createCronWorker(redisUrl: string) {
       connection,
       concurrency: 1,
       lockDuration: 600_000,
+      drainDelay: 30,
     },
   );
 }

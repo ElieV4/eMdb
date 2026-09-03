@@ -179,6 +179,7 @@ export function createCreditsImportWorker(redisUrl: string) {
       connection,
       concurrency: 1,
       lockDuration: 60 * 60 * 1000,
+      drainDelay: 30,
     },
   );
 }
