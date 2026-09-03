@@ -166,6 +166,17 @@ export class ImportController {
     return this.importService.getCreditsJobStatus(jobId);
   }
 
+  /**
+   * GET /import/credits/preview-count
+   * Nombre de titres concernés par un import de credits (pour affichage à
+   * côté du bouton, avant de lancer le job).
+   */
+  @Get('credits/preview-count')
+  async getCreditsPreviewCount(@CurrentUser() user: any) {
+    const count = await this.importService.getCreditsImportPreviewCount(user.id);
+    return { count };
+  }
+
   /** Cherche récursivement (1 niveau) le dossier contenant les fichiers repères Trakt. */
   private findExportRoot(dir: string): string | null {
     if (this.hasMarkerFile(dir)) return dir;

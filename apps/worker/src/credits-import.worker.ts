@@ -24,6 +24,20 @@ export const CREDITS_IMPORT_QUEUE_NAME = 'credits-import';
 
 const CREDIT_FILTER = ['acteur', 'realisateur'];
 const BATCH_SIZE = 100;
+const CREDITS_THRESHOLD = 10;
+
+async function filterTitlesMissingCredits<T extends { titleId: string }>(titles: T[]): Promise<T[]> {
+  if (titles.length === 0) return titles;
+
+  const counts = await prisma.credits.groupBy({
+    by: ['title_id'],
+    where: { title_id: { in: titles.map((t) => t.titleId) } },
+    _count: { id: true },
+  });
+  const countByTitleId = new Map(counts.map((c) => [c.title_id, c._count.id]));
+
+  return titles.filter((t) => (countByTitleId.get(t.titleId) ?? 0) < CREDITS_THRESHOLD);
+}
 
 async function getUserTitlesByYear(userId: string) {
   const [watches, ratings, listItems] = await Promise.all([
@@ -135,7 +149,8 @@ async function getUserTitlesByYear(userId: string) {
 async function runCreditsImport(job: Job<CreditsImportJobData>): Promise<CreditsImportResult> {
   const { userId } = job.data;
 
-  const titles = await getUserTitlesByYear(userId);
+  const allTitles = await getUserTitlesByYear(userId);
+  const titles = await filterTitlesMissingCredits(allTitles);
   const total = titles.length;
   let imported = 0;
   let failed = 0;

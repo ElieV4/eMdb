@@ -6,13 +6,25 @@ import {
   CREDITS_IMPORT_QUEUE_NAME,
   buildRedisConnection,
 } from './import.config';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+
+/**
+ * Doit rester synchronisé avec CREDITS_THRESHOLD dans
+ * apps/worker/src/credits-import.worker.ts — sert uniquement à afficher un
+ * aperçu du nombre de titres concernés avant de lancer le job.
+ */
+const CREDITS_THRESHOLD = 10;
 
 @Injectable()
 export class ImportService {
   private readonly logger = new Logger(ImportService.name);
   private queues = new Map<string, Queue>();
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   private getQueue(queueName: string): Queue {
     let queue = this.queues.get(queueName);
@@ -89,6 +101,36 @@ export class ImportService {
 
   async getCreditsJobStatus(jobId: string) {
     return this.getStatus(CREDITS_IMPORT_QUEUE_NAME, jobId);
+  }
+
+  /**
+   * Nombre de titres qu'un import de credits traiterait pour cet
+   * utilisateur (watches/ratings/listes, avec moins de CREDITS_THRESHOLD
+   * credits déjà en base) — affiché à côté du bouton "Importer les credits"
+   * pour donner une idée du volume avant de lancer le job.
+   */
+  async getCreditsImportPreviewCount(userId: string): Promise<number> {
+    const rows = await this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS count
+      FROM (
+        SELECT t.id
+        FROM (
+          SELECT title_id FROM user_watches WHERE user_id = ${userId}::uuid AND title_id IS NOT NULL
+          UNION
+          SELECT title_id FROM user_ratings WHERE user_id = ${userId}::uuid AND title_id IS NOT NULL
+          UNION
+          SELECT li.title_id FROM list_items li
+          JOIN user_lists ul ON ul.id = li.list_id
+          WHERE ul.user_id = ${userId}::uuid
+        ) ids
+        JOIN titles t ON t.id = ids.title_id
+        LEFT JOIN credits c ON c.title_id = t.id
+        GROUP BY t.id
+        HAVING COUNT(c.id) < ${CREDITS_THRESHOLD}
+      ) sub
+    `);
+
+    return Number(rows[0]?.count ?? 0);
   }
 
   private async getStatus(queueName: string, jobId: string) {

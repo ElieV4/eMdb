@@ -24,6 +24,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   useStartCreditsImport,
   useCreditsImportStatus,
+  useCreditsImportPreviewCount,
 } from "@/hooks/api/useImportCredits";
 
 export function ImportCreditsButton() {
@@ -33,6 +34,7 @@ export function ImportCreditsButton() {
   const upload = useStartCreditsImport();
   const statusQuery = useCreditsImportStatus(jobId);
   const status = statusQuery.data;
+  const previewCount = useCreditsImportPreviewCount();
 
   const isUploading = upload.isPending;
   const isDone = status?.status === "completed";
@@ -59,11 +61,17 @@ export function ImportCreditsButton() {
       : 0;
 
   return (
-    <div>
+    <div className="flex items-center gap-2">
       <Button type="button" variant="outline" onClick={handleOpen}>
         <Upload className="mr-2 h-4 w-4" />
         Importer les credits
       </Button>
+      {previewCount.data && previewCount.data.count > 0 && (
+        <span className="text-sm text-muted-foreground">
+          {previewCount.data.count} titre{previewCount.data.count > 1 ? "s" : ""} concerné
+          {previewCount.data.count > 1 ? "s" : ""}
+        </span>
+      )}
 
       <Dialog
         open={open}

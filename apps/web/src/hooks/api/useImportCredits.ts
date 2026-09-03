@@ -68,6 +68,13 @@ export function useStartCreditsImport() {
   });
 }
 
+export function useCreditsImportPreviewCount() {
+  return useQuery({
+    queryKey: ["import", "credits-preview-count"],
+    queryFn: () => apiFetch<{ count: number }>(`/import/credits/preview-count`),
+  });
+}
+
 const ACTIVE_STATUSES = new Set(["waiting", "active", "delayed", "paused"]);
 
 export function useCreditsImportStatus(jobId: string | null) {
