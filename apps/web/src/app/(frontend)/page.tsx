@@ -36,6 +36,7 @@ import {
 } from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
 import { buildEntityUrl } from "@/lib/utils";
+import { buildCardText, formatDuration, formatRatingStars } from "@/lib/cardFormatting";
 
 // Convertir Title en TitleSearchResult pour compatibilité avec TitleCard
 function titleToSearchResult(title: Title): TitleSearchResult {
@@ -159,24 +160,33 @@ function HomePageContent() {
     return watch.titles?.type === filters.type;
   });
 
-  const historyCards: DateCardData[] = filteredRecentWatches.map((watch) => ({
-    key: watch.id,
-    href: watch.episodes
-      ? `/episodes/${watch.episodes.id}`
-      : buildEntityUrl("/titles", watch.title_id ?? "", watch.titles?.titre_vf || watch.titles?.titre_vo),
-    imageUrl: watch.titles?.affiche_url,
-    title:
-      watch.titles?.titre_vf ||
-      watch.titles?.titre_vo ||
-      watch.episodes?.titre ||
-      "Inconnu",
-    subtitle: watch.episodes
-      ? `Épisode ${watch.episodes.numero}`
-      : watch.titles?.type === "serie"
-        ? "Série"
-        : "Film",
-    date: watch.date_vue,
-  }));
+  const historyCards: DateCardData[] = filteredRecentWatches.map((watch) => {
+    const serie = watch.episodes?.seasons.titles;
+    const resolvedTitle = watch.titles ?? serie;
+    const annee = resolvedTitle?.date_sortie
+      ? new Date(resolvedTitle.date_sortie).getFullYear()
+      : null;
+    const { title, subtitle } = buildCardText({
+      type: watch.episodes ? "serie" : ((resolvedTitle?.type as "film" | "serie") ?? "film"),
+      titre: resolvedTitle?.titre_vf || resolvedTitle?.titre_vo || "Titre inconnu",
+      annee,
+      episodeTitre: watch.episodes?.titre,
+      saison: watch.episodes?.seasons.numero,
+      episodeNumero: watch.episodes?.numero,
+      metricLabel: formatRatingStars(watch.note_perso),
+    });
+    return {
+      key: watch.id,
+      href: watch.episodes
+        ? `/episodes/${watch.episodes.id}`
+        : buildEntityUrl("/titles", watch.title_id ?? "", resolvedTitle?.titre_vf || resolvedTitle?.titre_vo),
+      imageUrl: resolvedTitle?.affiche_url,
+      title,
+      subtitle: subtitle ?? undefined,
+      date: watch.date_vue,
+      showTime: true,
+    };
+  });
 
   const calendarCards: DateCardData[] = [...(calendarEntries ?? [])]
     .sort((a, b) => {
@@ -184,14 +194,24 @@ function HomePageContent() {
       const db = b.date_diffusion ? new Date(b.date_diffusion).getTime() : Infinity;
       return da - db;
     })
-    .map((entry, idx) => ({
-      key: `${entry.title_id}-${entry.saison}-${entry.episode_numero}-${idx}`,
-      href: buildEntityUrl("/titles", entry.title_id, entry.titre_vf || entry.titre_vo),
-      imageUrl: entry.affiche_url,
-      title: entry.titre_vf || entry.titre_vo,
-      subtitle: `S${String(entry.saison).padStart(2, "0")}E${String(entry.episode_numero).padStart(2, "0")}${entry.episode_titre ? ` — ${entry.episode_titre}` : ""}`,
-      date: entry.date_diffusion,
-    }));
+    .map((entry, idx) => {
+      const { title, subtitle } = buildCardText({
+        type: "serie",
+        titre: entry.titre_vf || entry.titre_vo,
+        episodeTitre: entry.episode_titre,
+        saison: entry.saison,
+        episodeNumero: entry.episode_numero,
+        metricLabel: formatDuration(entry.duree_minutes),
+      });
+      return {
+        key: `${entry.title_id}-${entry.saison}-${entry.episode_numero}-${idx}`,
+        href: buildEntityUrl("/titles", entry.title_id, entry.titre_vf || entry.titre_vo),
+        imageUrl: entry.affiche_url,
+        title,
+        subtitle: subtitle ?? undefined,
+        date: entry.date_diffusion,
+      };
+    });
 
   // Si l'authentification est encore en cours de vérification
   if (isAuthLoading) {

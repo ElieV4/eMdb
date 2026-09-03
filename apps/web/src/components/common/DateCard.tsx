@@ -34,6 +34,10 @@ type DateCardProps = {
   /** Menu actions rapides ("⋮", ex. `TitleQuickActionsMenu`) — rendu en
    * sibling du `Link`, à côté du bouton de suppression s'il est présent. */
   quickActions?: ReactNode;
+  /** Ajoute l'heure (HH:mm) après la date relative dans le badge — utilisé
+   * pour une date de VISIONNAGE (Historique), où l'heure est une info utile,
+   * pas pour une date de diffusion (Calendrier). */
+  showTime?: boolean;
 };
 
 export function DateCard({
@@ -49,12 +53,22 @@ export function DateCard({
   inWatchlist = false,
   inFavorites = false,
   quickActions,
+  showTime = false,
 }: DateCardProps) {
   const src = imageUrl
     ? imageUrl.startsWith("http")
       ? imageUrl
       : `${TMDB_POSTER_BASE_URL}${imageUrl}`
     : null;
+
+  const dateLabel = (() => {
+    if (!date) return null;
+    const relative = formatRelativeDate(date);
+    if (!showTime) return relative;
+    const target = typeof date === "string" ? new Date(date) : date;
+    const time = `${String(target.getHours()).padStart(2, "0")}:${String(target.getMinutes()).padStart(2, "0")}`;
+    return `${relative} ${time}`;
+  })();
 
   return (
     <div className={cn("group relative shrink-0 w-32 sm:w-36", className)}>
@@ -96,9 +110,9 @@ export function DateCard({
             </div>
           )}
 
-          {date && (
+          {dateLabel && (
             <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
-              {formatRelativeDate(date)}
+              {dateLabel}
             </span>
           )}
         </div>
@@ -106,7 +120,7 @@ export function DateCard({
           {title}
         </p>
         {subtitle && (
-          <p className="text-xs text-muted-foreground line-clamp-1">
+          <p className="text-[11px] italic text-muted-foreground line-clamp-1">
             {subtitle}
           </p>
         )}

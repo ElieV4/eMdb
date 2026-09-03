@@ -31,6 +31,7 @@ import { parseTitleFilters, buildListIdsByTitle } from "@/lib/titleFilters";
 import { groupByPeriod, Period } from "@/lib/periodGrouping";
 import { UserWatch } from "@/lib/types/api";
 import { buildEntityUrl } from "@/lib/utils";
+import { buildCardText, formatRatingStars } from "@/lib/cardFormatting";
 
 function HistoryPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
@@ -224,9 +225,18 @@ function HistoryPageContent() {
                     // de la série se lit via episodes.seasons.titles.
                     const serie = watch.episodes?.seasons.titles;
                     const resolvedTitle = watch.titles ?? serie;
-                    const label = watch.episodes
-                      ? `${serie?.titre_vf || serie?.titre_vo || "Série"} — Épisode ${watch.episodes.numero}`
-                      : watch.titles?.titre_vf || watch.titles?.titre_vo || "Titre inconnu";
+                    const dateSortie = resolvedTitle?.date_sortie
+                      ? new Date(resolvedTitle.date_sortie).getFullYear()
+                      : null;
+                    const { title: label, subtitle } = buildCardText({
+                      type: watch.episodes ? "serie" : ((resolvedTitle?.type as "film" | "serie") ?? "film"),
+                      titre: resolvedTitle?.titre_vf || resolvedTitle?.titre_vo || "Titre inconnu",
+                      annee: dateSortie,
+                      episodeTitre: watch.episodes?.titre,
+                      saison: watch.episodes?.seasons.numero,
+                      episodeNumero: watch.episodes?.numero,
+                      metricLabel: formatRatingStars(watch.note_perso),
+                    });
                     const href = watch.episodes
                       ? `/episodes/${watch.episodes.id}`
                       : buildEntityUrl(
@@ -247,7 +257,9 @@ function HistoryPageContent() {
                           href={href}
                           imageUrl={resolvedTitle?.affiche_url}
                           title={label}
+                          subtitle={subtitle ?? undefined}
                           date={watch.date_vue}
+                          showTime
                           watched={resolvedTitle ? watchedTitles?.has(resolvedTitle.id) : false}
                           inWatchlist={resolvedTitle ? watchlistIds.has(resolvedTitle.id) : false}
                           inFavorites={resolvedTitle ? favoriteIds.has(resolvedTitle.id) : false}

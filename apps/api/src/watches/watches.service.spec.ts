@@ -39,6 +39,9 @@ const prismaServiceMock = {
   user_lists: {
     findFirst: jest.fn(),
   },
+  user_ratings: {
+    findMany: jest.fn(),
+  },
 };
 
 const listsServiceMock = {
@@ -365,13 +368,14 @@ describe('WatchesService', () => {
 
   describe('listWatches', () => {
     it('retourne la liste paginée', async () => {
-      const mockData = [{ id: watchId, title_id: titleId, date_vue: new Date() }];
+      const mockData = [{ id: watchId, title_id: titleId, episode_id: null, date_vue: new Date() }];
       prismaServiceMock.user_watches.findMany.mockResolvedValue(mockData);
       prismaServiceMock.user_watches.count.mockResolvedValue(1);
+      prismaServiceMock.user_ratings.findMany.mockResolvedValue([]);
 
       const result = await service.listWatches(userId, {});
 
-      expect(result.items).toEqual(mockData);
+      expect(result.items).toEqual([{ ...mockData[0], note_perso: null }]);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
       expect(result.limit).toBe(20);

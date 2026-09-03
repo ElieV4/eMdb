@@ -16,6 +16,7 @@ export type DateCardData = {
   title: string;
   subtitle?: string;
   date?: Date | string | null;
+  showTime?: boolean;
 };
 
 type DateCardSliderProps = {
@@ -44,6 +45,7 @@ export function DateCardSlider({
           title={item.title}
           subtitle={item.subtitle}
           date={item.date}
+          showTime={item.showTime}
         />
       ))}
     </CardSlider>

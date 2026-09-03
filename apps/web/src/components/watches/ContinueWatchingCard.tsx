@@ -17,6 +17,7 @@ import { TitleQuickActionsMenu } from "@/components/titles/TitleQuickActionsMenu
 import { TitleWatchedButton } from "@/components/titles/TitleWatchedButton";
 import { ContinueWatchingEntry } from "@/lib/types/api";
 import { buildEntityUrl, cn } from "@/lib/utils";
+import { buildCardText, formatDuration } from "@/lib/cardFormatting";
 
 const TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p/w300";
 const POSTER_WIDTH = 144;
@@ -38,8 +39,14 @@ export function ContinueWatchingCard({
   watchlistStatus,
   className,
 }: ContinueWatchingCardProps) {
-  const title = entry.titre_vf || entry.titre_vo;
-  const episodeCode = `S${String(entry.saison).padStart(2, "0")}E${String(entry.episode_numero).padStart(2, "0")}`;
+  const { title, subtitle } = buildCardText({
+    type: "serie",
+    titre: entry.titre_vf || entry.titre_vo,
+    episodeTitre: entry.episode_titre,
+    saison: entry.saison,
+    episodeNumero: entry.episode_numero,
+    metricLabel: formatDuration(entry.duree_minutes),
+  });
   const src = entry.affiche_url
     ? entry.affiche_url.startsWith("http")
       ? entry.affiche_url
@@ -86,10 +93,11 @@ export function ContinueWatchingCard({
         <p className="mt-1.5 text-sm font-medium line-clamp-1 group-hover:text-primary">
           {title}
         </p>
-        <p className="text-xs text-muted-foreground line-clamp-1">
-          {episodeCode}
-          {entry.episode_titre ? ` — ${entry.episode_titre}` : ""}
-        </p>
+        {subtitle && (
+          <p className="text-[11px] italic text-muted-foreground line-clamp-1">
+            {subtitle}
+          </p>
+        )}
       </Link>
 
       <TitleQuickActionsMenu

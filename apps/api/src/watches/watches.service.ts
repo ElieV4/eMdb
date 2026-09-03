@@ -448,6 +448,7 @@ export class WatchesService {
               titre_vf: true,
               affiche_url: true,
               type: true,
+              date_sortie: true,
             },
           },
           episodes: {
@@ -455,6 +456,7 @@ export class WatchesService {
               id: true,
               numero: true,
               titre: true,
+              duree_minutes: true,
               seasons: {
                 select: {
                   numero: true,
@@ -466,6 +468,7 @@ export class WatchesService {
                       titre_vf: true,
                       affiche_url: true,
                       type: true,
+                      date_sortie: true,
                     },
                   },
                 },
@@ -477,8 +480,39 @@ export class WatchesService {
       this.prisma.user_watches.count({ where }),
     ]);
 
+    // Note personnelle par visionnage (affichée en sous-titre à la place de
+    // la durée dans l'Historique) — pas de relation directe user_watches ->
+    // user_ratings, jointure manuelle limitée aux titres/épisodes de cette
+    // page plutôt qu'un lookup par item.
+    const titleIds = [...new Set(data.filter((w) => w.title_id).map((w) => w.title_id as string))];
+    const episodeIds = [...new Set(data.filter((w) => w.episode_id).map((w) => w.episode_id as string))];
+    const ratings =
+      titleIds.length > 0 || episodeIds.length > 0
+        ? await this.prisma.user_ratings.findMany({
+            where: {
+              user_id: userId,
+              OR: [
+                ...(titleIds.length > 0 ? [{ title_id: { in: titleIds } }] : []),
+                ...(episodeIds.length > 0 ? [{ episode_id: { in: episodeIds } }] : []),
+              ],
+            },
+            select: { title_id: true, episode_id: true, note_perso: true },
+          })
+        : [];
+    const ratingByTitleId = new Map(ratings.filter((r) => r.title_id).map((r) => [r.title_id, Number(r.note_perso)]));
+    const ratingByEpisodeId = new Map(
+      ratings.filter((r) => r.episode_id).map((r) => [r.episode_id, Number(r.note_perso)]),
+    );
+
+    const items = data.map((watch) => ({
+      ...watch,
+      note_perso: watch.episode_id
+        ? (ratingByEpisodeId.get(watch.episode_id) ?? null)
+        : (ratingByTitleId.get(watch.title_id) ?? null),
+    }));
+
     const totalPages = Math.ceil(total / limit);
-    return { items: data, total, page, limit, totalPages };
+    return { items, total, page, limit, totalPages };
   }
 
   // ======================================================================
@@ -557,6 +591,7 @@ export class WatchesService {
           numero: true,
           titre: true,
           date_sortie: true,
+          duree_minutes: true,
           seasons: {
             select: {
               numero: true,
@@ -593,6 +628,7 @@ export class WatchesService {
       episode_numero: episode.numero,
       episode_titre: episode.titre,
       date_diffusion: episode.date_sortie,
+      duree_minutes: episode.duree_minutes,
       nb_non_vus: nbNonVusParTitre.get(episode.seasons.title_id) ?? 0,
     }));
 
@@ -672,6 +708,7 @@ export class WatchesService {
         numero: true,
         titre: true,
         date_sortie: true,
+        duree_minutes: true,
         seasons: { select: { numero: true, title_id: true } },
         user_watches: {
           where: { user_id: userId },
@@ -688,7 +725,13 @@ export class WatchesService {
       watched: number;
       lastWatchedAt: Date | null;
       lastAiredAt: Date | null;
-      nextEpisode: { id: string; saison: number; numero: number; titre: string | null } | null;
+      nextEpisode: {
+        id: string;
+        saison: number;
+        numero: number;
+        titre: string | null;
+        duree_minutes: number | null;
+      } | null;
     };
     const aggByTitle = new Map<string, Agg>();
 
@@ -716,6 +759,7 @@ export class WatchesService {
           saison: episode.seasons.numero,
           numero: episode.numero,
           titre: episode.titre,
+          duree_minutes: episode.duree_minutes,
         };
       }
 
@@ -751,6 +795,7 @@ export class WatchesService {
           saison: agg.nextEpisode.saison,
           episode_numero: agg.nextEpisode.numero,
           episode_titre: agg.nextEpisode.titre,
+          duree_minutes: agg.nextEpisode.duree_minutes,
           total_episodes: agg.total,
           episodes_vus: agg.watched,
           episodes_restants: agg.total - agg.watched,

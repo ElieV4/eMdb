@@ -23,6 +23,7 @@ import { AlertCircle, Tv } from "lucide-react";
 import { groupByPeriod, Period } from "@/lib/periodGrouping";
 import { CalendarEntry } from "@/lib/types/api";
 import { buildEntityUrl } from "@/lib/utils";
+import { buildCardText, formatDuration } from "@/lib/cardFormatting";
 
 function CalendarPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
@@ -135,16 +136,26 @@ function CalendarPageContent() {
                   {group.label} ({group.items.length})
                 </h2>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-                  {group.items.map((entry, idx) => (
-                    <DateCard
-                      key={`${entry.title_id}-${entry.saison}-${entry.episode_numero}-${idx}`}
-                      href={buildEntityUrl("/titles", entry.title_id, entry.titre_vf || entry.titre_vo)}
-                      imageUrl={entry.affiche_url}
-                      title={entry.titre_vf || entry.titre_vo}
-                      subtitle={`S${String(entry.saison).padStart(2, "0")}E${String(entry.episode_numero).padStart(2, "0")}${entry.episode_titre ? ` — ${entry.episode_titre}` : ""}`}
-                      date={entry.date_diffusion}
-                    />
-                  ))}
+                  {group.items.map((entry, idx) => {
+                    const { title, subtitle } = buildCardText({
+                      type: "serie",
+                      titre: entry.titre_vf || entry.titre_vo,
+                      episodeTitre: entry.episode_titre,
+                      saison: entry.saison,
+                      episodeNumero: entry.episode_numero,
+                      metricLabel: formatDuration(entry.duree_minutes),
+                    });
+                    return (
+                      <DateCard
+                        key={`${entry.title_id}-${entry.saison}-${entry.episode_numero}-${idx}`}
+                        href={buildEntityUrl("/titles", entry.title_id, entry.titre_vf || entry.titre_vo)}
+                        imageUrl={entry.affiche_url}
+                        title={title}
+                        subtitle={subtitle ?? undefined}
+                        date={entry.date_diffusion}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -155,16 +166,26 @@ function CalendarPageContent() {
                   Date inconnue ({undated.length})
                 </h2>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-                  {undated.map((entry, idx) => (
-                    <DateCard
-                      key={`${entry.title_id}-${entry.saison}-${entry.episode_numero}-undated-${idx}`}
-                      href={buildEntityUrl("/titles", entry.title_id, entry.titre_vf || entry.titre_vo)}
-                      imageUrl={entry.affiche_url}
-                      title={entry.titre_vf || entry.titre_vo}
-                      subtitle={`S${String(entry.saison).padStart(2, "0")}E${String(entry.episode_numero).padStart(2, "0")}${entry.episode_titre ? ` — ${entry.episode_titre}` : ""}`}
-                      date={null}
-                    />
-                  ))}
+                  {undated.map((entry, idx) => {
+                    const { title, subtitle } = buildCardText({
+                      type: "serie",
+                      titre: entry.titre_vf || entry.titre_vo,
+                      episodeTitre: entry.episode_titre,
+                      saison: entry.saison,
+                      episodeNumero: entry.episode_numero,
+                      metricLabel: formatDuration(entry.duree_minutes),
+                    });
+                    return (
+                      <DateCard
+                        key={`${entry.title_id}-${entry.saison}-${entry.episode_numero}-undated-${idx}`}
+                        href={buildEntityUrl("/titles", entry.title_id, entry.titre_vf || entry.titre_vo)}
+                        imageUrl={entry.affiche_url}
+                        title={title}
+                        subtitle={subtitle ?? undefined}
+                        date={null}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             )}

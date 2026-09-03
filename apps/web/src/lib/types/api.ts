@@ -99,6 +99,9 @@ export type UserWatch = {
   support?: string | null;
   compagnie?: string | null;
   emotion?: string[] | null;
+  /** Note personnelle (/10) sur le titre/épisode de ce visionnage, si notée
+   * — affichée en sous-titre des cards Historique à la place de la durée. */
+  note_perso?: number | null;
   titles?: {
     id: string;
     tmdb_id: number | null;
@@ -106,11 +109,13 @@ export type UserWatch = {
     titre_vf: string | null;
     affiche_url: string | null;
     type: string;
+    date_sortie: string | null;
   };
   episodes?: {
     id: string;
     numero: number;
     titre: string | null;
+    duree_minutes: number | null;
     seasons: {
       numero: number;
       titles: {
@@ -120,6 +125,7 @@ export type UserWatch = {
         titre_vf: string | null;
         affiche_url: string | null;
         type: string;
+        date_sortie: string | null;
       };
     };
   };
@@ -240,6 +246,7 @@ export type ContinueWatchingEntry = {
   saison: number;
   episode_numero: number;
   episode_titre: string | null;
+  duree_minutes: number | null;
   total_episodes: number;
   episodes_vus: number;
   episodes_restants: number;
@@ -255,6 +262,7 @@ export type CalendarEntry = {
   episode_numero: number;
   episode_titre: string | null;
   date_diffusion: Date | null;
+  duree_minutes: number | null;
   nb_non_vus: number;
 };
 
