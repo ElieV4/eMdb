@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { getMovieExternalIds, getTvExternalIds } from '@emdb/tmdb-client';
 
 /**
  * Recherche + vérification d'un film complet sur Internet Archive (API
@@ -174,7 +175,14 @@ export async function findArchiveOrgFilm(params: {
  * 1. Si `url_directe` est configurée : essai direct sur l'URL devinée à
  *    partir du titre (rapide) — la page est chargée et son <title> vérifié
  *    (pas de "page not found"/"404", ces sites renvoient parfois un statut
- *    200 sur une page "introuvable" générique).
+ *    200 sur une page "introuvable" générique). Placeholders disponibles
+ *    dans `url_directe` : `{slug}` (titre normalisé), `{type}` ("movie" ou
+ *    "series"), `{tmdbId}` (id TMDB, déjà connu, aucun coût), `{imdbId}`
+ *    (id IMDB, ex. "tt1375666" — résolu à la demande via TMDB
+ *    `external_ids`, un appel de plus, déclenché uniquement si le template
+ *    référence effectivement `{imdbId}`). Beaucoup de ces sites
+ *    intercalent l'un des deux id dans l'URL (ex.
+ *    `https://exemple.com/{type}/{tmdbId}/{slug}`).
  * 2. Sinon (ou si l'essai direct est inconclusif — bloqué/erreur réseau, pas
  *    "confirmé introuvable") : recherche via `url_recherche`, résultats
  *    parsés (cheerio) puis scorés :
@@ -294,7 +302,26 @@ type FreeSiteQuery = {
   type: 'film' | 'serie';
   posterHash: string | null;
   year: number | null;
+  tmdbId: number | null;
 };
+
+/** IMDB id (ex. "tt1375666") résolu depuis le tmdb_id — certains sites
+ * gratuits devinent leurs URLs à partir de l'id IMDB plutôt que TMDB. Appel
+ * TMDB supplémentaire, déclenché uniquement quand `url_directe` référence
+ * réellement `{imdbId}` (cf. appelant) pour ne pas le payer sur les sites
+ * qui n'en ont pas besoin. Erreur réseau/TMDB avalée : `{imdbId}` retombe
+ * simplement sur '' dans le template (comportement déjà existant de
+ * `resolveTemplate` pour une clé non résolue).
+ */
+async function resolveImdbId(tmdbId: number, type: 'film' | 'serie'): Promise<string | null> {
+  try {
+    const data =
+      type === 'film' ? await getMovieExternalIds(tmdbId) : await getTvExternalIds(tmdbId);
+    return data?.imdb_id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** Config minimale d'un site whitelisté (table `free_watch_sites`) —
  * `url_directe`/`selecteur_resultat` optionnels, cf. commentaire ci-dessus. */
@@ -383,10 +410,17 @@ async function findOnGenericSite(
   let directConfirmedMissing = false;
 
   if (site.url_directe) {
-    directUrl = resolveTemplate(site.url_directe, {
+    const vars: Record<string, string> = {
       slug: slugify(params.titreVo),
       type: params.type === 'film' ? 'movie' : 'series',
-    });
+    };
+    if (params.tmdbId) vars.tmdbId = String(params.tmdbId);
+    if (params.tmdbId && site.url_directe.includes('{imdbId}')) {
+      const imdbId = await resolveImdbId(params.tmdbId, params.type);
+      if (imdbId) vars.imdbId = imdbId;
+    }
+
+    directUrl = resolveTemplate(site.url_directe, vars);
     const direct = await fetchHtml(directUrl, trace);
     if (direct && direct.status === 200) {
       const $ = cheerio.load(direct.html);
@@ -432,6 +466,7 @@ export async function findFreeWatchLink(
     type: 'film' | 'serie';
     afficheUrl?: string | null;
     anneeSortie?: number | null;
+    tmdbId?: number | null;
   },
   trace?: string[],
 ): Promise<FreeSiteMatch | null> {
@@ -443,6 +478,7 @@ export async function findFreeWatchLink(
       type: params.type,
       posterHash: extractPosterHash(params.afficheUrl),
       year: params.anneeSortie ?? null,
+      tmdbId: params.tmdbId ?? null,
     },
     trace,
   );

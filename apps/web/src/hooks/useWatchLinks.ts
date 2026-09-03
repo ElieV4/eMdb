@@ -119,6 +119,7 @@ export function useWatchLinks({
             if (titreVf) params.set("titreVf", titreVf);
             if (anneeSortie) params.set("anneeSortie", String(anneeSortie));
             if (afficheUrl) params.set("afficheUrl", afficheUrl);
+            if (tmdbId) params.set("tmdbId", String(tmdbId));
             const res = await fetch(`${API_BASE_URL}/watch-links/free?${params.toString()}`, {
               cache: "no-store",
             });
@@ -183,7 +184,7 @@ export function useWatchLinks({
     return () => {
       cancelled = true;
     };
-  }, [titreVo, titreVf, type, anneeSortie, afficheUrl]);
+  }, [titreVo, titreVf, type, anneeSortie, afficheUrl, tmdbId]);
 
   return { officialProviders, freeLinks: validFreeLinks, isFreeLinksLoading };
 }

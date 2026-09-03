@@ -62,7 +62,7 @@ export class FreeWatchSitesService {
         url_directe: dto.url_directe ?? null,
         selecteur_resultat: dto.selecteur_resultat ?? null,
       },
-      { titreVo: dto.titreVo, type: dto.type, anneeSortie: dto.anneeSortie },
+      { titreVo: dto.titreVo, type: dto.type, anneeSortie: dto.anneeSortie, tmdbId: dto.tmdbId },
       trace,
     );
 

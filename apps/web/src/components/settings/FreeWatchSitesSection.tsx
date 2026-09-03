@@ -71,6 +71,7 @@ function SiteForm({
   const [showAdvanced, setShowAdvanced] = useState(!!(initial?.url_directe || initial?.selecteur_resultat));
   const [testTitle, setTestTitle] = useState("Inception");
   const [testType, setTestType] = useState<"film" | "serie">("film");
+  const [testTmdbId, setTestTmdbId] = useState("27205"); // Inception
 
   const create = useCreateFreeWatchSite();
   const update = useUpdateFreeWatchSite();
@@ -81,12 +82,14 @@ function SiteForm({
 
   const handleTest = () => {
     if (!form.url_recherche.trim() || !testTitle.trim()) return;
+    const tmdbId = parseInt(testTmdbId, 10);
     test.mutate({
       url_recherche: form.url_recherche,
       url_directe: form.url_directe || undefined,
       selecteur_resultat: form.selecteur_resultat || undefined,
       titreVo: testTitle,
       type: testType,
+      tmdbId: Number.isFinite(tmdbId) ? tmdbId : undefined,
     });
   };
 
@@ -147,7 +150,9 @@ function SiteForm({
               placeholder="https://exemple.com/{type}/{slug}/"
             />
             <p className="text-xs text-muted-foreground">
-              {"{slug}"} = titre normalisé, {"{type}"} = "movie" ou "series".
+              {"{slug}"} = titre normalisé, {"{type}"} = "movie" ou "series",
+              {" "}{"{tmdbId}"} = id TMDB, {"{imdbId}"} = id IMDB (ex. tt1375666,
+              résolu automatiquement depuis le tmdbId).
             </p>
           </div>
           <div className="space-y-1">
@@ -172,6 +177,12 @@ function SiteForm({
             onChange={(e) => setTestTitle(e.target.value)}
             placeholder="Titre à chercher"
             className="max-w-[200px]"
+          />
+          <Input
+            value={testTmdbId}
+            onChange={(e) => setTestTmdbId(e.target.value)}
+            placeholder="Id TMDB (optionnel)"
+            className="max-w-[140px]"
           />
           <div className="flex rounded-lg border p-1">
             {(["film", "serie"] as const).map((t) => (

@@ -48,6 +48,7 @@ export type TestFreeWatchSiteInput = {
   titreVo: string;
   type: "film" | "serie";
   anneeSortie?: number;
+  tmdbId?: number;
 };
 
 /** Teste une config (enregistrée ou non) sur un titre d'exemple — bouton "tester" du formulaire. */

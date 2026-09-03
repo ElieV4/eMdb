@@ -33,4 +33,12 @@ export class TestFreeWatchSiteDto {
   @Min(1900)
   @Max(2100)
   anneeSortie?: number;
+
+  /** Id TMDB du titre de test — permet de tester une `url_directe`
+   * référençant `{tmdbId}` ou `{imdbId}` (résolu à la demande). Optionnel :
+   * sans lui, ces placeholders retombent simplement sur '' dans le rendu. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  tmdbId?: number;
 }

@@ -59,6 +59,7 @@ export class AppController {
     @Query('type') type: 'film' | 'serie' = 'film',
     @Query('afficheUrl') afficheUrl?: string,
     @Query('anneeSortie') anneeSortie?: string,
+    @Query('tmdbId') tmdbId?: string,
     @Query('debug') debug?: string,
   ) {
     if (!titreVo) {
@@ -67,6 +68,7 @@ export class AppController {
 
     const isDebug = debug === '1';
     const annee = anneeSortie ? parseInt(anneeSortie, 10) : undefined;
+    const tmdbIdNum = tmdbId ? parseInt(tmdbId, 10) : undefined;
     const debugTraces: Record<string, string[]> = {};
 
     const sites = await this.prisma.free_watch_sites.findMany({ where: { actif: true } });
@@ -83,6 +85,7 @@ export class AppController {
               type,
               afficheUrl,
               anneeSortie: Number.isFinite(annee) ? annee : undefined,
+              tmdbId: Number.isFinite(tmdbIdNum) ? tmdbIdNum : undefined,
             },
             trace,
           );
