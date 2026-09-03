@@ -5,12 +5,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ExternalLink, Star } from "lucide-react";
+import { Calendar, Clock, ExternalLink, Star } from "lucide-react";
 import { CreditGrouped, TitleDetail } from "@/lib/types/api";
 import { useWatchLinks } from "@/hooks/useWatchLinks";
 import { useAuthStore } from "@/store/authStore";
 import { buildEntityUrl, cn } from "@/lib/utils";
 import { TitlePoster } from "./TitlePoster";
+import { TitleInfo } from "./TitleInfo";
 import { WatchLinksSection } from "./WatchLinksSection";
 import { ProgressSerie } from "@/components/watches/ProgressSerie";
 import { TitleActions } from "./TitleActions";
@@ -30,10 +31,10 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
     titre_vf,
     type,
     date_sortie,
+    duree_minutes,
     note_imdb,
     affiche_url,
     backdrop_url,
-    statut,
     tmdb_id,
   } = title;
 
@@ -52,6 +53,7 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
   });
 
   return (
+    <>
     <div
       className={cn(
         "relative rounded-xl overflow-hidden bg-muted/20",
@@ -112,19 +114,25 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2 items-center">
-            {year && <span className="text-muted-foreground">({year})</span>}
+          <div className="flex flex-wrap gap-4 items-center text-sm">
+            {duree_minutes && (
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                {duree_minutes} min
+              </span>
+            )}
+            {year && (
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                {year}
+              </span>
+            )}
             {note_imdb && (
               <span className="flex items-center gap-1 text-amber-400">
                 <Star className="h-4 w-4 fill-current" />
                 <span className="font-medium">
                   {Number(note_imdb).toFixed(1)}
                 </span>
-              </span>
-            )}
-            {statut && (
-              <span className="px-2 py-1 text-xs rounded-full bg-muted/30">
-                {statut}
               </span>
             )}
             <span
@@ -145,6 +153,8 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
             </p>
           )}
 
+          <TitleInfo title={title} />
+
           {tmdb_id && (
             <a
               href={`https://www.themoviedb.org/${type === "film" ? "movie" : "tv"}/${tmdb_id}`}
@@ -156,14 +166,6 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
               Voir sur TMDB
             </a>
           )}
-
-          <div className="pt-2">
-            <WatchLinksSection
-              officialProviders={officialProviders}
-              freeLinks={freeLinks}
-              isFreeLinksLoading={isFreeLinksLoading}
-            />
-          </div>
         </div>
         </div>
 
@@ -177,5 +179,15 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
         )}
       </div>
     </div>
+
+    {/* Streaming officiel/libre — sous le hero, pas dedans */}
+    <div className="mt-6">
+      <WatchLinksSection
+        officialProviders={officialProviders}
+        freeLinks={freeLinks}
+        isFreeLinksLoading={isFreeLinksLoading}
+      />
+    </div>
+    </>
   );
 }

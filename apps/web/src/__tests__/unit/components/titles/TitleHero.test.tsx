@@ -133,7 +133,12 @@ describe("TitleHero", () => {
 
   it("affiche l'année de sortie", () => {
     renderHero(<TitleHero title={mockTitle} />);
-    expect(screen.getByText("(2010)")).toBeInTheDocument();
+    expect(screen.getByText("2010")).toBeInTheDocument();
+  });
+
+  it("affiche la durée", () => {
+    renderHero(<TitleHero title={mockTitle} />);
+    expect(screen.getByText("148 min")).toBeInTheDocument();
   });
 
   it("affiche la note IMDB", () => {
@@ -155,7 +160,7 @@ describe("TitleHero", () => {
 
   it("affiche le statut quand disponible", () => {
     renderHero(<TitleHero title={mockTitle} />);
-    expect(screen.getByText("Released")).toBeInTheDocument();
+    expect(screen.getByText("Statut : Released")).toBeInTheDocument();
   });
 
   it("affiche le synopsis quand disponible", () => {

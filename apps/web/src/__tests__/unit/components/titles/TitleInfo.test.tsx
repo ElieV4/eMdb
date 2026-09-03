@@ -41,16 +41,6 @@ describe("TitleInfo", () => {
     expect(screen.getByText("Thriller")).toBeInTheDocument();
   });
 
-  it("affiche l'année de sortie", () => {
-    render(<TitleInfo title={mockTitle} />);
-    expect(screen.getByText("2010")).toBeInTheDocument();
-  });
-
-  it("affiche la durée", () => {
-    render(<TitleInfo title={mockTitle} />);
-    expect(screen.getByText("148 min")).toBeInTheDocument();
-  });
-
   it("affiche le statut", () => {
     render(<TitleInfo title={mockTitle} />);
     expect(screen.getByText("Statut : Released")).toBeInTheDocument();

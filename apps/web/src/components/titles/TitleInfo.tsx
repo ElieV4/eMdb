@@ -4,7 +4,7 @@
  */
 
 import Link from "next/link";
-import { Calendar, Clock, Globe, Film } from "lucide-react";
+import { Globe, Film } from "lucide-react";
 import { TitleDetail } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 
@@ -14,17 +14,7 @@ interface TitleInfoProps {
 }
 
 export function TitleInfo({ title, className }: TitleInfoProps) {
-  const {
-    date_sortie,
-    duree_minutes,
-    statut,
-    is_animation,
-    title_genres,
-    title_countries,
-    title_studios,
-  } = title;
-
-  const year = date_sortie ? new Date(date_sortie).getFullYear() : null;
+  const { statut, is_animation, title_genres, title_countries, title_studios } = title;
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -42,35 +32,24 @@ export function TitleInfo({ title, className }: TitleInfoProps) {
         </div>
       )}
 
-      {/* Métadonnées */}
-      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-        {year && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span>{year}</span>
-          </div>
-        )}
+      {/* Métadonnées restantes — durée/année/note déjà affichées sous le
+          titre dans TitleHero */}
+      {(is_animation || statut) && (
+        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          {is_animation && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Film className="h-4 w-4" />
+              <span>Animation</span>
+            </div>
+          )}
 
-        {duree_minutes && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>{duree_minutes} min</span>
-          </div>
-        )}
-
-        {is_animation && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Film className="h-4 w-4" />
-            <span>Animation</span>
-          </div>
-        )}
-
-        {statut && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <span>Statut : {statut}</span>
-          </div>
-        )}
-      </div>
+          {statut && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span>Statut : {statut}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Pays */}
       {title_countries && title_countries.length > 0 && (

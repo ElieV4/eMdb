@@ -9,7 +9,6 @@
 import { notFound } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { TitleHero } from "@/components/titles/TitleHero";
-import { TitleInfo } from "@/components/titles/TitleInfo";
 import { TitleCreditsSplit } from "@/components/titles/TitleCreditsSplit";
 import { TitleRecommendations } from "@/components/titles/TitleRecommendations";
 import { SeasonCompact } from "@/components/seasons/SeasonCompact";
@@ -86,9 +85,6 @@ export default function TitleDetailPage({
       <div className="space-y-10">
         {/* Hero (actions utilisateur regroupées en bas du module) */}
         <TitleHero title={title} credits={credits} />
-
-        {/* Métadonnées */}
-        <TitleInfo title={title} />
 
         {/* Distribution (crédits) */}
         <section>
