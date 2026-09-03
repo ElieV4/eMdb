@@ -12,6 +12,7 @@
  */
 
 import Link from "next/link";
+import Image from "next/image";
 import { TitleQuickActionsMenu } from "@/components/titles/TitleQuickActionsMenu";
 import { TitleWatchedButton } from "@/components/titles/TitleWatchedButton";
 import { ContinueWatchingEntry } from "@/lib/types/api";
@@ -60,7 +61,13 @@ export function ContinueWatchingCard({
           style={{ width: `${POSTER_WIDTH}px`, height: `${POSTER_HEIGHT}px` }}
         >
           {src ? (
-            <img src={src} alt={title} className="w-full h-full object-cover" />
+            <Image
+              src={src}
+              alt={title}
+              fill
+              className="object-cover"
+              sizes={`${POSTER_WIDTH}px`}
+            />
           ) : null}
 
           <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1.5 pt-1 pb-1.5">
