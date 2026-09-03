@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { getDiscoverMovie, getDiscoverTv } from '@emdb/tmdb-client';
+import { importTitleByTmdbId } from '@emdb/tmdb-sync';
 
 /**
  * Service métier pour le module studios.
@@ -12,6 +14,30 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class StudiosService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Recherche locale de studios par nom (contains, insensible à la casse) —
+   * pas de recherche/import TMDB à la volée, contrairement aux titres/
+   * personnes : la table `studios` n'est peuplée que passivement (sociétés
+   * de production des titres déjà importés).
+   */
+  async search(q: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where = { nom: { contains: q, mode: 'insensitive' as const } };
+
+    const [items, total] = await Promise.all([
+      this.prisma.studios.findMany({
+        where,
+        select: { id: true, tmdb_id: true, nom: true, logo_url: true },
+        orderBy: { nom: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.studios.count({ where }),
+    ]);
+
+    return { items, total };
+  }
 
   /**
    * Détail d'un studio.
@@ -166,5 +192,114 @@ export class StudiosService {
 
     const peopleById = new Map(people.map((p) => [p.id, p]));
     return topPersonIds.map((personId) => peopleById.get(personId)).filter(Boolean);
+  }
+
+  // ======================================================================
+  // SUIVI (bookmark simple — pas d'auto-watchlist, contrairement aux
+  // personnes suivies : un studio n'a pas d'équivalent TMDB "combined
+  // credits" pour détecter ses futurs titres sans un scan coûteux)
+  // ======================================================================
+
+  async followStudio(userId: string, studioId: string) {
+    const studio = await this.prisma.studios.findUnique({
+      where: { id: studioId },
+      select: { id: true },
+    });
+    if (!studio) {
+      throw new NotFoundException('Studio introuvable.');
+    }
+
+    return this.prisma.user_follows_studio.create({
+      data: { user_id: userId, studio_id: studioId },
+    });
+  }
+
+  async unfollowStudio(userId: string, studioId: string): Promise<void> {
+    const follow = await this.prisma.user_follows_studio.findUnique({
+      where: { user_id_studio_id: { user_id: userId, studio_id: studioId } },
+    });
+    if (!follow) {
+      throw new NotFoundException('Vous ne suivez pas ce studio.');
+    }
+
+    await this.prisma.user_follows_studio.delete({
+      where: { user_id_studio_id: { user_id: userId, studio_id: studioId } },
+    });
+  }
+
+  async getFollowedStudios(userId: string) {
+    const follows = await this.prisma.user_follows_studio.findMany({
+      where: { user_id: userId },
+      include: {
+        studios: { select: { id: true, tmdb_id: true, nom: true, logo_url: true } },
+      },
+      orderBy: { followed_at: 'desc' },
+    });
+
+    return follows.map((f) => ({ ...f.studios, followed_at: f.followed_at }));
+  }
+
+  /**
+   * Rafraîchit la filmographie d'un studio depuis TMDB — contrairement aux
+   * personnes (un seul appel `combined_credits` renvoie tout), TMDB n'a pas
+   * d'endpoint "tous les titres d'une société" : on interroge `discover`
+   * (films puis séries) filtré par `with_companies`, trié par popularité,
+   * borné à quelques pages pour rester raisonnable sur un gros studio
+   * (ex. Warner Bros a des milliers de titres) plutôt que tout importer.
+   */
+  async refreshFilmography(id: string) {
+    const studio = await this.prisma.studios.findUnique({
+      where: { id },
+      select: { id: true, tmdb_id: true },
+    });
+    if (!studio) {
+      throw new NotFoundException('Studio introuvable.');
+    }
+    if (!studio.tmdb_id) {
+      throw new NotFoundException("Ce studio n'a pas de tmdb_id, impossible de rafraîchir.");
+    }
+
+    const MAX_PAGES = 5;
+    const tmdbIdsByType: { tmdbId: number; type: 'film' | 'serie' }[] = [];
+
+    for (const [type, discover] of [
+      ['film', getDiscoverMovie],
+      ['serie', getDiscoverTv],
+    ] as const) {
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        const data = await discover({
+          with_companies: studio.tmdb_id,
+          sort_by: 'popularity.desc',
+          page,
+        });
+        const results = data?.results ?? [];
+        for (const item of results) {
+          if (item?.id) tmdbIdsByType.push({ tmdbId: item.id, type });
+        }
+        if (page >= (data?.total_pages ?? 1)) break;
+      }
+    }
+
+    const uniqueByKey = new Map(tmdbIdsByType.map((t) => [`${t.type}:${t.tmdbId}`, t]));
+
+    const existing = await this.prisma.titles.findMany({
+      where: { tmdb_id: { in: [...uniqueByKey.values()].map((t) => t.tmdbId) } },
+      select: { tmdb_id: true },
+    });
+    const existingTmdbIds = new Set(existing.map((t) => t.tmdb_id));
+
+    let imported = 0;
+    let failed = 0;
+    for (const { tmdbId, type } of uniqueByKey.values()) {
+      if (existingTmdbIds.has(tmdbId)) continue;
+      try {
+        await importTitleByTmdbId(tmdbId, type, { withCredits: false });
+        imported++;
+      } catch {
+        failed++;
+      }
+    }
+
+    return { titlesImported: imported, titlesFailed: failed, filmography: await this.getFilmography(id) };
   }
 }

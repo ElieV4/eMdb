@@ -91,14 +91,21 @@ model list_shares {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model notifications {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String    @db.Uuid
-  episode_id String?   @db.Uuid
-  type       String
-  lu         Boolean   @default(false)
-  created_at DateTime  @default(now()) @db.Timestamptz(6)
-  episodes   episodes? @relation(fields: [episode_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                                            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                                       String    @db.Uuid
+  episode_id                                    String?   @db.Uuid
+  title_id                                      String?   @db.Uuid
+  related_user_id                               String?   @db.Uuid
+  message                                       String?
+  type                                          String
+  lu                                            Boolean   @default(false)
+  created_at                                    DateTime  @default(now()) @db.Timestamptz(6)
+  episodes                                      episodes? @relation(fields: [episode_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  titles                                        titles?   @relation(fields: [title_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_notifications_user_idTousers            users     @relation("notifications_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_notifications_related_user_idTousers    users?    @relation("notifications_related_user_idTousers", fields: [related_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([title_id], map: "idx_notifications_title")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -199,6 +206,7 @@ model titles {
   created_at                                                         DateTime                @default(now()) @db.Timestamptz(6)
   credits                                                            credits[]
   list_items                                                         list_items[]
+  notifications                                                      notifications[]
   seasons                                                            seasons[]
   title_countries                                                    title_countries[]
   title_genres                                                       title_genres[]
@@ -299,14 +307,30 @@ model users {
   password_hash      String
   pseudo             String               @unique
   avatar_url         String?
+  status             String               @default("active")
   created_at         DateTime             @default(now()) @db.Timestamptz(6)
   list_shares        list_shares[]
-  notifications      notifications[]
+  notifications_notifications_user_idTousers         notifications[] @relation("notifications_user_idTousers")
+  notifications_notifications_related_user_idTousers notifications[] @relation("notifications_related_user_idTousers")
+  push_tokens         push_tokens[]
   user_follows_serie  user_follows_serie[]
   user_follows_person user_follows_person[]
+  user_follows_studio user_follows_studio[]
   user_lists          user_lists[]
   user_ratings        user_ratings[]
   user_watches        user_watches[]
+}
+
+model push_tokens {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @db.Uuid
+  token        String   @unique
+  platform     String
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  last_seen_at DateTime @default(now()) @db.Timestamptz(6)
+  users        users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_push_tokens_user")
 }
 
 model user_follows_person {
@@ -320,6 +344,17 @@ model user_follows_person {
   @@index([person_id], map: "idx_follows_person_person")
 }
 
+model user_follows_studio {
+  user_id     String   @db.Uuid
+  studio_id   String   @db.Uuid
+  followed_at DateTime @default(now()) @db.Timestamptz(6)
+  studios     studios  @relation(fields: [studio_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, studio_id])
+  @@index([studio_id], map: "idx_follows_studio_studio")
+}
+
 model roles {
   id      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   code    String    @unique
@@ -328,11 +363,12 @@ model roles {
 }
 
 model studios {
-  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tmdb_id       Int?            @unique
-  nom           String
-  logo_url      String?
-  title_studios title_studios[]
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tmdb_id             Int?                  @unique
+  nom                 String
+  logo_url            String?
+  title_studios       title_studios[]
+  user_follows_studio user_follows_studio[]
 }
 
 model title_studios {

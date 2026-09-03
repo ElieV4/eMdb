@@ -11,9 +11,11 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { PersonCard } from "@/components/people/PersonCard";
+import { StudioCard } from "@/components/studios/StudioCard";
 import {
   useInfiniteTitleSearch,
   useInfinitePeopleSearch,
+  useInfiniteStudioSearch,
 } from "@/hooks/api/useInfiniteSearch";
 import { useWatchedTitles, useListMembership, useLists } from "@/hooks/api";
 import { useAuthStore } from "@/store/authStore";
@@ -79,7 +81,7 @@ function SearchPageContent() {
     hasNextPage: hasNextTitles,
     isFetchingNextPage: isFetchingNextTitles,
   } = useInfiniteTitleSearch(
-    query && activeTab !== "personne" ? query : "",
+    query && activeTab !== "personne" && activeTab !== "studio" ? query : "",
     activeTab === "tout" ? undefined : (activeTab as "film" | "serie"),
   );
 
@@ -90,8 +92,16 @@ function SearchPageContent() {
     hasNextPage: hasNextPeople,
     isFetchingNextPage: isFetchingNextPeople,
   } = useInfinitePeopleSearch(
-    query && activeTab !== "film" && activeTab !== "serie" ? query : "",
+    query && activeTab !== "film" && activeTab !== "serie" && activeTab !== "studio" ? query : "",
   );
+
+  const {
+    data: studiosPages,
+    isLoading: isStudiosLoading,
+    fetchNextPage: fetchNextStudios,
+    hasNextPage: hasNextStudios,
+    isFetchingNextPage: isFetchingNextStudios,
+  } = useInfiniteStudioSearch(query && activeTab === "studio" ? query : "");
 
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
@@ -108,8 +118,9 @@ function SearchPageContent() {
   const listIdsByTitle = buildListIdsByTitle(allLists);
 
   // État de chargement
-  const isLoading = isTitlesLoading || isPeopleLoading;
+  const isLoading = isTitlesLoading || isPeopleLoading || isStudiosLoading;
   const isPeopleTab = activeTab === "personne";
+  const isStudioTab = activeTab === "studio";
 
   const rawTitlesData = titlesPages?.pages.flatMap((p) => p.items) ?? [];
   const titlesData = rawTitlesData.filter((title) =>
@@ -119,6 +130,7 @@ function SearchPageContent() {
     ),
   );
   const peopleData = peoplePages?.pages.flatMap((p) => p.items) ?? [];
+  const studiosData = studiosPages?.pages.flatMap((p) => p.items) ?? [];
 
   // Total réel (TMDB total_results + résultats locaux), pas seulement la
   // portion déjà chargée par le scroll infini — reflète la recherche avant
@@ -127,11 +139,16 @@ function SearchPageContent() {
   // diverger quand un filtre est actif.
   const titlesTotal = titlesPages?.pages.at(-1)?.total ?? rawTitlesData.length;
   const peopleTotal = peoplePages?.pages.at(-1)?.total ?? peopleData.length;
-  const totalItems = isPeopleTab ? peopleTotal : titlesTotal;
+  const studiosTotal = studiosPages?.pages.at(-1)?.total ?? studiosData.length;
+  const totalItems = isStudioTab ? studiosTotal : isPeopleTab ? peopleTotal : titlesTotal;
 
-  const hasNextPage = isPeopleTab ? hasNextPeople : hasNextTitles;
-  const isFetchingNextPage = isPeopleTab ? isFetchingNextPeople : isFetchingNextTitles;
-  const fetchNextPage = isPeopleTab ? fetchNextPeople : fetchNextTitles;
+  const hasNextPage = isStudioTab ? hasNextStudios : isPeopleTab ? hasNextPeople : hasNextTitles;
+  const isFetchingNextPage = isStudioTab
+    ? isFetchingNextStudios
+    : isPeopleTab
+      ? isFetchingNextPeople
+      : isFetchingNextTitles;
+  const fetchNextPage = isStudioTab ? fetchNextStudios : isPeopleTab ? fetchNextPeople : fetchNextTitles;
 
   // Charge la page suivante dès que la sentinelle en bas de grille entre
   // dans le viewport.
@@ -218,7 +235,7 @@ function SearchPageContent() {
                 {totalItems} résultat{totalItems > 1 ? "s" : ""}
               </p>
 
-              {!isPeopleTab && titlesData.length === 0 && hasActiveTitleFilters(filters) ? (
+              {!isPeopleTab && !isStudioTab && titlesData.length === 0 && hasActiveTitleFilters(filters) ? (
                 <p className="text-sm text-muted-foreground">
                   Aucun résultat chargé ne correspond aux filtres actifs.
                 </p>
@@ -227,25 +244,40 @@ function SearchPageContent() {
                 <div
                   className={cn(
                     "grid gap-4",
-                    activeTab === "personne"
+                    activeTab === "personne" || activeTab === "studio"
                       ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
                       : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
                   )}
                 >
-                  {activeTab === "personne"
-                    ? peopleData.map((person) => (
-                        <PersonCard key={person.id} person={person} compact />
-                      ))
-                    : titlesData.map((title) => (
-                        <TitleCard
-                          key={title.id}
-                          title={title}
-                          compact
-                          watched={watchedTitles?.has(title.id)}
-                          inWatchlist={watchlistIds.has(title.id)}
-                          inFavorites={favoriteIds.has(title.id)}
-                        />
-                      ))}
+                  {activeTab === "personne" ? (
+                    peopleData.map((person) => (
+                      <PersonCard key={person.id} person={person} compact />
+                    ))
+                  ) : activeTab === "studio" ? (
+                    studiosData.map((studio) => (
+                      <StudioCard
+                        key={studio.id}
+                        studio={{
+                          id: studio.id,
+                          tmdbId: studio.tmdb_id,
+                          nom: studio.nom,
+                          logoUrl: studio.logo_url,
+                        }}
+                        compact
+                      />
+                    ))
+                  ) : (
+                    titlesData.map((title) => (
+                      <TitleCard
+                        key={title.id}
+                        title={title}
+                        compact
+                        watched={watchedTitles?.has(title.id)}
+                        inWatchlist={watchlistIds.has(title.id)}
+                        inFavorites={favoriteIds.has(title.id)}
+                      />
+                    ))
+                  )}
                 </div>
               )}
 

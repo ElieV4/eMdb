@@ -5,7 +5,7 @@
  * /studios/:id/people
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/apiClient";
 import { FilmographyGrouped, PersonRecommendation } from "@/lib/types/api";
 
@@ -49,5 +49,42 @@ export function useStudioRelatedPeople(id: string) {
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     enabled: !!id,
+  });
+}
+
+export type FollowedStudio = StudioDetail & { followed_at: string };
+
+export function useFollowedStudios() {
+  return useQuery({
+    queryKey: ["studios", "followed"],
+    queryFn: () => apiFetch<FollowedStudio[]>("/studios/followed"),
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useFollowStudio() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch(`/studios/${id}/follow`, { method: "POST" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["studios", "followed"] }),
+  });
+}
+
+export function useUnfollowStudio() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch(`/studios/${id}/follow`, { method: "DELETE" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["studios", "followed"] }),
+  });
+}
+
+export function useRefreshStudioFilmography(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch(`/studios/${id}/filmography/refresh`, { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["studios", "filmography", id] });
+      queryClient.invalidateQueries({ queryKey: ["studios", "people", id] });
+    },
   });
 }

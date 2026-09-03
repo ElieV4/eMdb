@@ -36,6 +36,13 @@ type BackendPersonSearchResult = {
   local_id?: string;
 };
 
+type BackendStudioSearchResult = {
+  id: string;
+  tmdb_id: number | null;
+  nom: string;
+  logo_url: string | null;
+};
+
 function mapTitle(item: BackendTitleSearchResult): TitleSearchResult {
   const id = item.local_id ?? String(item.tmdb_id);
   return {
@@ -109,6 +116,35 @@ export function useInfinitePeopleSearch(query: string, enabled: boolean = true) 
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.items.length >= MIN_PAGE_THRESHOLD ? lastPage.page + 1 : undefined,
+    staleTime: 5 * 60 * 1000,
+    enabled: enabled && !!query,
+  });
+}
+
+/**
+ * Recherche locale uniquement (studios.nom) — pas de TMDB, contrairement
+ * aux titres/personnes (cf. StudiosService.search). `total` reflète donc
+ * une vraie taille de page constante (20), `getNextPageParam` peut se fier
+ * à une correspondance exacte plutôt qu'au seuil approximatif utilisé pour
+ * les résultats TMDB ci-dessus.
+ */
+export function useInfiniteStudioSearch(query: string, enabled: boolean = true) {
+  const PAGE_SIZE = 20;
+  return useInfiniteQuery({
+    queryKey: ["studios", "search", "infinite", query],
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams();
+      params.set("q", query);
+      params.set("page", String(pageParam));
+
+      const data = await apiFetch<{ items: BackendStudioSearchResult[]; total: number }>(
+        `/studios/search?${params.toString()}`,
+      );
+      return { items: data.items, page: pageParam, total: data.total };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.items.length >= PAGE_SIZE ? lastPage.page + 1 : undefined,
     staleTime: 5 * 60 * 1000,
     enabled: enabled && !!query,
   });

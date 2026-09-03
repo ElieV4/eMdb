@@ -9,6 +9,7 @@
 
 import { notFound } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { RefreshDataButton } from "@/components/common/RefreshDataButton";
 import { StudioHero } from "@/components/studios/StudioHero";
 import { Filmography } from "@/components/people/Filmography";
 import { PersonCard } from "@/components/people/PersonCard";
@@ -16,6 +17,7 @@ import {
   useStudio,
   useStudioFilmography,
   useStudioRelatedPeople,
+  useRefreshStudioFilmography,
 } from "@/hooks/api/useStudio";
 import { FilmographyGrouped, PersonRecommendation } from "@/lib/types/api";
 
@@ -37,6 +39,7 @@ export default function StudioDetailPage({
     isLoading: isPeopleLoading,
     isError: isPeopleError,
   } = useStudioRelatedPeople(id);
+  const refreshFilmography = useRefreshStudioFilmography(id);
 
   if (isLoading) {
     return (
@@ -58,7 +61,16 @@ export default function StudioDetailPage({
 
         {/* Filmographie */}
         <section>
-          <h2 className="text-2xl font-bold mb-4">Filmographie</h2>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h2 className="text-2xl font-bold">Filmographie</h2>
+            <RefreshDataButton
+              onRefresh={() => refreshFilmography.mutate()}
+              isPending={refreshFilmography.isPending}
+              isError={refreshFilmography.isError}
+              label="Actualiser"
+              pendingLabel="Actualisation..."
+            />
+          </div>
           {isFilmographyLoading ? (
             <LoadingSpinner className="h-6 w-6" />
           ) : isFilmographyError || !filmography ? (

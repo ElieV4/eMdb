@@ -352,7 +352,7 @@ export type ListDetail = {
 // Phase 2 - Recherche & Navigation
 // ============================================
 
-export type SearchType = "film" | "serie" | "personne";
+export type SearchType = "film" | "serie" | "personne" | "studio";
 
 export type SearchParams = {
   query?: string;

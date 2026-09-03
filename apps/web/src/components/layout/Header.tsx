@@ -40,13 +40,14 @@ import {
   NOTE_IMDB_MIN,
   NOTE_IMDB_MAX,
 } from "@/lib/titleFilters";
-import { Filter, Film, Tv, Users, Search } from "lucide-react";
+import { Filter, Film, Tv, Users, Search, Building2 } from "lucide-react";
 
 const FILTER_TABS: FilterTab[] = [
   { id: "tout", label: "Tout", icon: <Search className="h-3.5 w-3.5" /> },
   { id: "film", label: "Film", icon: <Film className="h-3.5 w-3.5" /> },
   { id: "serie", label: "Série", icon: <Tv className="h-3.5 w-3.5" /> },
   { id: "personne", label: "Personne", icon: <Users className="h-3.5 w-3.5" /> },
+  { id: "studio", label: "Studio", icon: <Building2 className="h-3.5 w-3.5" /> },
 ];
 
 export function Header() {
@@ -122,10 +123,12 @@ export function Header() {
   // savent l'appliquer côté backend.
   const showAppreciesFrFilter = pathname.startsWith("/discover") || pathname === "/recommendations";
 
-  // Filtrer les tabs selon la page
+  // Filtrer les tabs selon la page — "personne"/"studio" n'ont de sens que
+  // sur la recherche unifiée, pas sur les pages de titres (discover,
+  // historique, calendrier...) qui ne savent pas gérer ces types.
   const visibleTabs = isSearchPage
     ? FILTER_TABS
-    : FILTER_TABS.filter((t) => t.id !== "personne");
+    : FILTER_TABS.filter((t) => t.id !== "personne" && t.id !== "studio");
 
   const setTypeFilter = (id: string) => {
     navigateWithFilters({ type: id === "tout" ? null : id });

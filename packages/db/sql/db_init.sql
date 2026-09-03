@@ -22,6 +22,10 @@ CREATE TABLE users (
     password_hash   TEXT NOT NULL,
     pseudo          TEXT NOT NULL UNIQUE,
     avatar_url      TEXT,
+    -- 'pending' à l'inscription (en attente de validation par l'admin, cf.
+    -- ADMIN_EMAILS), 'active' une fois approuvé, 'rejected' si refusé (login
+    -- bloqué dans les deux cas hors 'active', cf. auth.service.ts).
+    status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('pending','active','rejected')),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -323,6 +327,19 @@ CREATE TABLE user_follows_person (
 CREATE INDEX idx_follows_person_person ON user_follows_person(person_id);
 
 -- ============================================================
+-- SUIVI DE STUDIOS (bookmark simple, pas d'auto-watchlist pour l'instant)
+-- ============================================================
+
+CREATE TABLE user_follows_studio (
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    studio_id   UUID NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+    followed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, studio_id)
+);
+
+CREATE INDEX idx_follows_studio_studio ON user_follows_studio(studio_id);
+
+-- ============================================================
 -- RECOMMANDATIONS ALGO ("connexes") - precalculees en batch
 -- ============================================================
 
@@ -354,15 +371,38 @@ CREATE TABLE person_recommendations (
 -- ne correspondaient à aucun appel actuel. Même classe de bug que
 -- tmdb_sync_log_action_check/user_lists_type_check.
 CREATE TABLE notifications (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    episode_id  UUID REFERENCES episodes(id) ON DELETE CASCADE,
-    type        TEXT NOT NULL CHECK (type IN ('new_episode','season_premiere')),
-    lu          BOOLEAN NOT NULL DEFAULT false,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    episode_id      UUID REFERENCES episodes(id) ON DELETE CASCADE,
+    title_id        UUID REFERENCES titles(id) ON DELETE CASCADE,
+    -- 'account_request'/'account_login' : notifs admin du flux de validation
+    -- des inscriptions (cf. auth.service.ts) — pas liées à un episode/titre,
+    -- portent leur propre texte (message) et pointent vers l'utilisateur
+    -- concerné (related_user_id) plutôt qu'un episode/titre.
+    type            TEXT NOT NULL CHECK (type IN ('new_episode','season_premiere','new_film_person','new_film_studio','account_request','account_login')),
+    related_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    message         TEXT,
+    lu              BOOLEAN NOT NULL DEFAULT false,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_notifications_user_unread ON notifications(user_id) WHERE lu = false;
+CREATE INDEX idx_notifications_title ON notifications(title_id);
+
+-- ============================================================
+-- TOKENS PUSH (Firebase Cloud Messaging, app Android Capacitor)
+-- ============================================================
+
+CREATE TABLE push_tokens (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token         TEXT NOT NULL UNIQUE,
+    platform      TEXT NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_push_tokens_user ON push_tokens(user_id);
 
 -- ============================================================
 -- LOG DE SYNCHRONISATION TMDB [v2]

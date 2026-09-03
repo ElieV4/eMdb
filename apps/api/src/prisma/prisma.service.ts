@@ -41,7 +41,9 @@ export class PrismaService implements OnModuleDestroy {
   list_shares = prisma.list_shares;
   user_follows_serie = prisma.user_follows_serie;
   user_follows_person = prisma.user_follows_person;
+  user_follows_studio = prisma.user_follows_studio;
   notifications = prisma.notifications;
+  push_tokens = prisma.push_tokens;
   free_watch_sites = prisma.free_watch_sites;
 
   /**
