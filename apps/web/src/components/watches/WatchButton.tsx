@@ -49,9 +49,11 @@ import {
 import { WatchDateMenuItems } from "./WatchDateMenuItems";
 import { WatchDatePickerDialog } from "./WatchDatePickerDialog";
 import { HistoryDialog, HistoryDialogWatch } from "./HistoryDialog";
+import { WatchContextPopup } from "./WatchContextPopup";
 import { Check, Eye, RotateCcw, History as HistoryIcon, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolveWatchDateVue, WatchDateSelection } from "@/lib/watchDates";
+import { useSettingsStore } from "@/store/settingsStore";
 
 type WatchButtonProps = {
   titleId?: string;
@@ -86,6 +88,8 @@ export function WatchButton({
   });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [contextPopupWatchId, setContextPopupWatchId] = useState<string | null>(null);
+  const watchContextPopup = useSettingsStore((s) => s.watchContextPopup);
 
   const createWatch = useCreateWatch();
   const deleteWatch = useDeleteWatch();
@@ -107,10 +111,20 @@ export function WatchButton({
           episode_id: episodeId,
           date_vue: dateVue,
         },
-        { onSuccess: finishMutation },
+        {
+          onSuccess: (created) => {
+            finishMutation();
+            const kind = episodeId ? "episode" : "film";
+            const shouldPopup =
+              watchContextPopup === "les_deux" || watchContextPopup === kind;
+            if (shouldPopup && created?.id) {
+              setContextPopupWatchId(created.id);
+            }
+          },
+        },
       );
     },
-    [createWatch, episodeId, titleId, finishMutation],
+    [createWatch, episodeId, titleId, finishMutation, watchContextPopup],
   );
 
   const handleSelect = useCallback(
@@ -239,6 +253,11 @@ export function WatchButton({
         watches={watches}
         onDelete={handleDeleteOne}
         onUpdateContext={(watchId, patch) => updateWatchContext.mutate({ watchId, data: patch })}
+      />
+
+      <WatchContextPopup
+        watchId={contextPopupWatchId}
+        onOpenChange={(open) => !open && setContextPopupWatchId(null)}
       />
 
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>

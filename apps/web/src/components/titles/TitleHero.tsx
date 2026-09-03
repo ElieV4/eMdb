@@ -8,8 +8,10 @@ import Link from "next/link";
 import { Calendar, Clock, ExternalLink, Star } from "lucide-react";
 import { CreditGrouped, TitleDetail } from "@/lib/types/api";
 import { useWatchLinks } from "@/hooks/useWatchLinks";
+import { useWatches } from "@/hooks/api/useWatches";
 import { useAuthStore } from "@/store/authStore";
 import { buildEntityUrl, cn } from "@/lib/utils";
+import { supportLabel, compagnieLabel, WATCH_EMOTION_OPTIONS } from "@/lib/watchContext";
 import { TitlePoster } from "./TitlePoster";
 import { TitleInfo } from "./TitleInfo";
 import { WatchLinksSection } from "./WatchLinksSection";
@@ -51,6 +53,32 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
     anneeSortie: year,
     afficheUrl: affiche_url,
   });
+
+  // Contexte de visionnage agrégé — tous les éléments distincts renseignés
+  // sur les visionnages de ce titre (support/compagnie/émotion), pas
+  // seulement le dernier : un film revu dans des contextes différents doit
+  // montrer les deux (demande utilisateur).
+  const { data: watchesData } = useWatches(
+    { title_id: title.id, limit: 50 },
+    { enabled: isAuthenticated },
+  );
+  const contextLabels = (() => {
+    const watches = watchesData?.items ?? [];
+    const supports = new Set<string>();
+    const compagnies = new Set<string>();
+    const emotions = new Set<string>();
+    for (const watch of watches) {
+      const s = supportLabel(watch.support);
+      if (s) supports.add(s);
+      const c = compagnieLabel(watch.compagnie);
+      if (c) compagnies.add(c);
+      for (const e of watch.emotion ?? []) {
+        const label = WATCH_EMOTION_OPTIONS.find((o) => o.value === e)?.label;
+        if (label) emotions.add(label);
+      }
+    }
+    return [...supports, ...compagnies, ...emotions];
+  })();
 
   return (
     <>
@@ -146,6 +174,19 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
               {type === "film" ? "Film" : "Série"}
             </span>
           </div>
+
+          {contextLabels.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {contextLabels.map((label) => (
+                <span
+                  key={label}
+                  className="px-2 py-0.5 text-xs rounded-full bg-muted/30 text-muted-foreground"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          )}
 
           {title.synopsis && (
             <p className="text-sm text-muted-foreground line-clamp-3">

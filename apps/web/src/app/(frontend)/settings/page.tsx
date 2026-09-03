@@ -10,8 +10,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Type, Image as ImageIcon, Upload, Trash2, Globe } from "lucide-react";
-import { useSettingsStore, SizePreference } from "@/store/settingsStore";
+import { ArrowLeft, Type, Image as ImageIcon, Upload, Trash2, Globe, MessageSquareText } from "lucide-react";
+import { useSettingsStore, SizePreference, WatchContextPopupMode } from "@/store/settingsStore";
 import { useDeleteAccount } from "@/hooks/api/useDeleteAccount";
 import { useAuthStore } from "@/store/authStore";
 import { clearAuthCookie, clearRefreshCookie } from "@/lib/auth/authCookie";
@@ -65,12 +65,49 @@ function SizeSelector({
   );
 }
 
+const WATCH_CONTEXT_POPUP_OPTIONS: { value: WatchContextPopupMode; label: string }[] = [
+  { value: "aucun", label: "Aucun" },
+  { value: "film", label: "Films" },
+  { value: "episode", label: "Épisodes" },
+  { value: "les_deux", label: "Les deux" },
+];
+
+function WatchContextPopupSelector({
+  value,
+  onChange,
+}: {
+  value: WatchContextPopupMode;
+  onChange: (value: WatchContextPopupMode) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
+      {WATCH_CONTEXT_POPUP_OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className={cn(
+            "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+            value === option.value
+              ? "bg-primary text-white"
+              : "text-muted-foreground hover:bg-muted",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const fontSize = useSettingsStore((s) => s.fontSize);
   const posterSize = useSettingsStore((s) => s.posterSize);
+  const watchContextPopup = useSettingsStore((s) => s.watchContextPopup);
   const setFontSize = useSettingsStore((s) => s.setFontSize);
   const setPosterSize = useSettingsStore((s) => s.setPosterSize);
+  const setWatchContextPopup = useSettingsStore((s) => s.setWatchContextPopup);
   const logout = useAuthStore((s) => s.logout);
   const deleteAccount = useDeleteAccount();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -123,6 +160,18 @@ export default function SettingsPage() {
             S&apos;applique aux affiches de titres dans les pages et modules.
           </p>
           <SizeSelector value={posterSize} onChange={setPosterSize} />
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <MessageSquareText className="h-5 w-5 text-primary" />
+            Contexte de visionnage
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Propose de renseigner support/compagnie/émotion juste après avoir
+            marqué un titre comme vu.
+          </p>
+          <WatchContextPopupSelector value={watchContextPopup} onChange={setWatchContextPopup} />
         </section>
 
         <section className="space-y-3">

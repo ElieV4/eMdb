@@ -1,7 +1,8 @@
 /**
- * Contexte de visionnage (support / compagnie / émotion) — saisi uniquement
- * a posteriori depuis HistoryDialog, jamais à la création du watch. Valeurs
- * identiques à apps/api/src/watches/dto/update-watch-context.dto.ts.
+ * Contexte de visionnage (support / compagnie / émotion) — saisi soit a
+ * posteriori depuis HistoryDialog, soit juste après la création du watch
+ * via WatchContextPopup (selon le réglage `watchContextPopup`, Paramètres).
+ * Valeurs identiques à apps/api/src/watches/dto/update-watch-context.dto.ts.
  */
 
 import { Laptop, Tv, Smartphone, Clapperboard, LucideIcon } from "lucide-react";

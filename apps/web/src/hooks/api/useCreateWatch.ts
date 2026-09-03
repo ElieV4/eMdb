@@ -12,7 +12,7 @@ export function useCreateWatch() {
 
   return useMutation({
     mutationFn: (data: WatchCreateInput) =>
-      apiFetch("/watches", {
+      apiFetch<{ id: string }>("/watches", {
         method: "POST",
         body: data,
       }),

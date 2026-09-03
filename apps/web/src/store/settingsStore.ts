@@ -9,11 +9,17 @@ import { persist } from "zustand/middleware";
 
 export type SizePreference = "petit" | "moyen" | "grand";
 
+/** Quand proposer le popup "contexte de visionnage" à la création d'un
+ * visionnage (marquer comme vu) : "aucun" | "film" | "episode" | "les_deux". */
+export type WatchContextPopupMode = "aucun" | "film" | "episode" | "les_deux";
+
 type SettingsState = {
   fontSize: SizePreference;
   posterSize: SizePreference;
+  watchContextPopup: WatchContextPopupMode;
   setFontSize: (size: SizePreference) => void;
   setPosterSize: (size: SizePreference) => void;
+  setWatchContextPopup: (mode: WatchContextPopupMode) => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -21,8 +27,10 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       fontSize: "moyen",
       posterSize: "moyen",
+      watchContextPopup: "film",
       setFontSize: (fontSize) => set({ fontSize }),
       setPosterSize: (posterSize) => set({ posterSize }),
+      setWatchContextPopup: (watchContextPopup) => set({ watchContextPopup }),
     }),
     { name: "emdb-settings" },
   ),
