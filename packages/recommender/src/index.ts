@@ -7,6 +7,7 @@
  */
 
 export { jaccardSimilarity, hasCommonElement, hasCommonGenre } from './jaccard';
+export { tokenizeSynopsis, computeDateProximity } from './subject';
 
 export {
   computeTitleRecommendations,

@@ -2,19 +2,35 @@
  * eMDB Recommender - Main Recommendation Algorithm
  * Phase 5.1: Algorithme de similarité pour titres et personnes
  *
- * Implémente la similarité Jaccard pondérée :
- * - Genres partagés : poids 0.6
- * - Acteurs partagés (top 10) : poids 0.3
- * - Réalisateurs partagés : poids 0.1
+ * Implémente la similarité pondérée entre titres :
+ * - Genres partagés : poids 0.35
+ * - Acteurs partagés (top 10) : poids 0.25
+ * - Réalisateurs partagés : poids 0.10
+ * - Sujet (mots-clés du synopsis) : poids 0.20
+ * - Proximité de date de sortie : poids 0.10
+ *
+ * 2026-09-03 : réécrit pour tenir dans la limite mémoire de l'instance
+ * Render (512 Mo) — l'ancienne version (double PrismaClient dédié +
+ * O(N²) sans index + chargement de tous les crédits, tous rôles
+ * confondus) faisait OOM-crasher le worker en boucle. Voir
+ * apps/worker/src/cron.ts pour le contexte de l'incident.
  */
 
-import { PrismaClient } from '@emdb/db';
+import { prisma } from '@emdb/db';
 import { jaccardSimilarity, hasCommonGenre } from './jaccard';
+import { tokenizeSynopsis, computeDateProximity } from './subject';
 
 // Type pour les crédits indexés par titre
 type TitleCredits = {
   actors: Set<string>;
   directors: Set<string>;
+};
+
+// Métadonnées d'un titre utilisées pour le scoring
+type TitleMeta = {
+  genres: Set<string>;
+  releaseYear: number | null;
+  subjectTokens: Set<string>;
 };
 
 // Type pour les données personne
@@ -36,85 +52,138 @@ type PersonRecommendation = {
   score: number;
 };
 
-const prisma = new PrismaClient();
-
 /**
  * Calcule le score de similarité pondéré entre deux titres
- *
- * @param genresA - Genres du titre A
- * @param genresB - Genres du titre B
- * @param actorsA - Acteurs du titre A (top 10)
- * @param actorsB - Acteurs du titre B (top 10)
- * @param directorsA - Réalisateurs du titre A
- * @param directorsB - Réalisateurs du titre B
- * @returns Score entre 0 et 1
  */
 function computeTitleScore(
-  genresA: Set<string>,
-  genresB: Set<string>,
-  actorsA: Set<string>,
-  actorsB: Set<string>,
-  directorsA: Set<string>,
-  directorsB: Set<string>,
+  metaA: TitleMeta,
+  metaB: TitleMeta,
+  creditsA: TitleCredits,
+  creditsB: TitleCredits,
 ): number {
-  const genreScore = jaccardSimilarity(genresA, genresB) * 0.6;
-  const actorScore = jaccardSimilarity(actorsA, actorsB) * 0.3;
-  const directorScore = jaccardSimilarity(directorsA, directorsB) * 0.1;
-  return genreScore + actorScore + directorScore;
+  const genreScore = jaccardSimilarity(metaA.genres, metaB.genres) * 0.35;
+  const actorScore = jaccardSimilarity(creditsA.actors, creditsB.actors) * 0.25;
+  const directorScore = jaccardSimilarity(creditsA.directors, creditsB.directors) * 0.1;
+  const subjectScore = jaccardSimilarity(metaA.subjectTokens, metaB.subjectTokens) * 0.2;
+  const dateScore = computeDateProximity(metaA.releaseYear, metaB.releaseYear) * 0.1;
+  return genreScore + actorScore + directorScore + subjectScore + dateScore;
 }
 
 /**
- * Charge tous les titres avec leurs genres depuis la base de données
+ * Charge les métadonnées (genres, année de sortie, mots-clés du synopsis)
+ * de tous les titres en une seule requête.
  *
- * @returns Map title_id -> Set<genre_id>
+ * @returns Map title_id -> TitleMeta
  */
-async function loadTitleGenres(): Promise<Map<string, Set<string>>> {
-  const titlesWithGenres = await prisma.titles.findMany({
+async function loadTitlesMeta(): Promise<Map<string, TitleMeta>> {
+  const titles = await prisma.titles.findMany({
     select: {
       id: true,
-      title_genres: {
-        select: { genre_id: true },
-      },
+      date_sortie: true,
+      synopsis: true,
+      title_genres: { select: { genre_id: true } },
     },
   });
 
-  const titleGenres = new Map<string, Set<string>>();
-  for (const t of titlesWithGenres) {
-    titleGenres.set(t.id, new Set(t.title_genres.map((tg) => tg.genre_id)));
+  const titlesMeta = new Map<string, TitleMeta>();
+  for (const t of titles) {
+    titlesMeta.set(t.id, {
+      genres: new Set(t.title_genres.map((tg) => tg.genre_id)),
+      releaseYear: t.date_sortie ? t.date_sortie.getFullYear() : null,
+      subjectTokens: tokenizeSynopsis(t.synopsis),
+    });
   }
 
-  return titleGenres;
+  return titlesMeta;
 }
 
 /**
- * Charge les crédits pour acteurs (top 10) et réalisateurs depuis la base de données
- * Filtre les crédits au niveau titre (episode_id = null)
+ * Charge les crédits acteurs (top 10 par ordre de billing, au niveau BDD)
+ * et réalisateurs pour tous les titres. Restreint aux deux rôles utiles au
+ * scoring — évite de charger en mémoire tout le reste du casting/équipe
+ * technique (scénaristes, producteurs, etc.), non utilisé ici.
  *
- * @returns Map title_id -> { actors: Set<person_id>, directors: Set<person_id> }
+ * @returns Map title_id -> { actors, directors }
  */
 async function loadTitleCredits(): Promise<Map<string, TitleCredits>> {
-  const credits = await prisma.credits.findMany({
-    where: { episode_id: null },
-    include: {
-      roles: { select: { code: true } },
-    },
-    orderBy: { ordre: 'asc' },
-  });
+  const [actorRows, directorRows] = await Promise.all([
+    prisma.$queryRaw<{ title_id: string; person_id: string }[]>`
+      SELECT title_id, person_id FROM (
+        SELECT c.title_id, c.person_id,
+               ROW_NUMBER() OVER (PARTITION BY c.title_id ORDER BY c.ordre ASC NULLS LAST) AS rn
+        FROM credits c
+        JOIN roles r ON r.id = c.role_id
+        WHERE c.episode_id IS NULL AND r.code = 'acteur'
+      ) ranked
+      WHERE rn <= 10
+    `,
+    prisma.$queryRaw<{ title_id: string; person_id: string }[]>`
+      SELECT c.title_id, c.person_id
+      FROM credits c
+      JOIN roles r ON r.id = c.role_id
+      WHERE c.episode_id IS NULL AND r.code = 'realisateur'
+    `,
+  ]);
 
   const titleCredits = new Map<string, TitleCredits>();
-  for (const c of credits) {
-    if (!titleCredits.has(c.title_id)) {
-      titleCredits.set(c.title_id, { actors: new Set(), directors: new Set() });
+  const ensure = (titleId: string): TitleCredits => {
+    let entry = titleCredits.get(titleId);
+    if (!entry) {
+      entry = { actors: new Set(), directors: new Set() };
+      titleCredits.set(titleId, entry);
     }
-    const entry = titleCredits.get(c.title_id)!;
-    if (c.roles.code === 'acteur' && entry.actors.size < 10) {
-      entry.actors.add(c.person_id);
-    } else if (c.roles.code === 'realisateur') {
-      entry.directors.add(c.person_id);
-    }
-  }
+    return entry;
+  };
+
+  for (const row of actorRows) ensure(row.title_id).actors.add(row.person_id);
+  for (const row of directorRows) ensure(row.title_id).directors.add(row.person_id);
 
   return titleCredits;
+}
+
+/**
+ * Index inversé genre -> titres, pour générer les candidats d'un titre en
+ * O(1) au lieu de scanner tout le catalogue (l'ancienne version testait
+ * `hasCommonGenre` contre TOUS les autres titres pour chaque titre, un
+ * O(N²) même quand la quasi-totalité des paires n'avait aucun genre en
+ * commun).
+ */
+function buildGenreIndex(titlesMeta: Map<string, TitleMeta>): Map<string, Set<string>> {
+  const index = new Map<string, Set<string>>();
+  for (const [titleId, meta] of titlesMeta) {
+    for (const genreId of meta.genres) {
+      let bucket = index.get(genreId);
+      if (!bucket) {
+        bucket = new Set();
+        index.set(genreId, bucket);
+      }
+      bucket.add(titleId);
+    }
+  }
+  return index;
+}
+
+/**
+ * Candidats d'un titre : union des titres partageant au moins un genre.
+ * Reste le filtre principal de candidats (comme avant) pour garder
+ * l'algorithme tractable sur tout le catalogue — les signaux casting/sujet/
+ * date affinent le score parmi ces candidats mais ne servent pas seuls à
+ * élargir la recherche à tout le catalogue.
+ */
+function getCandidateIds(
+  titleId: string,
+  meta: TitleMeta,
+  genreIndex: Map<string, Set<string>>,
+): Set<string> {
+  const candidates = new Set<string>();
+  for (const genreId of meta.genres) {
+    const bucket = genreIndex.get(genreId);
+    if (!bucket) continue;
+    for (const id of bucket) {
+      if (id !== titleId) candidates.add(id);
+    }
+  }
+  return candidates;
 }
 
 /**
@@ -125,10 +194,12 @@ async function loadTitleCredits(): Promise<Map<string, TitleCredits>> {
  * @returns Nombre total de recommandations insérées
  */
 export async function computeTitleRecommendations(batchSize: number = 100): Promise<number> {
-  const titleGenres = await loadTitleGenres();
+  const titlesMeta = await loadTitlesMeta();
   const titleCredits = await loadTitleCredits();
+  const genreIndex = buildGenreIndex(titlesMeta);
 
-  const allTitleIds = Array.from(titleGenres.keys());
+  const allTitleIds = Array.from(titlesMeta.keys());
+  const emptyCredits: TitleCredits = { actors: new Set(), directors: new Set() };
   let totalInserted = 0;
 
   for (let i = 0; i < allTitleIds.length; i += batchSize) {
@@ -136,27 +207,15 @@ export async function computeTitleRecommendations(batchSize: number = 100): Prom
     const records: TitleRecommendation[] = [];
 
     for (const titleIdA of batch) {
+      const metaA = titlesMeta.get(titleIdA)!;
+      const creditsA = titleCredits.get(titleIdA) ?? emptyCredits;
+      const candidateIds = getCandidateIds(titleIdA, metaA, genreIndex);
+
       const candidates: Array<{ id: string; score: number }> = [];
-      const genresA = titleGenres.get(titleIdA)!;
-      const creditsA = titleCredits.get(titleIdA) ?? { actors: new Set(), directors: new Set() };
-
-      for (const titleIdB of allTitleIds) {
-        if (titleIdA === titleIdB) continue;
-
-        // Optimisation : si aucun genre commun, score = 0, on skip
-        const genresB = titleGenres.get(titleIdB)!;
-        if (!hasCommonGenre(genresA, genresB)) continue;
-
-        const creditsB = titleCredits.get(titleIdB) ?? { actors: new Set(), directors: new Set() };
-        const score = computeTitleScore(
-          genresA,
-          genresB,
-          creditsA.actors,
-          creditsB.actors,
-          creditsA.directors,
-          creditsB.directors,
-        );
-
+      for (const titleIdB of candidateIds) {
+        const metaB = titlesMeta.get(titleIdB)!;
+        const creditsB = titleCredits.get(titleIdB) ?? emptyCredits;
+        const score = computeTitleScore(metaA, metaB, creditsA, creditsB);
         if (score > 0) {
           candidates.push({ id: titleIdB, score });
         }
@@ -268,12 +327,21 @@ export async function computePersonRecommendations(): Promise<number> {
     }
   }
 
-  // Transaction : DELETE + INSERT
+  // Pas de transaction interactive englobante ici (contrairement aux
+  // recommandations de titres, traitées par petits batches) : un delete +
+  // insert massif en une seule transaction interactive dépasse le timeout
+  // Prisma par défaut (5s) dès que le catalogue de personnes grossit, ce
+  // qui fait échouer tout le job. On enchaîne à la place un DELETE rapide
+  // (quasi instantané, même sur beaucoup de lignes) puis des INSERT par
+  // paquets, chacun sous son propre timeout de requête.
   if (records.length > 0) {
-    await prisma.$transaction(async (tx) => {
-      await tx.person_recommendations.deleteMany({});
-      await tx.person_recommendations.createMany({ data: records });
-    });
+    await prisma.person_recommendations.deleteMany({});
+    const insertBatchSize = 1000;
+    for (let i = 0; i < records.length; i += insertBatchSize) {
+      await prisma.person_recommendations.createMany({
+        data: records.slice(i, i + insertBatchSize),
+      });
+    }
   }
 
   return records.length;
@@ -309,36 +377,24 @@ export async function computeAllRecommendations(batchSize: number = 100): Promis
 export async function computeRecommendationsForTitle(
   titleId: string,
 ): Promise<TitleRecommendation[]> {
-  const titleGenres = await loadTitleGenres();
+  const titlesMeta = await loadTitlesMeta();
   const titleCredits = await loadTitleCredits();
+  const genreIndex = buildGenreIndex(titlesMeta);
+  const emptyCredits: TitleCredits = { actors: new Set(), directors: new Set() };
 
-  const allTitleIds = Array.from(titleGenres.keys());
-  const candidates: Array<{ id: string; score: number }> = [];
-
-  const genresA = titleGenres.get(titleId);
-  const creditsA = titleCredits.get(titleId) ?? { actors: new Set(), directors: new Set() };
-
-  if (!genresA) {
+  const metaA = titlesMeta.get(titleId);
+  if (!metaA) {
     console.warn(`Title ${titleId} not found in database`);
     return [];
   }
+  const creditsA = titleCredits.get(titleId) ?? emptyCredits;
+  const candidateIds = getCandidateIds(titleId, metaA, genreIndex);
 
-  for (const titleIdB of allTitleIds) {
-    if (titleId === titleIdB) continue;
-
-    const genresB = titleGenres.get(titleIdB)!;
-    if (!hasCommonGenre(genresA, genresB)) continue;
-
-    const creditsB = titleCredits.get(titleIdB) ?? { actors: new Set(), directors: new Set() };
-    const score = computeTitleScore(
-      genresA,
-      genresB,
-      creditsA.actors,
-      creditsB.actors,
-      creditsA.directors,
-      creditsB.directors,
-    );
-
+  const candidates: Array<{ id: string; score: number }> = [];
+  for (const titleIdB of candidateIds) {
+    const metaB = titlesMeta.get(titleIdB)!;
+    const creditsB = titleCredits.get(titleIdB) ?? emptyCredits;
+    const score = computeTitleScore(metaA, metaB, creditsA, creditsB);
     if (score > 0) {
       candidates.push({ id: titleIdB, score });
     }

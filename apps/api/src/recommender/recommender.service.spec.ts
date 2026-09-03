@@ -96,11 +96,13 @@ describe('RecommenderService', () => {
   });
 
   describe('getUserRecommendations', () => {
-    it('agrège les recommandations pondérées par la note, exclut les titres déjà vus/notés', async () => {
+    it('utilise les titres vus récemment, pondérés par la note, et exclut les titres déjà vus/notés', async () => {
+      mockPrismaService.user_watches.findMany
+        .mockResolvedValueOnce([{ title_id: 'source-1' }]) // recentWatches
+        .mockResolvedValueOnce([{ title_id: 'watched-1' }]); // watchedRows (exclude)
       mockPrismaService.user_ratings.findMany
-        .mockResolvedValueOnce([{ title_id: 'source-1', note_perso: 8 }])
-        .mockResolvedValueOnce([{ title_id: 'source-1' }]);
-      mockPrismaService.user_watches.findMany.mockResolvedValueOnce([{ title_id: 'watched-1' }]);
+        .mockResolvedValueOnce([{ title_id: 'source-1', note_perso: 8 }]) // ratingsForRecent
+        .mockResolvedValueOnce([{ title_id: 'source-1' }]); // ratedRows (exclude)
       mockPrismaService.title_recommendations.findMany.mockResolvedValue([
         { title_id: 'source-1', recommended_id: 'rec-1', score: 0.8 },
         { title_id: 'source-1', recommended_id: 'watched-1', score: 0.9 },
@@ -118,40 +120,47 @@ describe('RecommenderService', () => {
       });
     });
 
-    it("retombe sur les titres vus si l'utilisateur n'a aucune note", async () => {
-      mockPrismaService.user_ratings.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+    it('exclut de la source un titre récent mais mal noté (< 5)', async () => {
       mockPrismaService.user_watches.findMany
-        .mockResolvedValueOnce([{ title_id: 'watched-1' }])
-        .mockResolvedValueOnce([{ title_id: 'watched-1' }]);
+        .mockResolvedValueOnce([{ title_id: 'good-1' }, { title_id: 'bad-1' }]) // recentWatches
+        .mockResolvedValueOnce([{ title_id: 'good-1' }, { title_id: 'bad-1' }]); // watchedRows
+      mockPrismaService.user_ratings.findMany
+        .mockResolvedValueOnce([{ title_id: 'bad-1', note_perso: 3 }]) // ratingsForRecent
+        .mockResolvedValueOnce([{ title_id: 'bad-1' }]); // ratedRows
       mockPrismaService.title_recommendations.findMany.mockResolvedValue([
-        { title_id: 'watched-1', recommended_id: 'rec-2', score: 0.5 },
+        { title_id: 'good-1', recommended_id: 'rec-1', score: 0.8 },
       ]);
       mockPrismaService.titles.findMany.mockResolvedValue([
-        { id: 'rec-2', titre_vo: 'Film Deux', title_countries: [] },
+        { id: 'rec-1', titre_vo: 'Film Un', title_countries: [] },
       ]);
 
-      const result = await service.getUserRecommendations('user-1', { limit: 10 });
+      await service.getUserRecommendations('user-1', { limit: 10 });
 
-      expect(result).toEqual([{ id: 'rec-2', titre_vo: 'Film Deux', title_countries: [] }]);
+      // Seul good-1 (non noté, donc pas "mal noté") sert de source — bad-1
+      // est exclu malgré sa fraîcheur car noté < 5.
+      expect(mockPrismaService.title_recommendations.findMany).toHaveBeenCalledWith({
+        where: { title_id: { in: ['good-1'] } },
+        select: { title_id: true, recommended_id: true, score: true },
+      });
     });
 
-    it("retourne un tableau vide si l'utilisateur n'a ni note ni visionnage", async () => {
-      mockPrismaService.user_ratings.findMany.mockResolvedValueOnce([]);
+    it("retourne un tableau vide si l'utilisateur n'a aucun visionnage", async () => {
       mockPrismaService.user_watches.findMany.mockResolvedValueOnce([]);
 
       const result = await service.getUserRecommendations('user-1', { limit: 10 });
 
       expect(result).toEqual([]);
+      expect(mockPrismaService.user_ratings.findMany).not.toHaveBeenCalled();
       expect(mockPrismaService.title_recommendations.findMany).not.toHaveBeenCalled();
     });
 
     it('booste les titres francophones (FR/BE/CH) quand appreciesFr est actif', async () => {
+      mockPrismaService.user_watches.findMany
+        .mockResolvedValueOnce([{ title_id: 'source-1' }])
+        .mockResolvedValueOnce([]);
       mockPrismaService.user_ratings.findMany
         .mockResolvedValueOnce([{ title_id: 'source-1', note_perso: 10 }])
         .mockResolvedValueOnce([]);
-      mockPrismaService.user_watches.findMany.mockResolvedValueOnce([]);
       mockPrismaService.title_recommendations.findMany.mockResolvedValue([
         { title_id: 'source-1', recommended_id: 'rec-fr', score: 0.5 },
         { title_id: 'source-1', recommended_id: 'rec-us', score: 0.6 },

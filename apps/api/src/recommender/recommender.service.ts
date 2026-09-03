@@ -141,9 +141,12 @@ export class RecommenderService {
   /**
    * Recommandations personnalisées pour un utilisateur — agrège les
    * recommandations par-titre déjà calculées (`title_recommendations`,
-   * similarité genres/acteurs/réalisateurs) pour chaque titre que
-   * l'utilisateur a bien noté (note_perso >= 7), pondérées par cette note.
-   * Sans note, retombe sur les titres vus (poids égal). Exclut les titres
+   * similarité genres/casting/réalisateur/sujet/date) pour les titres
+   * regardés RÉCEMMENT par l'utilisateur, pondérées par sa note quand il y
+   * en a une. Un titre récent mais mal noté (note_perso < 5) est exclu de
+   * la source : une mauvaise note signale explicitement "ne me recommande
+   * pas des choses similaires à ça", contrairement à l'absence de note qui
+   * ne signale rien de particulier. Exclut des RÉSULTATS tous les titres
    * déjà vus ou notés (pas de sens à recommander ce qui est déjà connu).
    *
    * `appreciesFr` applique un boost (pas un filtre dur) aux titres dont un
@@ -161,30 +164,35 @@ export class RecommenderService {
     options: { limit?: number; appreciesFr?: boolean } = {},
   ) {
     const limit = options.limit ?? 20;
+    const POOR_RATING_THRESHOLD = 5;
 
-    const ratedTitles = await this.prisma.user_ratings.findMany({
-      where: { user_id: userId, title_id: { not: null }, note_perso: { gte: 7 } },
-      select: { title_id: true, note_perso: true },
-      orderBy: { updated_at: 'desc' },
+    const recentWatches = await this.prisma.user_watches.findMany({
+      where: { user_id: userId, title_id: { not: null } },
+      select: { title_id: true },
+      distinct: ['title_id'],
+      orderBy: { date_vue: 'desc' },
       take: 30,
     });
 
-    let sourceTitles: { titleId: string; weight: number }[];
-    if (ratedTitles.length > 0) {
-      sourceTitles = ratedTitles.map((r) => ({
-        titleId: r.title_id as string,
-        weight: Number(r.note_perso) / 10,
-      }));
-    } else {
-      const watched = await this.prisma.user_watches.findMany({
-        where: { user_id: userId, title_id: { not: null } },
-        select: { title_id: true },
-        distinct: ['title_id'],
-        orderBy: { date_vue: 'desc' },
-        take: 30,
-      });
-      sourceTitles = watched.map((w) => ({ titleId: w.title_id as string, weight: 1 }));
+    if (recentWatches.length === 0) {
+      return [];
     }
+
+    const recentTitleIds = recentWatches.map((w) => w.title_id as string);
+    const ratingsForRecent = await this.prisma.user_ratings.findMany({
+      where: { user_id: userId, title_id: { in: recentTitleIds } },
+      select: { title_id: true, note_perso: true },
+    });
+    const noteByTitleId = new Map(
+      ratingsForRecent.map((r) => [r.title_id as string, Number(r.note_perso)]),
+    );
+
+    const sourceTitles: { titleId: string; weight: number }[] = recentTitleIds
+      .filter((id) => (noteByTitleId.get(id) ?? Infinity) >= POOR_RATING_THRESHOLD)
+      .map((id) => ({
+        titleId: id,
+        weight: noteByTitleId.has(id) ? noteByTitleId.get(id)! / 10 : 1,
+      }));
 
     if (sourceTitles.length === 0) {
       return [];
