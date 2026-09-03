@@ -34,14 +34,18 @@ export class ImportService {
    * résultat final (stats d'import) en pollant après complétion — un job
    * retiré immédiatement de Redis à la complétion ne serait plus consultable.
    */
-  async startTraktImport(userId: string, extractDir: string): Promise<{ jobId: string | undefined; status: string }> {
+  async startTraktImport(
+    userId: string,
+    extractDir: string,
+    sinceDate?: string,
+  ): Promise<{ jobId: string | undefined; status: string }> {
     const queue = this.getQueue(TRAKT_IMPORT_QUEUE_NAME);
 
     this.logger.log(`Ajout d'un job trakt-import pour l'utilisateur ${userId}`);
 
     const job = await queue.add(
       'trakt-import',
-      { userId, extractDir },
+      { userId, extractDir, sinceDate },
       {
         removeOnComplete: { age: 3600 },
         removeOnFail: { age: 3600 },

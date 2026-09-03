@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
@@ -66,6 +67,12 @@ export class ImportController {
    * un dossier temporaire, puis planifie un job d'import en tâche de fond
    * (potentiellement long : des dizaines de minutes selon le volume de
    * titres absents du catalogue local).
+   *
+   * Champ optionnel `sinceDate` (form-data, ISO "YYYY-MM-DD") : limite
+   * l'import aux visionnages (historique + films vus) à partir de cette
+   * date — réimport incrémental pour ne récupérer que l'historique récent
+   * sans reparcourir des années de données à chaque fois (cf.
+   * trakt-import.worker.ts pour le détail du filtrage).
    */
   @Post('trakt')
   @UseInterceptors(
@@ -84,9 +91,17 @@ export class ImportController {
       limits: { fileSize: 100 * 1024 * 1024 }, // 100 Mo max
     }),
   )
-  async importTrakt(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
+  async importTrakt(
+    @CurrentUser() user: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('sinceDate') sinceDate?: string,
+  ) {
     if (!file) {
       throw new BadRequestException('Aucun fichier fourni.');
+    }
+
+    if (sinceDate && Number.isNaN(new Date(sinceDate).getTime())) {
+      throw new BadRequestException('sinceDate invalide.');
     }
 
     const extractDir = path.join(IMPORT_TMP_DIR, `trakt-import-${randomUUID()}`);
@@ -114,8 +129,11 @@ export class ImportController {
     // Fichier zip uploadé lui-même : plus nécessaire une fois extrait.
     this.safeUnlink(file.path);
 
-    this.logger.log(`Import Trakt démarré pour l'utilisateur ${user.id} (dossier ${resolvedDir})`);
-    return this.importService.startTraktImport(user.id, resolvedDir);
+    this.logger.log(
+      `Import Trakt démarré pour l'utilisateur ${user.id} (dossier ${resolvedDir})` +
+        (sinceDate ? ` depuis ${sinceDate}` : ''),
+    );
+    return this.importService.startTraktImport(user.id, resolvedDir, sinceDate);
   }
 
   /**

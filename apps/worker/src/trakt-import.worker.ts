@@ -8,6 +8,14 @@ import { buildRedisConnection } from './worker';
 export type TraktImportJobData = {
   userId: string;
   extractDir: string;
+  /** ISO date optionnelle : seuls les visionnages (historique + films vus)
+   * à cette date ou après sont importés — ratings/listes/collection ne sont
+   * pas concernés (petit volume, pas la source du problème que ce filtre
+   * adresse). Un gros historique Trakt (des années de visionnages) peut
+   * représenter des milliers d'items à résoudre un par un (recherche/import
+   * TMDB, écritures Prisma, updateProgress BullMQ) — se limiter aux entrées
+   * récentes réduit drastiquement ce volume pour un réimport incrémental. */
+  sinceDate?: string;
 };
 
 export type TraktImportProgress = {
@@ -61,19 +69,30 @@ function loadJson(dir: string, fileName: string): any[] {
  * de progression). Un même titre compte une seule fois même s'il apparaît
  * dans plusieurs fichiers (historique + notes + listes).
  */
-function collectReferencedTmdbIds(dir: string): { movieIds: Set<number>; showIds: Set<number> } {
+function collectReferencedTmdbIds(
+  dir: string,
+  sinceDate: Date | null,
+): { movieIds: Set<number>; showIds: Set<number> } {
   const movieIds = new Set<number>();
   const showIds = new Set<number>();
+
+  // Une entrée sans date connue est conservée (pas filtrable, on préfère
+  // l'importer plutôt que la perdre silencieusement) — même logique que le
+  // fallback `new Date()` déjà utilisé plus bas quand `watched_at` est absent.
+  const isRecentEnough = (dateStr: string | undefined) =>
+    !sinceDate || !dateStr || new Date(dateStr) >= sinceDate;
 
   for (let i = 1; i <= 50; i++) {
     for (const item of loadJson(dir, `watched-history-${i}.json`)) {
       if (item.action !== 'watch') continue;
+      if (!isRecentEnough(item.watched_at)) continue;
       if (item.type === 'movie' && item.movie?.ids?.tmdb) movieIds.add(item.movie.ids.tmdb);
       if ((item.type === 'episode' || item.type === 'show') && item.show?.ids?.tmdb) {
         showIds.add(item.show.ids.tmdb);
       }
     }
     for (const item of loadJson(dir, `watched-movies-${i}.json`)) {
+      if (!isRecentEnough(item.last_watched_at)) continue;
       if (item.movie?.ids?.tmdb) movieIds.add(item.movie.ids.tmdb);
     }
   }
@@ -101,8 +120,9 @@ function collectReferencedTmdbIds(dir: string): { movieIds: Set<number>; showIds
 
 async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImportResult> {
   const { userId, extractDir } = job.data;
+  const sinceDate = job.data.sinceDate ? new Date(job.data.sinceDate) : null;
 
-  const { movieIds, showIds } = collectReferencedTmdbIds(extractDir);
+  const { movieIds, showIds } = collectReferencedTmdbIds(extractDir, sinceDate);
   const total = movieIds.size + showIds.size;
   let resolved = 0;
   let titlesImported = 0;
@@ -199,6 +219,10 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
   for (let i = 1; i <= 50; i++) {
     for (const item of loadJson(extractDir, `watched-history-${i}.json`)) {
       if (item.action !== 'watch' || item.type === 'movie') continue;
+      if (sinceDate && item.watched_at && new Date(item.watched_at) < sinceDate) {
+        watchSkip++;
+        continue;
+      }
       try {
         if (item.type === 'episode') {
           const showTmdbId = item.show?.ids?.tmdb;
@@ -253,6 +277,10 @@ async function runTraktImport(job: Job<TraktImportJobData>): Promise<TraktImport
   let movieSkip = 0;
   for (let i = 1; i <= 50; i++) {
     for (const item of loadJson(extractDir, `watched-movies-${i}.json`)) {
+      if (sinceDate && item.last_watched_at && new Date(item.last_watched_at) < sinceDate) {
+        movieSkip++;
+        continue;
+      }
       try {
         const tmdbId = item.movie?.ids?.tmdb;
         if (!tmdbId) { movieSkip++; continue; }

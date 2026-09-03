@@ -50,10 +50,11 @@ export type TraktImportStatus = {
 
 export function useUploadTraktExport() {
   return useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, sinceDate }: { file: File; sinceDate?: string }) => {
       const accessToken = useAuthStore.getState().accessToken;
       const formData = new FormData();
       formData.append("file", file);
+      if (sinceDate) formData.append("sinceDate", sinceDate);
 
       const res = await fetch(`${API_BASE_URL}/import/trakt`, {
         method: "POST",

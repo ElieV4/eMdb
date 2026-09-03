@@ -1,9 +1,11 @@
 /**
  * Bouton "Importer depuis Trakt" (bug #55/#56) — bas de la page Profil.
  *
- * Flux : sélection du .zip -> upload + dézippage côté API -> job BullMQ
- * (potentiellement long, ~20-30 min) -> polling du statut toutes les 2s ->
- * barre de progression "X / Y titres importés" -> état "Import terminé".
+ * Flux : sélection du .zip -> étape de config (date de départ optionnelle,
+ * pour un réimport incrémental) -> upload + dézippage côté API -> job BullMQ
+ * (potentiellement long, ~20-30 min sur un import complet) -> polling du
+ * statut toutes les 2s -> barre de progression "X / Y titres importés" ->
+ * état "Import terminé".
  */
 
 "use client";
@@ -11,6 +13,7 @@
 import { useRef, useState } from "react";
 import { Upload, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -29,11 +32,17 @@ export function TraktImportButton() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
+  // Fichier choisi, en attente de confirmation (étape "config" avant l'upload
+  // réel) — permet de proposer une date de départ sans upload immédiat au
+  // choix du fichier.
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [sinceDate, setSinceDate] = useState("");
 
   const upload = useUploadTraktExport();
   const statusQuery = useTraktImportStatus(jobId);
   const status = statusQuery.data;
 
+  const isConfiguring = !!pendingFile && !upload.isPending && !jobId;
   const isUploading = upload.isPending;
   const isDone = status?.status === "completed";
   const isFailed = status?.status === "failed" || upload.isError;
@@ -48,15 +57,24 @@ export function TraktImportButton() {
     if (!file) return;
 
     setJobId(null);
+    setSinceDate("");
+    setPendingFile(file);
     setOpen(true);
-    upload.mutate(file, {
-      onSuccess: (data) => setJobId(data.jobId),
-    });
+  }
+
+  function handleStartImport() {
+    if (!pendingFile) return;
+    upload.mutate(
+      { file: pendingFile, sinceDate: sinceDate || undefined },
+      { onSuccess: (data) => setJobId(data.jobId) },
+    );
   }
 
   function handleClose() {
     setOpen(false);
     setJobId(null);
+    setPendingFile(null);
+    setSinceDate("");
     upload.reset();
   }
 
@@ -90,7 +108,7 @@ export function TraktImportButton() {
           }
         }}
       >
-        <DialogContent showCloseButton={isDone || isFailed}>
+        <DialogContent showCloseButton={isDone || isFailed || isConfiguring}>
           <DialogHeader>
             <DialogTitle>Import Trakt</DialogTitle>
             <DialogDescription>
@@ -98,11 +116,32 @@ export function TraktImportButton() {
                 ? "Import terminé."
                 : isFailed
                   ? "L'import a échoué."
-                  : "Import de votre historique Trakt en cours. Cette opération peut prendre plusieurs dizaines de minutes."}
+                  : isConfiguring
+                    ? "Un import complet peut prendre plusieurs dizaines de minutes. Pour un réimport (mise à jour de l'historique déjà importé), limiter la date de départ accélère nettement l'opération."
+                    : "Import de votre historique Trakt en cours. Cette opération peut prendre plusieurs dizaines de minutes."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {isConfiguring && (
+              <div className="space-y-2">
+                <label htmlFor="trakt-since-date" className="text-sm font-medium">
+                  Importer les visionnages depuis (optionnel)
+                </label>
+                <Input
+                  id="trakt-since-date"
+                  type="date"
+                  value={sinceDate}
+                  onChange={(e) => setSinceDate(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Laisser vide pour importer tout l&apos;historique. Les notes et
+                  listes (watchlist, favoris, collection) sont toujours
+                  importées en entier, quelle que soit cette date.
+                </p>
+              </div>
+            )}
+
             {isUploading && !status && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -153,6 +192,17 @@ export function TraktImportButton() {
               </div>
             )}
           </div>
+
+          {isConfiguring && (
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleClose}>
+                Annuler
+              </Button>
+              <Button type="button" onClick={handleStartImport}>
+                Lancer l&apos;import
+              </Button>
+            </DialogFooter>
+          )}
 
           {(isDone || isFailed) && (
             <DialogFooter>
