@@ -93,7 +93,7 @@ export function EpisodeCard({
 
         {/* Infos */}
         <div className="p-3 space-y-2">
-          <h4 className="text-sm font-medium line-clamp-1 group-hover:text-primary">
+          <h4 className="text-sm font-medium line-clamp-1 group-hover:text-primary" title={titre ?? undefined}>
             {titre}
           </h4>
 

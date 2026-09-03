@@ -120,13 +120,13 @@ export function TitleCard({
           <div className="space-y-1">
             {/* Titre — mêmes classes que DateCard/ContinueWatchingCard (uniformisation
                 typographique demandée par l'utilisateur, référence : cartes épisode du calendrier) */}
-            <h3 className="text-sm font-medium line-clamp-1 group-hover:text-primary">
+            <h3 className="text-sm font-medium line-clamp-1 group-hover:text-primary" title={displayTitle}>
               {displayTitle}
             </h3>
 
             {/* Titre original si différent */}
             {titreOriginal && titreOriginal !== titre && !compact && (
-              <p className="text-xs text-muted-foreground line-clamp-1">
+              <p className="text-xs text-muted-foreground line-clamp-1" title={titre}>
                 {titre}
               </p>
             )}
@@ -222,11 +222,11 @@ export function TitleCardHorizontal({
         />
 
         <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-medium line-clamp-1 group-hover:text-primary">
+        <h3 className="text-sm font-medium line-clamp-1 group-hover:text-primary" title={titre}>
           {titre}
         </h3>
         {titreOriginal && titreOriginal !== titre && (
-          <p className="text-xs text-muted-foreground line-clamp-1">
+          <p className="text-xs text-muted-foreground line-clamp-1" title={titreOriginal}>
             {titreOriginal}
           </p>
         )}

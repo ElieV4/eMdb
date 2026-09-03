@@ -64,12 +64,13 @@ export function PersonCard({
               "font-semibold line-clamp-1 group-hover:text-primary",
               compact ? "text-sm" : "text-base",
             )}
+            title={nom}
           >
             {nom}
           </h3>
 
           {showRole && rolePrincipal && !compact && (
-            <p className="text-xs text-muted-foreground line-clamp-1">
+            <p className="text-xs text-muted-foreground line-clamp-1" title={rolePrincipal}>
               {rolePrincipal}
             </p>
           )}
@@ -110,11 +111,11 @@ export function PersonCardHorizontal({
 
       {/* Infos */}
       <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-sm line-clamp-1 group-hover:text-primary">
+        <h3 className="font-semibold text-sm line-clamp-1 group-hover:text-primary" title={nom}>
           {nom}
         </h3>
         {rolePrincipal && (
-          <p className="text-xs text-muted-foreground line-clamp-1">
+          <p className="text-xs text-muted-foreground line-clamp-1" title={rolePrincipal}>
             {rolePrincipal}
           </p>
         )}

@@ -70,6 +70,7 @@ export function PersonBadge({
             "font-medium line-clamp-1 group-hover:text-primary",
             size === "sm" ? "text-xs" : size === "md" ? "text-sm" : "text-base",
           )}
+          title={nom}
         >
           {nom}
         </p>
@@ -83,6 +84,7 @@ export function PersonBadge({
                   ? "text-xs"
                   : "text-sm",
             )}
+            title={role}
           >
             {role}
           </p>
@@ -148,6 +150,7 @@ export function PersonBadgeStatic({
                   ? "text-xs"
                   : "text-sm",
             )}
+            title={role}
           >
             {role}
           </p>

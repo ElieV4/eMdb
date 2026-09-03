@@ -264,7 +264,10 @@ export function TitleSearchBar({
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium line-clamp-1">
+                      <p
+                        className="text-sm font-medium line-clamp-1"
+                        title={isTitle ? suggestion.titre : suggestion.nom}
+                      >
                         {isTitle ? suggestion.titre : suggestion.nom}
                       </p>
                       <p className="text-xs text-muted-foreground line-clamp-1">

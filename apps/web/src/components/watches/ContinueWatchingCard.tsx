@@ -90,11 +90,11 @@ export function ContinueWatchingCard({
             </div>
           </div>
         </div>
-        <p className="mt-1.5 text-sm font-medium line-clamp-1 group-hover:text-primary">
+        <p className="mt-1.5 text-sm font-medium line-clamp-1 group-hover:text-primary" title={title}>
           {title}
         </p>
         {subtitle && (
-          <p className="text-[11px] italic text-muted-foreground line-clamp-1">
+          <p className="text-[11px] italic text-muted-foreground line-clamp-1" title={subtitle}>
             {subtitle}
           </p>
         )}

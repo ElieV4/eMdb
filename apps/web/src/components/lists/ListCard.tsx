@@ -39,7 +39,7 @@ export function ListCard({ list, className }: ListCardProps) {
       <Link href={`/lists/${list.id}`} className="block h-full">
         <Card className="p-4 h-full transition-colors hover:bg-muted/50">
           <div className={cn("flex items-start justify-between mb-2", isCustom && "pr-8")}>
-            <h3 className="font-semibold line-clamp-1">{list.nom}</h3>
+            <h3 className="font-semibold line-clamp-1" title={list.nom}>{list.nom}</h3>
             <Badge variant="secondary" className="ml-2 shrink-0">
               {typeLabels[list.type] ?? list.type}
             </Badge>
