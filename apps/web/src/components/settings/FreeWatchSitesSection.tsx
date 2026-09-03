@@ -151,8 +151,8 @@ function SiteForm({
             />
             <p className="text-xs text-muted-foreground">
               {"{slug}"} = titre normalisé, {"{type}"} = "movie" ou "series",
-              {" "}{"{tmdbId}"} = id TMDB, {"{imdbId}"} = id IMDB (ex. tt1375666,
-              résolu automatiquement depuis le tmdbId).
+              {" "}{"{tmdbId}"} = id TMDB (ex. 27205), {"{imdbId}"} = id IMDB
+              (ex. tt1375666, résolu automatiquement depuis le tmdbId).
             </p>
           </div>
           <div className="space-y-1">
