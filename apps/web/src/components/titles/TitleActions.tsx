@@ -31,16 +31,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Check, Heart, ListPlus, History, Loader2 } from "lucide-react";
+import { Check, Heart, ListPlus, History, Loader2, Archive, ArchiveRestore } from "lucide-react";
 import { WatchButton } from "@/components/watches/WatchButton";
 import { HistoryDialog } from "@/components/watches/HistoryDialog";
 import { FollowButton } from "@/components/watches/FollowButton";
 import { RatingInput } from "@/components/ratings/RatingInput";
 import { useUserFollows } from "@/hooks/api/useUserFollows";
 import { useUserLists } from "@/hooks/api/useUserLists";
+import { useListMembership } from "@/hooks/api/useListMembership";
 import { useAddListItem } from "@/hooks/api/useAddListItem";
 import { useRemoveListItem } from "@/hooks/api/useRemoveListItem";
 import { useCreateList } from "@/hooks/api/useCreateList";
+import { useUpdateListItemStatus } from "@/hooks/api/useUpdateListItemStatus";
 import { useUpsertRating } from "@/hooks/api/useUpsertRating";
 import { useDeleteWatch } from "@/hooks/api/useDeleteWatch";
 import { useUpdateWatchContext } from "@/hooks/api/useUpdateWatchContext";
@@ -60,12 +62,14 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
   const { isAuthenticated } = useAuthStore();
   const { data: follows } = useUserFollows();
   const { data: userLists } = useUserLists(titleId);
+  const { watchlistStatuses } = useListMembership();
   const { data: ratingsSummary } = useTitleRatingsSummary(titleId);
   const { data: watchesData } = useWatches({ title_id: titleId, limit: 50 });
   const queryClient = useQueryClient();
   const addListItem = useAddListItem();
   const removeListItem = useRemoveListItem();
   const createList = useCreateList();
+  const updateItemStatus = useUpdateListItemStatus();
   const upsertRating = useUpsertRating();
   const deleteWatch = useDeleteWatch();
   const updateWatchContext = useUpdateWatchContext();
@@ -126,6 +130,20 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
 
   const handleUnwatch = async (watchId: string) => {
     await deleteWatch.mutateAsync(watchId);
+  };
+
+  const watchlistStatus = watchlistStatuses.get(titleId);
+
+  const handleToggleAbandon = async () => {
+    if (!watchlist) return;
+    if (!isInList(watchlist.id)) {
+      await addListItem.mutateAsync({ listId: watchlist.id, titleId });
+    }
+    updateItemStatus.mutate({
+      listId: watchlist.id,
+      titleId,
+      statut: watchlistStatus === "abandonnee" ? "en_cours" : "abandonnee",
+    });
   };
 
   const handleToggleFavorite = async () => {
@@ -190,6 +208,22 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
                   )}
                 />
                 Watchlist
+              </DropdownMenuItem>
+            )}
+            {/* Abandonner / reprendre une série de la watchlist */}
+            {type === "serie" && watchlist && (
+              <DropdownMenuItem onClick={handleToggleAbandon}>
+                {watchlistStatus === "abandonnee" ? (
+                  <>
+                    <ArchiveRestore className="mr-2 h-4 w-4" />
+                    Reprendre la série
+                  </>
+                ) : (
+                  <>
+                    <Archive className="mr-2 h-4 w-4" />
+                    Abandonner la série
+                  </>
+                )}
               </DropdownMenuItem>
             )}
             {/* Favoris */}
