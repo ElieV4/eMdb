@@ -23,7 +23,7 @@ export function useUpdateListItemStatus() {
     }) =>
       apiFetch(`/lists/${listId}/items/${titleId}/statut`, {
         method: "PATCH",
-        body: JSON.stringify({ statut }),
+        body: { statut },
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lists"], exact: false });
