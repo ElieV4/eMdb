@@ -6,7 +6,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { useFollow } from "@/hooks/api/useFollow";
 import { useUnfollow } from "@/hooks/api/useUnfollow";
@@ -32,6 +32,15 @@ export function FollowButton({
   const follow = useFollow();
   const unfollow = useUnfollow();
   const [followed, setFollowed] = useState(initialFollowed);
+
+  // `initialFollowed` vient d'une requête côté parent (useFollows()),
+  // souvent pas encore résolue au montage (le state local se fige sur `false`,
+  // valeur par défaut avant chargement) — sans resync ici, le bouton reste
+  // bloqué sur "Suivre" même une fois la vraie donnée arrivée, et un clic
+  // déclenche un POST /follows en double (409 : déjà suivi côté serveur).
+  useEffect(() => {
+    setFollowed(initialFollowed);
+  }, [initialFollowed]);
 
   if (!user) {
     return null;

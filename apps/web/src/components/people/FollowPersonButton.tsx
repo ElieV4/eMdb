@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFollowPerson } from "@/hooks/api/useFollowPerson";
 import { useUnfollowPerson } from "@/hooks/api/useUnfollowPerson";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,13 @@ export function FollowPersonButton({
   const follow = useFollowPerson();
   const unfollow = useUnfollowPerson();
   const [followed, setFollowed] = useState(initialFollowed);
+
+  // cf. FollowButton.tsx : `initialFollowed` arrive souvent après le
+  // montage (requête parente pas encore résolue) — sans resync, le bouton
+  // reste figé sur "Suivre" et un clic redonde en 409 côté serveur.
+  useEffect(() => {
+    setFollowed(initialFollowed);
+  }, [initialFollowed]);
 
   if (!user) {
     return null;

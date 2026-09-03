@@ -36,7 +36,7 @@ import { WatchButton } from "@/components/watches/WatchButton";
 import { HistoryDialog } from "@/components/watches/HistoryDialog";
 import { FollowButton } from "@/components/watches/FollowButton";
 import { RatingInput } from "@/components/ratings/RatingInput";
-import { useUserFollows } from "@/hooks/api/useUserFollows";
+import { useFollows } from "@/hooks/api/useFollows";
 import { useUserLists } from "@/hooks/api/useUserLists";
 import { useListMembership } from "@/hooks/api/useListMembership";
 import { useAddListItem } from "@/hooks/api/useAddListItem";
@@ -60,7 +60,7 @@ type TitleActionsProps = {
 
 export function TitleActions({ titleId, type, releaseDate, className }: TitleActionsProps) {
   const { isAuthenticated } = useAuthStore();
-  const { data: follows } = useUserFollows();
+  const { data: follows } = useFollows();
   const { data: userLists } = useUserLists(titleId);
   const { watchlistStatuses } = useListMembership();
   const { data: ratingsSummary } = useTitleRatingsSummary(titleId);
@@ -91,7 +91,7 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
     return null;
   }
 
-  const isFollowed = follows?.some((f) => f.title_id === titleId) ?? false;
+  const isFollowed = follows?.some((f) => f.id === titleId) ?? false;
 
   const favoriteList = userLists?.find((l) => l.type === "favoris");
   const watchlist = userLists?.find((l) => l.type === "watchlist");

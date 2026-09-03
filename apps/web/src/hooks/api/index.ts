@@ -74,7 +74,6 @@ export { useInfiniteCalendar } from "./useInfiniteCalendar";
 export { useFollow } from "./useFollow";
 export { useUnfollow } from "./useUnfollow";
 export { useFollows } from "./useFollows";
-export { useUserFollows } from "./useUserFollows";
 export { useFollowPerson } from "./useFollowPerson";
 export { useUnfollowPerson } from "./useUnfollowPerson";
 export { useFollowedPeople } from "./useFollowedPeople";

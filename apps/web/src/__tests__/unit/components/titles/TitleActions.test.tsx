@@ -3,8 +3,8 @@
  * Bug #13 — Vérifie la présence et le comportement des actions titre.
  */
 
-jest.mock("@/hooks/api/useUserFollows", () => ({
-  useUserFollows: () => ({
+jest.mock("@/hooks/api/useFollows", () => ({
+  useFollows: () => ({
     data: [],
     isLoading: false,
     isError: false,
@@ -60,7 +60,9 @@ jest.mock("@/components/watches/WatchButton", () => ({
 }));
 
 jest.mock("@/components/watches/FollowButton", () => ({
-  FollowButton: () => <div data-testid="follow-button" />,
+  FollowButton: ({ initialFollowed }: { initialFollowed?: boolean }) => (
+    <div data-testid="follow-button" data-followed={String(!!initialFollowed)} />
+  ),
 }));
 
 jest.mock("@/components/ratings/RatingInput", () => ({
@@ -111,7 +113,7 @@ describe("TitleActions", () => {
 
   it("affiche les actions principales pour une série", () => {
     renderWithClient(<TitleActions titleId="title-1" type="serie" />);
-    expect(screen.getByTestId("watch-button")).toBeInTheDocument();
+    expect(screen.queryByTestId("watch-button")).not.toBeInTheDocument();
     expect(screen.getByTestId("follow-button")).toBeInTheDocument();
     expect(screen.getByTestId("rating-input")).toBeInTheDocument();
   });
@@ -134,5 +136,20 @@ describe("TitleActions", () => {
 
     renderWithClient(<TitleActions titleId="title-1" type="film" />);
     expect(screen.getByLabelText("Dans 2 listes")).toHaveTextContent("2");
+  });
+
+  it("détecte un titre déjà suivi via le champ `id` renvoyé par GET /follows", () => {
+    // GET /follows renvoie des objets titre complets ({id, titre_vo, ...}),
+    // pas {user_id, title_id} — un ancien hook (useUserFollows, supprimé)
+    // lisait `title_id`, toujours undefined en pratique, donc `isFollowed`
+    // restait bloqué à false et un reclic sur "Suivre" redondait en 409.
+    jest.spyOn(require("@/hooks/api/useFollows"), "useFollows").mockReturnValue({
+      data: [{ id: "title-1", tmdb_id: 1, titre_vo: "X", titre_vf: null, affiche_url: null, type: "serie", next_episode_air_date: null, followed_at: "2026-01-01" }],
+      isLoading: false,
+      isError: false,
+    });
+
+    renderWithClient(<TitleActions titleId="title-1" type="serie" />);
+    expect(screen.getByTestId("follow-button")).toHaveAttribute("data-followed", "true");
   });
 });
