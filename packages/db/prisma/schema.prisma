@@ -90,6 +90,9 @@ model list_shares {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+// NB : title_id/related_user_id/message font partie du chantier
+// "notifications push" (pas du chantier studios), inclus par erreur dans le
+// commit 2ede937 en même temps que user_follows_studio — voir db_init.sql.
 model notifications {
   id                                            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id                                       String    @db.Uuid
@@ -307,6 +310,7 @@ model users {
   password_hash      String
   pseudo             String               @unique
   avatar_url         String?
+  // Chantier "notifications push" (pas studios) — voir note db_init.sql.
   status             String               @default("active")
   created_at         DateTime             @default(now()) @db.Timestamptz(6)
   list_shares        list_shares[]
@@ -321,6 +325,7 @@ model users {
   user_watches        user_watches[]
 }
 
+// Chantier "notifications push" (pas studios) — voir note db_init.sql.
 model push_tokens {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id      String   @db.Uuid

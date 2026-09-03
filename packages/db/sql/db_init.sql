@@ -25,6 +25,11 @@ CREATE TABLE users (
     -- 'pending' à l'inscription (en attente de validation par l'admin, cf.
     -- ADMIN_EMAILS), 'active' une fois approuvé, 'rejected' si refusé (login
     -- bloqué dans les deux cas hors 'active', cf. auth.service.ts).
+    -- NB : colonne du chantier "notifications push" (pas du chantier
+    -- studios), incluse par erreur dans le commit 2ede937 en même temps que
+    -- user_follows_studio — le code applicatif correspondant n'est pas
+    -- encore committé au moment de cette note, et cette colonne n'a pas
+    -- encore été appliquée en production.
     status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('pending','active','rejected')),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -370,6 +375,13 @@ CREATE TABLE person_recommendations (
 -- packages/tmdb-sync/src/index.ts) — 'nouvel_episode'/'rappel'/'recommandation'
 -- ne correspondaient à aucun appel actuel. Même classe de bug que
 -- tmdb_sync_log_action_check/user_lists_type_check.
+--
+-- NB : title_id/related_user_id/message et les types account_request/
+-- account_login/new_film_person/new_film_studio font partie du chantier
+-- "notifications push" (pas du chantier studios), inclus par erreur dans le
+-- commit 2ede937 en même temps que user_follows_studio — idem pour la table
+-- push_tokens ci-dessous. Ni l'un ni l'autre n'était encore appliqué en
+-- production au moment de cette note.
 CREATE TABLE notifications (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
