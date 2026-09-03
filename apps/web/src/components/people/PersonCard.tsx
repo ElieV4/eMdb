@@ -6,7 +6,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { PersonSearchResult } from "@/lib/types/api";
-import { cn } from "@/lib/utils";
+import { buildEntityUrl, cn } from "@/lib/utils";
 
 const PLACEHOLDER_PERSON = "/placeholder-person.jpg";
 
@@ -27,7 +27,7 @@ export function PersonCard({
 
   const imageSrc = photoUrl || PLACEHOLDER_PERSON;
 
-  const href = local ? `/people/${id}` : `/people/tmdb/${person.tmdbId}`;
+  const href = local ? buildEntityUrl("/people", id, nom) : `/people/tmdb/${person.tmdbId}`;
 
   return (
     <Link
@@ -86,7 +86,7 @@ export function PersonCardHorizontal({
 }: Omit<PersonCardProps, "compact" | "showRole">) {
   const { id, nom, photoUrl, rolePrincipal, local } = person;
 
-  const href = local ? `/people/${id}` : `/people/tmdb/${person.tmdbId}`;
+  const href = local ? buildEntityUrl("/people", id, nom) : `/people/tmdb/${person.tmdbId}`;
 
   return (
     <Link

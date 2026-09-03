@@ -30,6 +30,7 @@ import { AlertCircle, ListChecks } from "lucide-react";
 import { parseTitleFilters, buildListIdsByTitle } from "@/lib/titleFilters";
 import { groupByPeriod, Period } from "@/lib/periodGrouping";
 import { UserWatch } from "@/lib/types/api";
+import { buildEntityUrl } from "@/lib/utils";
 
 function HistoryPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
@@ -228,7 +229,11 @@ function HistoryPageContent() {
                       : watch.titles?.titre_vf || watch.titles?.titre_vo || "Titre inconnu";
                     const href = watch.episodes
                       ? `/episodes/${watch.episodes.id}`
-                      : `/titles/${watch.title_id}`;
+                      : buildEntityUrl(
+                          "/titles",
+                          watch.title_id ?? "",
+                          resolvedTitle?.titre_vf || resolvedTitle?.titre_vo,
+                        );
 
                     return (
                       <div key={watch.id} className="relative">

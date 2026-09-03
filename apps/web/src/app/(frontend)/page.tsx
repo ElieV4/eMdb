@@ -35,6 +35,7 @@ import {
   buildListIdsByTitle,
 } from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
+import { buildEntityUrl } from "@/lib/utils";
 
 // Convertir Title en TitleSearchResult pour compatibilité avec TitleCard
 function titleToSearchResult(title: Title): TitleSearchResult {
@@ -162,7 +163,7 @@ function HomePageContent() {
     key: watch.id,
     href: watch.episodes
       ? `/episodes/${watch.episodes.id}`
-      : `/titles/${watch.title_id}`,
+      : buildEntityUrl("/titles", watch.title_id ?? "", watch.titles?.titre_vf || watch.titles?.titre_vo),
     imageUrl: watch.titles?.affiche_url,
     title:
       watch.titles?.titre_vf ||
@@ -185,7 +186,7 @@ function HomePageContent() {
     })
     .map((entry, idx) => ({
       key: `${entry.title_id}-${entry.saison}-${entry.episode_numero}-${idx}`,
-      href: `/titles/${entry.title_id}`,
+      href: buildEntityUrl("/titles", entry.title_id, entry.titre_vf || entry.titre_vo),
       imageUrl: entry.affiche_url,
       title: entry.titre_vf || entry.titre_vo,
       subtitle: `S${String(entry.saison).padStart(2, "0")}E${String(entry.episode_numero).padStart(2, "0")}${entry.episode_titre ? ` — ${entry.episode_titre}` : ""}`,

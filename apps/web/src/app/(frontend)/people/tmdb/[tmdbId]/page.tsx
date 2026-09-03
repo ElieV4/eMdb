@@ -6,6 +6,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { apiFetch } from "@/lib/api/apiClient";
+import { buildEntityUrl } from "@/lib/utils";
 
 export default function TmdbPersonImportPage({
   params,
@@ -20,7 +21,7 @@ export default function TmdbPersonImportPage({
   useEffect(() => {
     const importPerson = async () => {
       try {
-        const data = await apiFetch<{ id: string }>(
+        const data = await apiFetch<{ id: string; nom?: string }>(
           `/people/tmdb/${encodeURIComponent(tmdbId)}`,
         );
 
@@ -31,7 +32,7 @@ export default function TmdbPersonImportPage({
           );
         }
 
-        router.replace(`/people/${localId}`);
+        router.replace(buildEntityUrl("/people", localId, data.nom));
       } catch (err) {
         const message =
           err instanceof Error

@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Tv } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { buildEntityUrl, cn } from "@/lib/utils";
 
 type FollowedSeriesGridProps = {
   className?: string;
@@ -75,7 +75,7 @@ export function FollowedSeriesGrid({ className }: FollowedSeriesGridProps) {
             />
             <div className="flex-1">
               <Link
-                href={`/titles/${serie.id}`}
+                href={buildEntityUrl("/titles", serie.id, serie.titre_vf || serie.titre_vo)}
                 className="font-semibold hover:underline"
               >
                 {serie.titre_vf || serie.titre_vo}

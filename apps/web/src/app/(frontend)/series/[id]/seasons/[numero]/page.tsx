@@ -14,13 +14,15 @@ import { useSeason } from "@/hooks/api/useSeason";
 import { useTitle } from "@/hooks/api/useTitles";
 import { useWatches } from "@/hooks/api/useWatches";
 import { useAuthStore } from "@/store/authStore";
+import { buildEntityUrl, extractIdFromRouteParam } from "@/lib/utils";
 
 export default function SeasonDetailPage({
   params,
 }: {
   params: { id: string; numero: string };
 }) {
-  const { id, numero } = params;
+  const id = extractIdFromRouteParam(params.id);
+  const { numero } = params;
   const seasonNumero = parseInt(numero, 10);
   const { isAuthenticated } = useAuthStore();
 
@@ -53,13 +55,14 @@ export default function SeasonDetailPage({
 
   const { titre, date_sortie, synopsis, episodes } = season;
   const year = date_sortie ? new Date(date_sortie).getFullYear() : null;
+  const titleHref = buildEntityUrl("/titles", id, title?.titre_vf || title?.titre_vo);
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="space-y-8">
         {/* Navigation vers la série */}
         <Link
-          href={`/titles/${id}`}
+          href={titleHref}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -70,7 +73,7 @@ export default function SeasonDetailPage({
         <div>
           {title && (
             <Link
-              href={`/titles/${id}`}
+              href={titleHref}
               className="text-sm text-muted-foreground hover:text-foreground hover:underline"
             >
               {title.titre_vf || title.titre_vo}

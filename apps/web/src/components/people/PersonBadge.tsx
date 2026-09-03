@@ -6,7 +6,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Person } from "@/lib/types/api";
-import { cn } from "@/lib/utils";
+import { buildEntityUrl, cn } from "@/lib/utils";
 
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 const PLACEHOLDER_PERSON = "/placeholder-person.jpg";
@@ -40,7 +40,7 @@ export function PersonBadge({
 
   return (
     <Link
-      href={`/people/${id}`}
+      href={buildEntityUrl("/people", id, nom)}
       className={cn(
         "group flex items-center gap-2 rounded-lg transition-colors duration-200",
         "hover:bg-muted/50 p-1",

@@ -6,6 +6,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { apiFetch } from "@/lib/api/apiClient";
+import { buildEntityUrl } from "@/lib/utils";
 
 export default function TmdbTitleImportPage({
   params,
@@ -34,7 +35,7 @@ export default function TmdbTitleImportPage({
         // Le vrai correctif du bug #35 est côté backend (importPersonByTmdbId
         // ne re-fetchait jamais les personnes déjà connues localement) ; ce
         // timeout élevé reste une marge de sécurité pour les cas encore lents.
-        const data = await apiFetch<{ id: string }>(
+        const data = await apiFetch<{ id: string; titre_vo?: string; titre_vf?: string | null }>(
           `/titles/tmdb/${encodeURIComponent(tmdbId)}?type=${encodeURIComponent(type)}`,
           { timeoutMs: 120_000 },
         );
@@ -44,7 +45,7 @@ export default function TmdbTitleImportPage({
           throw new Error("Réponse inattendue lors de l'import du titre.");
         }
 
-        router.replace(`/titles/${localId}`);
+        router.replace(buildEntityUrl("/titles", localId, data.titre_vf || data.titre_vo));
       } catch (err) {
         const message =
           err instanceof Error

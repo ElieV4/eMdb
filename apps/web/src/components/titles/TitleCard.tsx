@@ -9,7 +9,7 @@ import { TitlePoster } from "./TitlePoster";
 import { TitleQuickActionsMenu } from "./TitleQuickActionsMenu";
 import { TitleWatchedButton } from "./TitleWatchedButton";
 import { TitleSearchResult } from "@/lib/types/api";
-import { cn } from "@/lib/utils";
+import { buildEntityUrl, cn } from "@/lib/utils";
 import { usePosterScale } from "@/hooks/usePosterScale";
 
 interface TitleCardProps {
@@ -51,7 +51,7 @@ export function TitleCard({
     titreOriginal && titreOriginal !== titre ? titreOriginal : titre;
 
   const href = local
-    ? `/titles/${id}`
+    ? buildEntityUrl("/titles", id, displayTitle)
     : `/titles/tmdb/${title.tmdbId}?type=${type}`;
 
   const posterScale = usePosterScale();
@@ -184,7 +184,7 @@ export function TitleCardHorizontal({
   const year = dateSortie ? new Date(dateSortie).getFullYear() : null;
 
   const href = local
-    ? `/titles/${id}`
+    ? buildEntityUrl("/titles", id, titre)
     : `/titles/tmdb/${title.tmdbId}?type=${type}`;
 
   return (

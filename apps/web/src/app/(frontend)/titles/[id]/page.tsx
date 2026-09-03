@@ -22,13 +22,14 @@ import { useRefreshTitle } from "@/hooks/api/useRefreshTitle";
 import { useSerieProgress } from "@/hooks/api/useSerieProgress";
 import { useAuthStore } from "@/store/authStore";
 import { dedupeGroupedByEntity } from "@/lib/creditGrouping";
+import { extractIdFromRouteParam } from "@/lib/utils";
 
 export default function TitleDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const { id } = params;
+  const id = extractIdFromRouteParam(params.id);
   const { isAuthenticated } = useAuthStore();
 
   const { data: title, isLoading, isError } = useTitle(id);

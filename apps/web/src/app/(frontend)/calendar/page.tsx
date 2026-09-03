@@ -22,6 +22,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Tv } from "lucide-react";
 import { groupByPeriod, Period } from "@/lib/periodGrouping";
 import { CalendarEntry } from "@/lib/types/api";
+import { buildEntityUrl } from "@/lib/utils";
 
 function CalendarPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
@@ -137,7 +138,7 @@ function CalendarPageContent() {
                   {group.items.map((entry, idx) => (
                     <DateCard
                       key={`${entry.title_id}-${entry.saison}-${entry.episode_numero}-${idx}`}
-                      href={`/titles/${entry.title_id}`}
+                      href={buildEntityUrl("/titles", entry.title_id, entry.titre_vf || entry.titre_vo)}
                       imageUrl={entry.affiche_url}
                       title={entry.titre_vf || entry.titre_vo}
                       subtitle={`S${String(entry.saison).padStart(2, "0")}E${String(entry.episode_numero).padStart(2, "0")}${entry.episode_titre ? ` — ${entry.episode_titre}` : ""}`}
@@ -157,7 +158,7 @@ function CalendarPageContent() {
                   {undated.map((entry, idx) => (
                     <DateCard
                       key={`${entry.title_id}-${entry.saison}-${entry.episode_numero}-undated-${idx}`}
-                      href={`/titles/${entry.title_id}`}
+                      href={buildEntityUrl("/titles", entry.title_id, entry.titre_vf || entry.titre_vo)}
                       imageUrl={entry.affiche_url}
                       title={entry.titre_vf || entry.titre_vo}
                       subtitle={`S${String(entry.saison).padStart(2, "0")}E${String(entry.episode_numero).padStart(2, "0")}${entry.episode_titre ? ` — ${entry.episode_titre}` : ""}`}

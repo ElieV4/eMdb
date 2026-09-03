@@ -8,7 +8,7 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X, ChevronDown, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { buildEntityUrl, cn } from "@/lib/utils";
 import { useSearch } from "@/hooks/api/useSearch";
 import { TitleSearchResult, PersonSearchResult } from "@/lib/types/api";
 
@@ -98,12 +98,12 @@ export function TitleSearchBar({
           const suggestion = suggestions[activeSuggestionIndex];
           if ("type" in suggestion) {
             const href = suggestion.local
-              ? `/titles/${suggestion.id}`
+              ? buildEntityUrl("/titles", suggestion.id, suggestion.titre)
               : `/titles/tmdb/${suggestion.tmdbId}?type=${suggestion.type}`;
             router.push(href);
           } else {
             const href = suggestion.local
-              ? `/people/${suggestion.id}`
+              ? buildEntityUrl("/people", suggestion.id, suggestion.nom)
               : `/people/tmdb/${suggestion.tmdbId}`;
             router.push(href);
           }
@@ -141,12 +141,12 @@ export function TitleSearchBar({
   ) => {
     if ("type" in suggestion) {
       const href = suggestion.local
-        ? `/titles/${suggestion.id}`
+        ? buildEntityUrl("/titles", suggestion.id, suggestion.titre)
         : `/titles/tmdb/${suggestion.tmdbId}?type=${suggestion.type}`;
       router.push(href);
     } else {
       const href = suggestion.local
-        ? `/people/${suggestion.id}`
+        ? buildEntityUrl("/people", suggestion.id, suggestion.nom)
         : `/people/tmdb/${suggestion.tmdbId}`;
       router.push(href);
     }

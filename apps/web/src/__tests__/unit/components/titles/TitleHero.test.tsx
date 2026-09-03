@@ -316,7 +316,7 @@ describe("TitleHero", () => {
     expect(screen.getByText("Réalisé par")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Christopher Nolan" })).toHaveAttribute(
       "href",
-      "/people/person-1",
+      "/people/person-1-christopher-nolan",
     );
   });
 

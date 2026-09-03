@@ -26,13 +26,14 @@ import { PersonCard } from "@/components/people/PersonCard";
 import { CardSlider } from "@/components/common/CardSlider";
 import { FollowPersonButton } from "@/components/people/FollowPersonButton";
 import { dedupeGroupedByEntity } from "@/lib/creditGrouping";
+import { extractIdFromRouteParam } from "@/lib/utils";
 
 export default function PersonDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const { id } = params;
+  const id = extractIdFromRouteParam(params.id);
   const { isAuthenticated } = useAuthStore();
 
   const { data: person, isLoading, isError } = usePerson(id);

@@ -9,7 +9,7 @@ import { ExternalLink, Star } from "lucide-react";
 import { CreditGrouped, TitleDetail } from "@/lib/types/api";
 import { useWatchLinks } from "@/hooks/useWatchLinks";
 import { useAuthStore } from "@/store/authStore";
-import { cn } from "@/lib/utils";
+import { buildEntityUrl, cn } from "@/lib/utils";
 import { TitlePoster } from "./TitlePoster";
 import { WatchLinksSection } from "./WatchLinksSection";
 import { ProgressSerie } from "@/components/watches/ProgressSerie";
@@ -101,7 +101,7 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
                   <span key={director.id}>
                     {index > 0 && ", "}
                     <Link
-                      href={`/people/${director.personne.id}`}
+                      href={buildEntityUrl("/people", director.personne.id, director.personne.nom)}
                       className="text-foreground hover:underline"
                     >
                       {director.personne.nom}

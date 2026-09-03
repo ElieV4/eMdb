@@ -21,6 +21,7 @@ import { useWatches } from "@/hooks/api/useWatches";
 import { useUpsertRating } from "@/hooks/api/useUpsertRating";
 import { useAuthStore } from "@/store/authStore";
 import { useQueryClient } from "@tanstack/react-query";
+import { buildEntityUrl } from "@/lib/utils";
 
 export default function EpisodeDetailPage({
   params,
@@ -93,6 +94,9 @@ export default function EpisodeDetailPage({
     : null;
 
   const seasonNumero = seasons?.numero ?? 0;
+  const titleLabel = title?.titre_vf || title?.titre_vo;
+  const titleHref = buildEntityUrl("/titles", titleId, titleLabel);
+  const seasonHref = `${buildEntityUrl("/series", titleId, titleLabel)}/seasons/${seasonNumero}`;
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -100,7 +104,7 @@ export default function EpisodeDetailPage({
         {/* Navigation vers la saison */}
         {titleId && (
           <Link
-            href={`/series/${titleId}/seasons/${seasonNumero}`}
+            href={seasonHref}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -137,7 +141,7 @@ export default function EpisodeDetailPage({
                 {titleId && (
                   <>
                     <Link
-                      href={`/titles/${titleId}`}
+                      href={titleHref}
                       className="hover:text-foreground hover:underline"
                     >
                       {title?.titre_vf || title?.titre_vo}

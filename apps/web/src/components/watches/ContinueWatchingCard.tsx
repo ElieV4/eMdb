@@ -15,7 +15,7 @@ import Link from "next/link";
 import { TitleQuickActionsMenu } from "@/components/titles/TitleQuickActionsMenu";
 import { TitleWatchedButton } from "@/components/titles/TitleWatchedButton";
 import { ContinueWatchingEntry } from "@/lib/types/api";
-import { cn } from "@/lib/utils";
+import { buildEntityUrl, cn } from "@/lib/utils";
 
 const TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p/w300";
 const POSTER_WIDTH = 144;
@@ -54,7 +54,7 @@ export function ContinueWatchingCard({
       className={cn("group relative shrink-0", className)}
       style={{ width: `${POSTER_WIDTH}px` }}
     >
-      <Link href={`/titles/${entry.title_id}`}>
+      <Link href={buildEntityUrl("/titles", entry.title_id, title)}>
         <div
           className="relative overflow-hidden rounded-lg bg-muted/20"
           style={{ width: `${POSTER_WIDTH}px`, height: `${POSTER_HEIGHT}px` }}
