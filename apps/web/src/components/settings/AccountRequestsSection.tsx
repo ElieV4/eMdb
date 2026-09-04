@@ -1,27 +1,17 @@
 /**
  * Module "Demandes de compte" — visible uniquement par l'administrateur
- * (cf. ADMIN_EMAILS / NEXT_PUBLIC_ADMIN_EMAILS, même pattern que
- * AdminRefreshButton.tsx). Liste les inscriptions en attente de validation
+ * (cf. useIsAdmin). Liste les inscriptions en attente de validation
  * (users.status = 'pending') et permet de les approuver/refuser.
  */
 
 "use client";
 
-import { useAuthStore } from "@/store/authStore";
+import { useIsAdmin } from "@/hooks/api/useIsAdmin";
 import { useAccountRequests } from "@/hooks/api/useAccountRequests";
 import { useApproveAccountRequest } from "@/hooks/api/useApproveAccountRequest";
 import { useRejectAccountRequest } from "@/hooks/api/useRejectAccountRequest";
 import { Button } from "@/components/ui/button";
 import { Check, X } from "lucide-react";
-
-const ADMIN_EMAILS = (
-  process.env.NEXT_PUBLIC_ADMIN_EMAILS ??
-  process.env.ADMIN_EMAILS ??
-  ""
-)
-  .split(",")
-  .map((email) => email.trim().toLowerCase())
-  .filter(Boolean);
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-FR", {
@@ -34,14 +24,13 @@ function formatDate(iso: string): string {
 }
 
 export function AccountRequestsSection() {
-  const { user } = useAuthStore();
-  const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+  const { isAdmin, isLoading: isLoadingAdmin } = useIsAdmin();
 
   const { data: requests, isLoading } = useAccountRequests(isAdmin);
   const approve = useApproveAccountRequest();
   const reject = useRejectAccountRequest();
 
-  if (!isAdmin) return null;
+  if (isLoadingAdmin || !isAdmin) return null;
 
   const isBusy = (id: string) =>
     (approve.isPending && approve.variables === id) ||
@@ -54,10 +43,14 @@ export function AccountRequestsSection() {
         Nouvelles inscriptions en attente de validation avant activation.
       </p>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Chargement...</p>}
+      {isLoading && (
+        <p className="text-sm text-muted-foreground">Chargement...</p>
+      )}
 
       {!isLoading && (requests?.length ?? 0) === 0 && (
-        <p className="text-sm text-muted-foreground">Aucune demande en attente.</p>
+        <p className="text-sm text-muted-foreground">
+          Aucune demande en attente.
+        </p>
       )}
 
       {!isLoading && requests && requests.length > 0 && (
