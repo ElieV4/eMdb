@@ -11,6 +11,7 @@ import {
   checkFollowedPersonsForNewTitles,
   checkFollowedStudiosForNewTitles,
 } from '@emdb/tmdb-sync';
+import { checkFestivalSelections } from './festival-notifications.worker';
 
 export type ImportJobData =
   | { type: 'import-title'; tmdb_id: number; title_type: 'film' | 'serie' }
@@ -24,7 +25,8 @@ export type CronJobData =
   | { type: 'generate-notifications' }
   | { type: 'clean-notifications' }
   | { type: 'check-followed-persons' }
-  | { type: 'check-followed-studios' };
+  | { type: 'check-followed-studios' }
+  | { type: 'check-festival-selections' };
 
 export const IMPORT_QUEUE_NAME = 'tmdb-import';
 export const CRON_QUEUE_NAME = 'tmdb-cron';
@@ -172,6 +174,16 @@ export function getCronRepeatJobs() {
         removeOnFail: true,
       } as JobsOptions,
     },
+    {
+      name: 'check-festival-selections',
+      data: {},
+      options: {
+        jobId: 'check-festival-selections',
+        repeat: { cron: '15 3 * * *' },
+        removeOnComplete: true,
+        removeOnFail: true,
+      } as JobsOptions,
+    },
   ];
 }
 
@@ -275,6 +287,11 @@ export function createCronWorker(redisUrl: string) {
         case 'check-followed-studios': {
           const result = await checkFollowedStudiosForNewTitles();
           console.log(`Studios suivis : ${result.titlesNotified} nouveaux titres notifiés`);
+          return result;
+        }
+        case 'check-festival-selections': {
+          const result = await checkFestivalSelections();
+          console.log(`Sélections de festivals : ${result.editionsNotified} éditions notifiées`);
           return result;
         }
         default:

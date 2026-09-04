@@ -111,6 +111,16 @@ model notifications {
   @@index([title_id], map: "idx_notifications_title")
 }
 
+/// Suivi des éditions de festivals/cérémonies déjà notifiées (module
+/// "Sélection" de Découvrir) — évite de re-notifier tous les utilisateurs à
+/// chaque passage du cron `check-festival-selections` une fois la sélection
+/// d'une édition déjà signalée une première fois.
+model festival_editions_notified {
+  edition_qid  String   @id
+  festival_nom String
+  notified_at  DateTime @default(now()) @db.Timestamptz(6)
+}
+
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model people {
   id                                                                   String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

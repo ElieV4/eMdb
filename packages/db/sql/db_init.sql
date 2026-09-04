@@ -473,6 +473,20 @@ CREATE TABLE free_watch_sites (
 );
 
 -- ============================================================
+-- SELECTION DE FESTIVALS (module "Selection" de Decouvrir)
+-- ============================================================
+
+-- Suivi des editions de festivals/ceremonies deja notifiees — evite de
+-- re-notifier tous les utilisateurs a chaque passage du cron
+-- check-festival-selections une fois la selection d'une edition deja
+-- signalee une premiere fois.
+CREATE TABLE festival_editions_notified (
+    edition_qid   TEXT PRIMARY KEY,
+    festival_nom  TEXT NOT NULL,
+    notified_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
 -- FONCTIONS METIER [v2]
 -- ============================================================
 

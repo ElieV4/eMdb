@@ -16,6 +16,7 @@
     "@emdb/push": "*",
     "@emdb/recommender": "*",
     "@emdb/tmdb-sync": "*",
+    "@emdb/wikidata-client": "*",
     "bullmq": "^5.12.1",
     "ioredis": "^5.4.1",
     "ts-node": "^10.9.2"

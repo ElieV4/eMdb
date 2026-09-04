@@ -263,9 +263,18 @@ export class DiscoverService {
     sort: (a: DiscoverTitleResult & { popularity: number }, b: DiscoverTitleResult & { popularity: number }) => number,
     limit: number,
   ): Promise<DiscoverTitleResult[]> {
-    const sliced = items.sort(sort).slice(0, limit);
+    const sliced = items.sort(sort).slice(0, limit).map(({ popularity, ...item }) => item);
+    return this.attachLocalInfo(sliced);
+  }
 
-    const tmdbIds = sliced.map((item) => item.tmdb_id);
+  /**
+   * Marque, pour chaque résultat, s'il correspond à un titre déjà présent en
+   * local (via son `tmdb_id`) — partagé avec `FestivalsService`, dont les
+   * résultats (sélections de festivals) suivent la même logique "déjà
+   * importé" que les autres modules Découvrir.
+   */
+  async attachLocalInfo(items: DiscoverTitleResult[]): Promise<DiscoverTitleResult[]> {
+    const tmdbIds = items.map((item) => item.tmdb_id);
     const localTitles = await this.prisma.titles.findMany({
       where: { tmdb_id: { in: tmdbIds } },
       select: {
@@ -283,7 +292,7 @@ export class DiscoverService {
       localTitles.filter((t) => t.tmdb_id !== null).map((t) => [t.tmdb_id as number, t]),
     );
 
-    return sliced.map(({ popularity, ...item }) => {
+    return items.map((item) => {
       const local = localByTmdbId.get(item.tmdb_id);
       return {
         ...item,
