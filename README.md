@@ -35,7 +35,9 @@ Prérequis : Node.js 20+, Docker.
 ```bash
 cp .env.example .env   # renseigner TMDB_API_KEY au minimum
 npm install
-docker compose up -d   # PostgreSQL + Redis
+docker compose up -d   # PostgreSQL + Redis (base vierge)
+npm run prisma:migrate:deploy   # tables, via l'historique de migrations
+npm run prisma:apply-raw-sql     # triggers, fonctions, vues matérialisées
 npm run prisma:generate
 npm run dev:api         # apps/api sur :3001
 npm run dev:worker       # apps/worker

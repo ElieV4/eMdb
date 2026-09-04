@@ -49,9 +49,6 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
       - name: Install dependencies
         run: npm ci --workspaces --if-present || npm install --workspaces --if-present
 
@@ -61,18 +58,21 @@ jobs:
       - name: Format check
         run: npm run format:check
 
-      - name: Appliquer le schéma SQL (db_init.sql) sur la base de CI
-        env:
-          PGPASSWORD: emdb
-        run: psql -h postgres -U emdb -d emdb -f packages/db/sql/db_init.sql
-
-      - name: Prisma — introspection + validation (dry-run migration)
+      - name: Prisma — applique l'historique de migrations
         run: |
           cd packages/db
-          npm run db:pull
+          npm run migrate:deploy
           npm run generate
-          npm run migrate:dry-run
           cd ../..
+
+      - name: Applique les objets SQL hors-Prisma (triggers, fonctions, vues matérialisées)
+        run: |
+          cd packages/db
+          npm run apply:raw-sql
+          cd ../..
+
+      - name: Détecte une dérive entre les migrations et schema.prisma
+        run: npx prisma migrate diff --exit-code --from-url "$DATABASE_URL" --to-schema-datamodel packages/db/prisma/schema.prisma
 
       - name: Tests
         run: npm run test --workspaces --if-present
