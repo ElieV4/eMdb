@@ -2,9 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import { WorkerManagerService } from './admin/worker-manager.service';
 import dotenv from 'dotenv';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 
 dotenv.config({ path: path.resolve(process.cwd(), '..', '..', '.env') });
 console.log('[main] DATABASE_URL =', process.env.DATABASE_URL ? '[set]' : '[MISSING]');
@@ -33,21 +33,11 @@ async function bootstrap() {
   // Render payant) héberge à la fois l'API et les workers BullMQ, en lançant
   // apps/worker comme process enfant (même mécanisme ts-node que
   // `start:dev` en local, cf. apps/worker/package.json > start:prod).
-  if (process.env.EMBED_WORKER === 'true') {
-    const workerDir = path.resolve(process.cwd(), '..', 'worker');
-    const worker = spawn('npx', ['ts-node', '--transpile-only', 'src/index.ts'], {
-      cwd: workerDir,
-      env: process.env,
-      stdio: 'inherit',
-      shell: process.platform === 'win32',
-    });
-    worker.on('exit', (code) => {
-      // eslint-disable-next-line no-console
-      console.error(`[api] worker embarqué arrêté (code ${code})`);
-    });
-    // eslint-disable-next-line no-console
-    console.log('[api] worker BullMQ embarqué démarré (EMBED_WORKER=true)');
-  }
+  // Le cycle de vie de ce process enfant est délégué à WorkerManagerService,
+  // qui expose aussi pause()/resume() (endpoints /admin/worker/*) pour le
+  // stopper à la demande sans redéploiement — cf. commentaire dans ce
+  // service pour le contexte (quota Upstash 500k commandes/mois).
+  app.get(WorkerManagerService).autoStart();
 }
 
 bootstrap();

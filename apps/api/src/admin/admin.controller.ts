@@ -14,6 +14,9 @@ import { AdminService } from './admin.service';
  * - GET  /admin/account-requests           → demandes de compte en attente
  * - POST /admin/account-requests/:id/approve
  * - POST /admin/account-requests/:id/reject
+ * - GET  /admin/worker/status              → statut du worker BullMQ embarqué
+ * - POST /admin/worker/pause               → coupe le worker (économie Redis)
+ * - POST /admin/worker/resume              → relance le worker
  */
 @UseGuards(JwtAuthGuard, AdminGuard)
 @Controller('admin')
@@ -61,5 +64,38 @@ export class AdminController {
   @Post('account-requests/:id/reject')
   async rejectAccountRequest(@Param('id') id: string) {
     return this.adminService.rejectAccountRequest(id);
+  }
+
+  /**
+   * GET /admin/worker/status
+   * Statut du worker BullMQ embarqué (running/paused/embedEnabled).
+   */
+  @Get('worker/status')
+  async getWorkerStatus() {
+    return this.adminService.getWorkerStatus();
+  }
+
+  /**
+   * POST /admin/worker/pause
+   * Coupe le worker embarqué (process tué, connexion Redis fermée) pour
+   * stopper immédiatement sa consommation de commandes Redis — à utiliser
+   * quand le quota gratuit Upstash (500k commandes/mois) approche de sa
+   * limite, pour éviter que le manque de commandes Redis fasse tomber le
+   * reste du site.
+   */
+  @Post('worker/pause')
+  async pauseWorker() {
+    this.logger.warn('Pause manuelle du worker embarqué (admin)');
+    return this.adminService.pauseWorker();
+  }
+
+  /**
+   * POST /admin/worker/resume
+   * Relance le worker embarqué après une pause manuelle.
+   */
+  @Post('worker/resume')
+  async resumeWorker() {
+    this.logger.log('Reprise manuelle du worker embarqué (admin)');
+    return this.adminService.resumeWorker();
   }
 }

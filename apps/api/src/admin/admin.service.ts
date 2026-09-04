@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { CRON_QUEUE_NAME, buildRedisConnection } from './bullmq.config';
+import { WorkerManagerService, WorkerStatus } from './worker-manager.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ListsService } from '../lists/lists.service';
 
@@ -24,6 +25,7 @@ export class AdminService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly listsService: ListsService,
+    private readonly workerManager: WorkerManagerService,
   ) {}
 
   /**
@@ -133,5 +135,28 @@ export class AdminService {
     await this.prisma.users.update({ where: { id: userId }, data: { status: 'rejected' } });
 
     return { success: true };
+  }
+
+  /**
+   * Statut courant du worker BullMQ embarqué (process enfant, cf.
+   * WorkerManagerService). `embedEnabled` reflète EMBED_WORKER, `running`
+   * l'état réel du process, `paused` si une pause manuelle a été demandée.
+   */
+  getWorkerStatus(): WorkerStatus {
+    return this.workerManager.getStatus();
+  }
+
+  /**
+   * Coupe le worker embarqué (tue le process enfant → connexion Redis
+   * fermée) sans toucher au reste de l'API. Utile en urgence quand le
+   * quota Upstash (500k commandes Redis/mois) approche de sa limite.
+   */
+  pauseWorker(): WorkerStatus {
+    return this.workerManager.pause();
+  }
+
+  /** Relance le worker embarqué après une pause manuelle. */
+  resumeWorker(): WorkerStatus {
+    return this.workerManager.resume();
   }
 }

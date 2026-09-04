@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AdminService } from './admin.service';
+import { WorkerManagerService } from './worker-manager.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { ListsService } from '../lists/lists.service';
 import { Queue } from 'bullmq';
 
 // Mock de Queue BullMQ
@@ -39,6 +42,16 @@ describe('AdminService', () => {
               if (key === 'REDIS_URL') return 'redis://localhost:6379';
               return defaultValue;
             }),
+          },
+        },
+        { provide: PrismaService, useValue: {} },
+        { provide: ListsService, useValue: {} },
+        {
+          provide: WorkerManagerService,
+          useValue: {
+            getStatus: jest.fn(),
+            pause: jest.fn(),
+            resume: jest.fn(),
           },
         },
       ],
@@ -100,6 +113,54 @@ describe('AdminService', () => {
       mockQueueAdd.mockRejectedValue(new Error('Redis connection refused'));
 
       await expect(service.refreshMaterializedViews()).rejects.toThrow('Redis connection refused');
+    });
+  });
+
+  describe('worker embarqué (pause/resume)', () => {
+    let module: TestingModule;
+    let workerManager: { getStatus: jest.Mock; pause: jest.Mock; resume: jest.Mock };
+
+    beforeEach(async () => {
+      module = await Test.createTestingModule({
+        providers: [
+          AdminService,
+          { provide: ConfigService, useValue: { get: jest.fn() } },
+          { provide: PrismaService, useValue: {} },
+          { provide: ListsService, useValue: {} },
+          {
+            provide: WorkerManagerService,
+            useValue: {
+              getStatus: jest.fn(),
+              pause: jest.fn(),
+              resume: jest.fn(),
+            },
+          },
+        ],
+      }).compile();
+
+      service = module.get<AdminService>(AdminService);
+      workerManager = module.get(WorkerManagerService);
+    });
+
+    it('délègue getWorkerStatus() à WorkerManagerService', () => {
+      workerManager.getStatus.mockReturnValue({ embedEnabled: true, running: true, paused: false });
+
+      expect(service.getWorkerStatus()).toEqual({ embedEnabled: true, running: true, paused: false });
+      expect(workerManager.getStatus).toHaveBeenCalled();
+    });
+
+    it('délègue pauseWorker() à WorkerManagerService', () => {
+      workerManager.pause.mockReturnValue({ embedEnabled: true, running: false, paused: true });
+
+      expect(service.pauseWorker()).toEqual({ embedEnabled: true, running: false, paused: true });
+      expect(workerManager.pause).toHaveBeenCalled();
+    });
+
+    it('délègue resumeWorker() à WorkerManagerService', () => {
+      workerManager.resume.mockReturnValue({ embedEnabled: true, running: true, paused: false });
+
+      expect(service.resumeWorker()).toEqual({ embedEnabled: true, running: true, paused: false });
+      expect(workerManager.resume).toHaveBeenCalled();
     });
   });
 });

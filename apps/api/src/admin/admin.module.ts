@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { AdminGuard } from './admin.guard';
+import { WorkerManagerService } from './worker-manager.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ListsModule } from '../lists/lists.module';
 
@@ -23,7 +24,7 @@ import { ListsModule } from '../lists/lists.module';
 @Module({
   imports: [ConfigModule, PrismaModule, ListsModule],
   controllers: [AdminController],
-  providers: [AdminService, AdminGuard],
-  exports: [AdminService],
+  providers: [AdminService, AdminGuard, WorkerManagerService],
+  exports: [AdminService, WorkerManagerService],
 })
 export class AdminModule {}
