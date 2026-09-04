@@ -1,0 +1,16 @@
+version: 2
+
+models:
+  - name: stg_user_watches
+    description: Un visionnage par ligne, colonnes renommees pour la couche staging.
+    columns:
+      - name: watch_id
+        tests: [unique, not_null]
+      - name: user_id
+        tests: [not_null]
+
+  - name: stg_titles
+    description: Duree et flag animation par titre, pour les jointures dataviz.
+    columns:
+      - name: title_id
+        tests: [unique, not_null]

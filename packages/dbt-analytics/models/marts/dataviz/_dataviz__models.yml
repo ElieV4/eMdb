@@ -1,0 +1,72 @@
+version: 2
+
+models:
+  - name: mart_watch_time_by_period
+    description: >
+      Temps de visionnage par utilisateur, ventile par semaine/mois/annee.
+      Alias physique `mv_watch_time_by_period` (compat. API dataviz existante).
+    columns:
+      - name: user_id
+        tests: [not_null]
+      - name: minutes
+        tests: [not_null]
+
+  - name: mart_watch_count_by_period
+    description: Nombre de visionnages par utilisateur, par semaine/mois/annee.
+    columns:
+      - name: user_id
+        tests: [not_null]
+
+  - name: mart_watch_time_by_genre
+    description: Temps de visionnage par utilisateur et par genre.
+    columns:
+      - name: user_id
+        tests: [not_null]
+      - name: genre_id
+        tests:
+          - not_null
+          - relationships:
+              to: source('emdb', 'genres')
+              field: id
+
+  - name: mart_watch_count_by_genre
+    description: Nombre de visionnages par utilisateur et par genre.
+    columns:
+      - name: genre_id
+        tests:
+          - relationships:
+              to: source('emdb', 'genres')
+              field: id
+
+  - name: mart_watch_time_by_country
+    description: Temps de visionnage par utilisateur et par pays de production.
+    columns:
+      - name: user_id
+        tests: [not_null]
+      - name: country_id
+        tests:
+          - not_null
+          - relationships:
+              to: source('emdb', 'countries')
+              field: id
+
+  - name: mart_watch_count_by_country
+    description: Nombre de visionnages par utilisateur et par pays de production.
+    columns:
+      - name: country_id
+        tests:
+          - relationships:
+              to: source('emdb', 'countries')
+              field: id
+
+  - name: mart_watch_time_by_animation
+    description: Temps de visionnage par utilisateur, animation vs live-action.
+    columns:
+      - name: user_id
+        tests: [not_null]
+
+  - name: mart_watch_count_by_animation
+    description: Nombre de visionnages par utilisateur, animation vs live-action.
+    columns:
+      - name: user_id
+        tests: [not_null]

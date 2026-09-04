@@ -1,4 +1,6 @@
 import Redis from 'ioredis';
+import { spawn } from 'node:child_process';
+import path from 'node:path';
 import { Queue, Worker, JobScheduler, JobsOptions } from 'bullmq';
 import { prisma } from '@emdb/db';
 import {
@@ -33,17 +35,6 @@ export const CRON_QUEUE_NAME = 'tmdb-cron';
 
 export const DEFAULT_WORKER_CONCURRENCY = 5;
 
-const MATERIALIZED_VIEWS = [
-  'mv_watch_time_by_period',
-  'mv_watch_time_by_genre',
-  'mv_watch_time_by_country',
-  'mv_watch_time_by_animation',
-  'mv_watch_count_by_genre',
-  'mv_watch_count_by_period',
-  'mv_watch_count_by_country',
-  'mv_watch_count_by_animation',
-];
-
 export function buildRedisConnection(redisUrl: string) {
   // BullMQ exige `maxRetriesPerRequest: null` sur la connexion utilisée par
   // un `Worker` (commandes bloquantes) — sans ça, toute création de Worker
@@ -64,10 +55,28 @@ export function getWeeklyResyncRange() {
   };
 }
 
-export async function refreshMaterializedViews() {
-  for (const viewName of MATERIALIZED_VIEWS) {
-    await prisma.$executeRawUnsafe(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${viewName};`);
-  }
+/**
+ * Reconstruit les 8 tables dataviz (ex mv_watch_*) via dbt (packages/dbt-analytics)
+ * au lieu d'un REFRESH MATERIALIZED VIEW SQL brut : les tests dbt (not_null,
+ * relationships, cohérence des durées) s'exécutent à chaque run, et le job
+ * échoue explicitement si l'un d'eux casse plutôt que de publier une donnée
+ * silencieusement fausse. Voir packages/dbt-analytics/README.md.
+ */
+export async function refreshMaterializedViews(): Promise<void> {
+  const runDbtScript = path.resolve(__dirname, '..', '..', '..', 'scripts', 'run-dbt.js');
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('node', [runDbtScript, 'build', '--select', 'marts.dataviz'], {
+      env: process.env,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+    child.on('exit', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`dbt build a échoué (code ${code})`));
+    });
+    child.on('error', reject);
+  });
 }
 
 /**

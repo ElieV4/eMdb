@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: int_watches_enriched
+    description: >
+      Un visionnage par ligne, avec la duree effective (episode sinon titre)
+      et le titre resolu. Base commune aux 8 marts dataviz.
+    columns:
+      - name: watch_id
+        tests: [unique, not_null]
+      - name: user_id
+        tests: [not_null]
+      - name: duree_minutes
+        tests:
+          - not_null

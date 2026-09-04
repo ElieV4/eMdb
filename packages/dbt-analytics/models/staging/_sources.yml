@@ -1,0 +1,31 @@
+version: 2
+
+sources:
+  - name: emdb
+    description: Tables applicatives eMDB, gerees par Prisma (packages/db/prisma/schema.prisma).
+    schema: public
+    tables:
+      - name: user_watches
+        description: Visionnages utilisateur (film ou episode).
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: user_id
+            tests: [not_null]
+      - name: titles
+        description: Films et series.
+        columns:
+          - name: id
+            tests: [unique, not_null]
+      - name: episodes
+        description: Episodes d'une saison.
+      - name: seasons
+        description: Saisons d'une serie.
+      - name: title_genres
+        description: Association titre <-> genre.
+      - name: title_countries
+        description: Association titre <-> pays de production.
+      - name: genres
+        description: Referentiel des genres.
+      - name: countries
+        description: Referentiel des pays.

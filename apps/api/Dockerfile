@@ -2,8 +2,11 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 
-# Installer les dépendances système pour Prisma
-RUN apk add --no-cache openssl libstdc++
+# Installer les dépendances système pour Prisma + Python pour dbt
+# (packages/dbt-analytics) : en prod cloud, le worker (dbt inclus) tourne
+# comme process enfant de ce même service (EMBED_WORKER=true, cf.
+# wiki/Déploiement), donc l'image api en a besoin aussi.
+RUN apk add --no-cache openssl libstdc++ python3 py3-pip
 
 # Copie des manifests pour profiter du cache Docker sur l'install
 COPY package.json package-lock.json* ./
@@ -14,6 +17,11 @@ RUN npm install --workspaces --if-present
 
 # Copie du reste du monorepo (utile en build ; en dev, volumes montés par compose)
 COPY . .
+
+# dbt dans un virtualenv dédié (pas de pip global sur l'image, cf. PEP 668).
+RUN python3 -m venv /opt/dbt-venv && \
+    /opt/dbt-venv/bin/pip install --no-cache-dir -r packages/dbt-analytics/requirements.txt
+ENV DBT_BIN=/opt/dbt-venv/bin/dbt
 
 # Générer le client Prisma
 RUN cd /app/packages/db && npx prisma generate --schema=./prisma/schema.prisma

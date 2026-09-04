@@ -64,3 +64,10 @@ supabase/.temp
 
 # --- Claude Code (config locale, jamais partagee) ---
 .claude/settings.local.json
+
+# --- dbt ---
+packages/dbt-analytics/target/
+packages/dbt-analytics/dbt_packages/
+packages/dbt-analytics/logs/
+packages/dbt-analytics/.venv/
+packages/dbt-analytics/.user.yml

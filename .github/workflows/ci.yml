@@ -65,7 +65,7 @@ jobs:
           npm run generate
           cd ../..
 
-      - name: Applique les objets SQL hors-Prisma (triggers, fonctions, vues matérialisées)
+      - name: Applique les objets SQL hors-Prisma (extension, trigger, fonctions)
         run: |
           cd packages/db
           npm run apply:raw-sql
@@ -73,6 +73,19 @@ jobs:
 
       - name: Détecte une dérive entre les migrations et schema.prisma
         run: npx prisma migrate diff --exit-code --from-url "$DATABASE_URL" --to-schema-datamodel packages/db/prisma/schema.prisma
+
+      - name: Setup Python (dbt)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: packages/dbt-analytics/requirements.txt
+
+      - name: Installe dbt
+        run: pip install -r packages/dbt-analytics/requirements.txt
+
+      - name: dbt build (marts dataviz — run + tests)
+        run: npm run dbt -- build --select marts.dataviz
 
       - name: Tests
         run: npm run test --workspaces --if-present

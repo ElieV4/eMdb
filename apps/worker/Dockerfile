@@ -2,8 +2,9 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 
-# Dépendances système pour le moteur Prisma (cf. apps/api/Dockerfile).
-RUN apk add --no-cache openssl libstdc++
+# Dépendances système pour le moteur Prisma (cf. apps/api/Dockerfile) + Python
+# pour dbt (packages/dbt-analytics, cf. wiki/Architecture#migrations).
+RUN apk add --no-cache openssl libstdc++ python3 py3-pip
 
 COPY package.json package-lock.json* ./
 COPY apps/worker/package.json apps/worker/package.json
@@ -12,6 +13,11 @@ COPY packages/db/package.json packages/db/package.json
 RUN npm install --workspaces --if-present
 
 COPY . .
+
+# dbt dans un virtualenv dédié (pas de pip global sur l'image, cf. PEP 668).
+RUN python3 -m venv /opt/dbt-venv && \
+    /opt/dbt-venv/bin/pip install --no-cache-dir -r packages/dbt-analytics/requirements.txt
+ENV DBT_BIN=/opt/dbt-venv/bin/dbt
 
 # Génère le client Prisma dans l'image — packages/db est ensuite écrasé par
 # le volume monté par docker-compose (source host, `dist/` inclus), mais

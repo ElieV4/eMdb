@@ -10,7 +10,7 @@ Ce dossier contient le schéma Prisma (`schema.prisma`) et l'historique de migra
 
 > ✅ **On modifie `schema.prisma` directement**, puis on génère une migration avec `prisma migrate dev` (voir workflow ci-dessous).
 
-Prisma ne gère pas tout : les triggers, fonctions PL/pgSQL et vues matérialisées restent définis en SQL brut dans `../sql/db_init.sql` et sont appliqués séparément (voir section "Objets SQL hors Prisma").
+Prisma ne gère pas tout : l'extension `pgcrypto`, les triggers et fonctions PL/pgSQL restent définis en SQL brut dans `../sql/db_init.sql` (voir section "Objets SQL hors Prisma") ; les 8 tables dataviz (ex vues matérialisées) sont gérées par dbt (`packages/dbt-analytics`).
 
 ---
 
@@ -31,13 +31,14 @@ Ceci crée un nouveau dossier dans `migrations/<timestamp>_description_du_change
 ```bash
 docker compose up -d          # PostgreSQL vierge (aucun schéma auto-appliqué)
 npm run migrate:deploy         # applique tout l'historique de migrations
-npm run apply:raw-sql           # triggers, fonctions, vues matérialisées
+npm run apply:raw-sql           # extension, trigger, fonctions
 npm run generate                 # client Prisma
+npm run dbt -- build              # les 8 tables dataviz (racine du repo)
 ```
 
 ### Production (première fois)
 
-Identique au local : `migrate:deploy` puis `apply:raw-sql`. Voir [wiki/Déploiement](../../../../wiki/Déploiement).
+Identique au local : `migrate:deploy`, `apply:raw-sql`, `dbt build`. Voir [wiki/Déploiement](../../../../wiki/Déploiement).
 
 ### Production (base déjà provisionnée avant l'introduction des migrations)
 
@@ -84,9 +85,9 @@ const count = await prisma.$queryRaw<number>(
 );
 ```
 
-### 📈 Vues matérialisées (Dataviz)
+### 📈 Vues dataviz (gérées par dbt)
 
-8 vues (`mv_watch_time_by_*`, `mv_watch_count_by_*` — période/genre/pays/animation), rafraîchies toutes les 3h par le worker via `REFRESH MATERIALIZED VIEW CONCURRENTLY` (nécessite un index UNIQUE, déjà en place sur chaque vue).
+8 objets (`mv_watch_time_by_*`, `mv_watch_count_by_*` — période/genre/pays/animation) : **plus définis dans `db_init.sql`**, mais par `packages/dbt-analytics` (modèles `marts/dataviz/mart_watch_*`, alias physique = nom historique). Rafraîchis toutes les 3h par le worker via `dbt build` (run + tests) au lieu de `REFRESH MATERIALIZED VIEW CONCURRENTLY`. Voir `packages/dbt-analytics/README.md`.
 
 ---
 
@@ -96,7 +97,8 @@ const count = await prisma.$queryRaw<number>(
 | -------------------------- | ---------------------------------------------------------------------- |
 | `npm run migrate:dev`      | Crée + applique une migration à partir des changements de `schema.prisma` |
 | `npm run migrate:deploy`   | Applique l'historique de migrations (CI/prod/nouvel environnement)  |
-| `npm run apply:raw-sql`    | Applique les objets SQL hors-Prisma (extension, triggers, fonctions, MV) |
+| `npm run apply:raw-sql`    | Applique les objets SQL hors-Prisma (extension, trigger, fonctions) |
+| `npm run dbt -- build` (racine) | Reconstruit + teste les 8 tables dataviz via dbt |
 | `npm run generate`         | Génère le client Prisma                                              |
 | `npm run db:refresh-mv` (racine) | Rafraîchit manuellement les vues matérialisées                |
 | `npm run seed`             | Seed genres + pays                                                    |

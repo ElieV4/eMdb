@@ -24,6 +24,7 @@
     "prisma:apply-raw-sql": "npm run apply:raw-sql --workspace=packages/db",
     "db:apply-raw-sql": "npm run apply:raw-sql --workspace=packages/db",
     "db:refresh-mv": "npm run refresh:materialized-views --workspace=packages/db",
+    "dbt": "node scripts/run-dbt.js",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f"
