@@ -18,6 +18,11 @@ export interface DiscoverTitleResult {
   date_sortie: string | null;
   local: boolean;
   local_id?: string;
+  /** Durée (film) / nombre d'épisodes hors spéciaux (série) — uniquement
+   * disponibles pour les résultats déjà importés localement (`local: true`),
+   * TMDB discover/trending ne les fournissant pas directement. */
+  duree_minutes?: number;
+  nombre_episodes?: number;
 }
 
 const DISCOVER_MODULES = ['tendances', 'populaires', 'attendus', 'sorties'] as const;
@@ -263,16 +268,33 @@ export class DiscoverService {
     const tmdbIds = sliced.map((item) => item.tmdb_id);
     const localTitles = await this.prisma.titles.findMany({
       where: { tmdb_id: { in: tmdbIds } },
-      select: { id: true, tmdb_id: true },
+      select: {
+        id: true,
+        tmdb_id: true,
+        type: true,
+        duree_minutes: true,
+        seasons: {
+          where: { numero: { not: 0 } },
+          select: { _count: { select: { episodes: true } } },
+        },
+      },
     });
     const localByTmdbId = new Map(
-      localTitles.filter((t) => t.tmdb_id !== null).map((t) => [t.tmdb_id as number, t.id]),
+      localTitles.filter((t) => t.tmdb_id !== null).map((t) => [t.tmdb_id as number, t]),
     );
 
-    return sliced.map(({ popularity, ...item }) => ({
-      ...item,
-      local: localByTmdbId.has(item.tmdb_id),
-      local_id: localByTmdbId.get(item.tmdb_id),
-    }));
+    return sliced.map(({ popularity, ...item }) => {
+      const local = localByTmdbId.get(item.tmdb_id);
+      return {
+        ...item,
+        local: !!local,
+        local_id: local?.id,
+        duree_minutes: local?.duree_minutes ?? undefined,
+        nombre_episodes:
+          local && local.type === 'serie'
+            ? local.seasons.reduce((sum, s) => sum + s._count.episodes, 0)
+            : undefined,
+      };
+    });
   }
 }

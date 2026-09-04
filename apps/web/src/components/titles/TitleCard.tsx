@@ -11,6 +11,7 @@ import { TitleWatchedButton } from "./TitleWatchedButton";
 import { TitleSearchResult } from "@/lib/types/api";
 import { buildEntityUrl, cn } from "@/lib/utils";
 import { usePosterScale } from "@/hooks/usePosterScale";
+import { buildTitleCardMeta } from "@/lib/cardFormatting";
 
 interface TitleCardProps {
   title: TitleSearchResult;
@@ -40,13 +41,15 @@ export function TitleCard({
     titreOriginal,
     type,
     dateSortie,
-    note,
+    duree,
+    nombreEpisodes,
     afficheUrl,
     local,
   } = title;
 
   // Extraire l'année de la date de sortie
   const year = dateSortie ? new Date(dateSortie).getFullYear() : null;
+  const meta = buildTitleCardMeta({ type, annee: year, duree, nombreEpisodes });
   const displayTitle =
     titreOriginal && titreOriginal !== titre ? titreOriginal : titre;
 
@@ -131,18 +134,11 @@ export function TitleCard({
               </p>
             )}
 
-            {/* Métadonnées (année, note) */}
+            {/* Métadonnées : "Année - Durée" (film) / "Année - N ép." (série) */}
             <div className="flex items-center gap-2 text-xs">
-              {year && <span className="text-muted-foreground">{year}</span>}
+              {meta && <span className="text-muted-foreground">{meta}</span>}
 
-              {note && (
-                <span className="flex items-center gap-0.5 text-amber-400">
-                  <Star className="h-3.5 w-3.5 fill-current" />
-                  <span>{Number(note).toFixed(1)}</span>
-                </span>
-              )}
-
-              {showType && !compact && (
+              {showType && !compact && !meta && (
                 <span
                   className={cn(
                     "px-1.5 py-0.5 text-xs font-medium rounded-full",

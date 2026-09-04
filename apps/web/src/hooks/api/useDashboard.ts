@@ -24,6 +24,7 @@ type BackendTitleRow = {
   date_sortie: string | null;
   duree_minutes?: number | null;
   note_imdb: number | string | null;
+  nombre_episodes?: number | null;
   title_genres?: { genres: { id: string; nom: string } }[];
   title_countries?: { countries: { id: string; nom: string } }[];
 };
@@ -42,6 +43,7 @@ function mapBackendTitleRow(row: BackendTitleRow): Title {
     afficheUrl: row.affiche_url ?? undefined,
     genres: row.title_genres?.map((tg) => tg.genres),
     pays: row.title_countries?.map((tc) => tc.countries),
+    nombreEpisodes: row.nombre_episodes ?? undefined,
   };
 }
 

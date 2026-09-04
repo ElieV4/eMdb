@@ -41,6 +41,8 @@ export type Title = {
   statut?: string;
   genres?: Genre[];
   pays?: Country[];
+  /** Nombre total d'épisodes (hors saison 0/spéciaux) — séries uniquement. */
+  nombreEpisodes?: number;
 };
 
 export type Person = {
@@ -386,6 +388,9 @@ export type TitleSearchResult = {
    * importés localement (filtre "Studio" sur /search, modification P).
    * `undefined` = non applicable (résultat TMDB pas encore importé). */
   studioIds?: string[];
+  /** Nombre total d'épisodes (hors saison 0/spéciaux) — séries uniquement,
+   * renseigné seulement quand la donnée locale est disponible. */
+  nombreEpisodes?: number;
 };
 
 export type PersonSearchResult = {

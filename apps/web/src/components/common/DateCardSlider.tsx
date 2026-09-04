@@ -6,6 +6,7 @@
  * sur place, pour rester cohérent avec les autres modules de l'accueil).
  */
 
+import type { ReactNode } from "react";
 import { DateCard } from "./DateCard";
 import { CardSlider } from "./CardSlider";
 
@@ -14,7 +15,7 @@ export type DateCardData = {
   href: string;
   imageUrl?: string | null;
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   date?: Date | string | null;
   showTime?: boolean;
 };

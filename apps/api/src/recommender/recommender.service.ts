@@ -244,6 +244,13 @@ export class RecommenderService {
       include: {
         title_genres: { include: { genres: { select: { id: true, nom: true } } } },
         title_countries: { include: { countries: { select: { id: true, code: true, nom: true } } } },
+        // Nombre total d'épisodes (hors saison 0/spéciaux) affiché sur les
+        // cards série de la page Recommandations — sommé depuis le compte
+        // par saison, cf. lists.service.ts#getListDetail (même pattern).
+        seasons: {
+          where: { numero: { not: 0 } },
+          select: { _count: { select: { episodes: true } } },
+        },
       },
     });
 
@@ -262,7 +269,13 @@ export class RecommenderService {
 
     scored.sort((a, b) => b.score - a.score);
 
-    return scored.slice(0, limit).map((s) => s.title);
+    return scored.slice(0, limit).map((s) => ({
+      ...s.title,
+      nombre_episodes:
+        s.title.type === 'serie'
+          ? s.title.seasons.reduce((sum, se) => sum + se._count.episodes, 0)
+          : undefined,
+    }));
   }
 
   private async getLastRun() {

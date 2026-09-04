@@ -19,6 +19,8 @@ type BackendDiscoverResult = {
   date_sortie: string | null;
   local: boolean;
   local_id?: string;
+  duree_minutes?: number;
+  nombre_episodes?: number;
 };
 
 function mapBackendDiscoverResult(item: BackendDiscoverResult): TitleSearchResult {
@@ -34,6 +36,8 @@ function mapBackendDiscoverResult(item: BackendDiscoverResult): TitleSearchResul
     note: item.note_imdb ?? undefined,
     afficheUrl: item.poster_path ?? undefined,
     local: item.local,
+    duree: item.duree_minutes,
+    nombreEpisodes: item.nombre_episodes,
   };
 }
 

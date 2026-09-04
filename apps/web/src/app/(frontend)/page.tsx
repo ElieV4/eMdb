@@ -9,7 +9,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Calendar, TrendingUp, Users } from "lucide-react";
+import { Calendar, TrendingUp, Users, Star } from "lucide-react";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { DateCardSlider, DateCardData } from "@/components/common/DateCardSlider";
@@ -36,7 +36,12 @@ import {
 } from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
 import { buildEntityUrl } from "@/lib/utils";
-import { buildCardText, formatDuration, formatRatingStars } from "@/lib/cardFormatting";
+import {
+  buildCardText,
+  formatDuration,
+  formatRatingStars,
+  formatSeasonEpisodeCompact,
+} from "@/lib/cardFormatting";
 
 // Convertir Title en TitleSearchResult pour compatibilité avec TitleCard
 function titleToSearchResult(title: Title): TitleSearchResult {
@@ -53,6 +58,7 @@ function titleToSearchResult(title: Title): TitleSearchResult {
     genres: title.genres,
     pays: title.pays,
     local: true,
+    nombreEpisodes: title.nombreEpisodes,
   };
 }
 
@@ -166,15 +172,26 @@ function HomePageContent() {
     const annee = resolvedTitle?.date_sortie
       ? new Date(resolvedTitle.date_sortie).getFullYear()
       : null;
-    const { title, subtitle } = buildCardText({
-      type: watch.episodes ? "serie" : ((resolvedTitle?.type as "film" | "serie") ?? "film"),
-      titre: resolvedTitle?.titre_vf || resolvedTitle?.titre_vo || "Titre inconnu",
-      annee,
-      episodeTitre: watch.episodes?.titre,
-      saison: watch.episodes?.seasons.numero,
-      episodeNumero: watch.episodes?.numero,
-      metricLabel: formatRatingStars(watch.note_perso),
-    });
+    // Titre nu + année/SxxExx et note perso sur la ligne du dessous (même
+    // format que /history, cf. cardFormatting.ts).
+    const title = resolvedTitle?.titre_vf || resolvedTitle?.titre_vo || "Titre inconnu";
+    const seasonEp = watch.episodes
+      ? formatSeasonEpisodeCompact(watch.episodes.seasons.numero, watch.episodes.numero)
+      : null;
+    const ratingLabel = formatRatingStars(watch.note_perso);
+    const metaPrimary = watch.episodes ? seasonEp : annee ? String(annee) : null;
+    const subtitle =
+      metaPrimary || ratingLabel ? (
+        <span className="inline-flex items-center gap-1">
+          {metaPrimary}
+          {ratingLabel && (
+            <span className="inline-flex items-center gap-0.5">
+              <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />
+              {ratingLabel}
+            </span>
+          )}
+        </span>
+      ) : null;
     return {
       key: watch.id,
       href: watch.episodes

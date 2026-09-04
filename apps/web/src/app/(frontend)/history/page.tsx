@@ -26,12 +26,12 @@ import { TitleQuickActionsMenu } from "@/components/titles/TitleQuickActionsMenu
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ListChecks } from "lucide-react";
+import { AlertCircle, ListChecks, Star } from "lucide-react";
 import { parseTitleFilters, buildListIdsByTitle } from "@/lib/titleFilters";
 import { groupByPeriod, Period } from "@/lib/periodGrouping";
 import { UserWatch } from "@/lib/types/api";
 import { buildEntityUrl } from "@/lib/utils";
-import { buildCardText, formatRatingStars } from "@/lib/cardFormatting";
+import { formatRatingStars, formatSeasonEpisodeCompact } from "@/lib/cardFormatting";
 
 function HistoryPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
@@ -228,15 +228,27 @@ function HistoryPageContent() {
                     const dateSortie = resolvedTitle?.date_sortie
                       ? new Date(resolvedTitle.date_sortie).getFullYear()
                       : null;
-                    const { title: label, subtitle } = buildCardText({
-                      type: watch.episodes ? "serie" : ((resolvedTitle?.type as "film" | "serie") ?? "film"),
-                      titre: resolvedTitle?.titre_vf || resolvedTitle?.titre_vo || "Titre inconnu",
-                      annee: dateSortie,
-                      episodeTitre: watch.episodes?.titre,
-                      saison: watch.episodes?.seasons.numero,
-                      episodeNumero: watch.episodes?.numero,
-                      metricLabel: formatRatingStars(watch.note_perso),
-                    });
+                    // Titre nu (pas de "(Année)"/"- titre épisode" en suffixe,
+                    // contrairement à Calendrier/Continuer) : l'année ou le
+                    // SxxExx vit sur la ligne du dessous, avec la note perso.
+                    const label = resolvedTitle?.titre_vf || resolvedTitle?.titre_vo || "Titre inconnu";
+                    const seasonEp = watch.episodes
+                      ? formatSeasonEpisodeCompact(watch.episodes.seasons.numero, watch.episodes.numero)
+                      : null;
+                    const ratingLabel = formatRatingStars(watch.note_perso);
+                    const metaPrimary = watch.episodes ? seasonEp : dateSortie ? String(dateSortie) : null;
+                    const subtitle =
+                      metaPrimary || ratingLabel ? (
+                        <span className="inline-flex items-center gap-1">
+                          {metaPrimary}
+                          {ratingLabel && (
+                            <span className="inline-flex items-center gap-0.5">
+                              <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />
+                              {ratingLabel}
+                            </span>
+                          )}
+                        </span>
+                      ) : null;
                     const href = watch.episodes
                       ? `/episodes/${watch.episodes.id}`
                       : buildEntityUrl(

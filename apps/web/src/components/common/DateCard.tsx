@@ -17,7 +17,8 @@ type DateCardProps = {
   href: string;
   imageUrl?: string | null;
   title: string;
-  subtitle?: string;
+  /** Texte simple, ou JSX (ex. note perso avec icône étoile, cf. history/page.tsx). */
+  subtitle?: ReactNode;
   date?: Date | string | null;
   className?: string;
   /** Bouton de suppression (croix) superposé en haut à droite — ex. retirer
@@ -120,7 +121,10 @@ export function DateCard({
           {title}
         </p>
         {subtitle && (
-          <p className="text-[11px] italic text-muted-foreground line-clamp-1" title={subtitle}>
+          <p
+            className="text-[11px] italic text-muted-foreground line-clamp-1"
+            title={typeof subtitle === "string" ? subtitle : undefined}
+          >
             {subtitle}
           </p>
         )}

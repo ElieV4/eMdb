@@ -254,6 +254,13 @@ export class ListsService {
             type: true,
             date_sortie: true,
             note_imdb: true,
+            duree_minutes: true,
+            // Nombre total d'épisodes (hors saison 0/spéciaux) affiché sur les
+            // cards série de la watchlist — sommé depuis le compte par saison.
+            seasons: {
+              where: { numero: { not: 0 } },
+              select: { _count: { select: { episodes: true } } },
+            },
             title_genres: { include: { genres: { select: { id: true, nom: true } } } },
             title_countries: { include: { countries: { select: { id: true, nom: true } } } },
           },
@@ -284,6 +291,11 @@ export class ListsService {
           ? item.titles.date_sortie.toISOString()
           : undefined,
         note: item.titles.note_imdb ? Number(item.titles.note_imdb) : undefined,
+        duree: item.titles.duree_minutes ?? undefined,
+        nombreEpisodes:
+          item.titles.type === 'serie'
+            ? item.titles.seasons.reduce((sum, s) => sum + s._count.episodes, 0)
+            : undefined,
         afficheUrl: item.titles.affiche_url ?? undefined,
         genres: item.titles.title_genres.map((tg) => tg.genres),
         pays: item.titles.title_countries.map((tc) => tc.countries),

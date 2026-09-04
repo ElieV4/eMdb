@@ -35,6 +35,7 @@ function titleToSearchResult(title: Title): TitleSearchResult {
     genres: title.genres,
     pays: title.pays,
     local: true,
+    nombreEpisodes: title.nombreEpisodes,
   };
 }
 
