@@ -1,6 +1,9 @@
 # @emdb/dbt-analytics
 
-Projet dbt qui remplace les 8 vues matérialisées SQL brutes (`mv_watch_*`) utilisées par le module dataviz (`apps/api/src/dataviz`). Auparavant recalculées via `REFRESH MATERIALIZED VIEW CONCURRENTLY` (job worker), elles sont maintenant des tables reconstruites par `dbt build`, avec tests et documentation.
+Projet dbt pour le module dataviz (`apps/api/src/dataviz`), à deux niveaux :
+
+1. **`int_watches_enriched`** (vue, toujours à jour) — base commune qui résout episode → titre et la durée effective. Consommée **directement par l'endpoint live `GET /dataviz/query`** (le moteur d'exploration dynamique de la page Profil) : remplace un `LEFT JOIN episodes/seasons` + calcul de durée qui était dupliqué dans 8 requêtes SQL différentes du service. **C'est donc une dépendance de premier plan de l'app, pas seulement un détail interne dbt** — sans elle, la page Profil ne répond plus (500).
+2. **8 marts `mart_watch_*`** — remplacent les anciennes vues matérialisées SQL brutes (`mv_watch_*`), utilisées par les endpoints legacy `getWatchTime`/`getWatchCount` (conservés pour compatibilité/tests, plus appelés par le frontend actuel). Reconstruits en tables par `dbt build`.
 
 ## Structure
 

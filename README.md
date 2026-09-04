@@ -40,7 +40,7 @@ docker compose up -d   # PostgreSQL + Redis (base vierge)
 npm run prisma:migrate:deploy   # tables, via l'historique de migrations
 npm run prisma:apply-raw-sql     # extension, trigger, fonctions
 npm run prisma:generate
-npm run dbt -- build              # les 8 tables dataviz (nécessite Python, voir packages/dbt-analytics)
+npm run dbt -- build              # requis (page Profil incluse) — nécessite Python, voir packages/dbt-analytics
 npm run dev:api         # apps/api sur :3001
 npm run dev:worker       # apps/worker
 ```

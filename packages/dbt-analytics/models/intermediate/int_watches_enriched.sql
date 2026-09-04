@@ -1,6 +1,10 @@
 -- Un visionnage par ligne, enrichi de la duree effective (episode sinon
 -- titre) et du titre resolu (direct ou via l'episode -> saison -> serie).
--- Base commune aux 8 marts dataviz (time/count x period/genre/country/animation).
+-- Vue (non materialisee) : toujours a jour, jamais de decalage avec
+-- user_watches. Consommee par les 8 marts dataviz ET directement par
+-- l'endpoint GET /dataviz/query (apps/api/src/dataviz/dataviz.service.ts) --
+-- remplace le JOIN episodes/seasons + calcul de duree qui etait auparavant
+-- duplique dans 8 requetes SQL differentes de ce service.
 with watches as (
     select * from {{ ref('stg_user_watches') }}
 ),
@@ -20,7 +24,11 @@ titles as (
 select
     w.watch_id,
     w.user_id,
+    w.episode_id,
     w.date_vue,
+    w.support,
+    w.compagnie,
+    w.emotion,
     coalesce(w.title_id, s.title_id) as title_id,
     coalesce(e.duree_minutes, t.duree_minutes, 0) as duree_minutes,
     t.is_animation

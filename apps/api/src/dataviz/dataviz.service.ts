@@ -34,8 +34,11 @@ type DatavizResult = { total: number | null; rows: DatavizRow[] };
  *   depuis la modification W (gardées pour compatibilité/tests).
  * - query() (modification W) : endpoint unique alimentant les 8 visuels
  *   dataviz de la page Profil, chacun avec son propre menu métrique/
- *   agrégation/groupement/filtres — requête `user_watches` directement (pas
- *   de vue matérialisée), voir `DatavizQueryDto` pour le détail du modèle.
+ *   agrégation/groupement/filtres — base commune `int_watches_enriched`
+ *   (vue dbt, packages/dbt-analytics : résout episode → titre et la durée
+ *   effective une seule fois, toujours à jour car non matérialisée), puis
+ *   jointures dynamiques (genre/pays/studio/acteur/réalisateur...) selon la
+ *   combinaison demandée. Voir `DatavizQueryDto` pour le détail du modèle.
  */
 @Injectable()
 export class DatavizService {
@@ -325,7 +328,7 @@ export class DatavizService {
   // Modification W — menu unifié (métrique/agrégation/groupement/filtres)
   // ======================================================================
 
-  private readonly durationExpr = 'COALESCE(e.duree_minutes, t.duree_minutes, 0)';
+  private readonly durationExpr = 'uw.duree_minutes';
 
   /**
    * Métrique "note" : note perso de l'utilisateur (user_ratings.note_perso),
@@ -748,10 +751,8 @@ export class DatavizService {
     const orderByAll = [pieces.orderExpr, legend?.orderExpr].filter(Boolean).join(', ');
     const sql = `
       SELECT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category${legendSelect}, ${val} AS value
-      FROM user_watches uw
-      LEFT JOIN episodes e ON e.id = uw.episode_id
-      LEFT JOIN seasons s ON s.id = e.season_id
-      JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      FROM int_watches_enriched uw
+      JOIN titles t ON t.id = uw.title_id
       ${this.noteJoin}
       ${pieces.joinSql}
       ${legend?.joinSql ?? ''}
@@ -807,10 +808,8 @@ export class DatavizService {
 
     const sql = `
       SELECT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category${legendSelect}, ${val} AS value
-      FROM user_watches uw
-      LEFT JOIN episodes e ON e.id = uw.episode_id
-      LEFT JOIN seasons s ON s.id = e.season_id
-      JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      FROM int_watches_enriched uw
+      JOIN titles t ON t.id = uw.title_id
       ${pieces.joinSql}
       WHERE ${where}
       GROUP BY ${groupByAll}
@@ -835,10 +834,8 @@ export class DatavizService {
     const where = this.buildWhere(userId, dto, 't') + this.excludeSentinelDate;
     const bucketsSql = `
       SELECT (${trunc}) AS bucket, ${cntExpr} AS cnt
-      FROM user_watches uw
-      LEFT JOIN episodes e ON e.id = uw.episode_id
-      LEFT JOIN seasons s ON s.id = e.season_id
-      JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      FROM int_watches_enriched uw
+      JOIN titles t ON t.id = uw.title_id
       WHERE ${where}
       GROUP BY (${trunc})
     `;
@@ -884,10 +881,8 @@ export class DatavizService {
     const sql = `
       WITH agg AS (
         SELECT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category, (${trunc}) AS bucket, ${primaryAgg} AS val
-        FROM user_watches uw
-        LEFT JOIN episodes e ON e.id = uw.episode_id
-        LEFT JOIN seasons s ON s.id = e.season_id
-        JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+        FROM int_watches_enriched uw
+        JOIN titles t ON t.id = uw.title_id
         ${dto.metric === 'note' ? this.noteJoin : ''}
         ${pieces.joinSql}
         WHERE ${where}
@@ -925,10 +920,8 @@ export class DatavizService {
     const sql = `
       WITH deduped AS (
         SELECT DISTINCT ${pieces.categoryIdExpr} AS category_id, ${pieces.categoryExpr} AS category, t.id AS title_id, ur.note_perso
-        FROM user_watches uw
-        LEFT JOIN episodes e ON e.id = uw.episode_id
-        LEFT JOIN seasons s ON s.id = e.season_id
-        JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+        FROM int_watches_enriched uw
+        JOIN titles t ON t.id = uw.title_id
         ${this.noteJoin}
         ${pieces.joinSql}
         WHERE ${where} AND ur.note_perso IS NOT NULL
@@ -987,10 +980,8 @@ export class DatavizService {
       : Prisma.empty;
     const rows = await this.prisma.$queryRaw<{ id: string; nom: string }[]>(Prisma.sql`
       SELECT t.id, COALESCE(t.titre_vf, t.titre_vo) AS nom, COUNT(*) AS cnt
-      FROM user_watches uw
-      LEFT JOIN episodes e ON e.id = uw.episode_id
-      LEFT JOIN seasons s ON s.id = e.season_id
-      JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      FROM int_watches_enriched uw
+      JOIN titles t ON t.id = uw.title_id
       WHERE uw.user_id = ${userId}::UUID ${searchClause}
       GROUP BY t.id, t.titre_vf, t.titre_vo
       ORDER BY cnt DESC
@@ -1003,10 +994,8 @@ export class DatavizService {
     const searchClause = pattern ? Prisma.sql`AND st.nom ILIKE ${pattern} ESCAPE '\\'` : Prisma.empty;
     const rows = await this.prisma.$queryRaw<{ id: string; nom: string }[]>(Prisma.sql`
       SELECT st.id, st.nom, COUNT(*) AS cnt
-      FROM user_watches uw
-      LEFT JOIN episodes e ON e.id = uw.episode_id
-      LEFT JOIN seasons s ON s.id = e.season_id
-      JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      FROM int_watches_enriched uw
+      JOIN titles t ON t.id = uw.title_id
       JOIN title_studios ts ON ts.title_id = t.id
       JOIN studios st ON st.id = ts.studio_id
       WHERE uw.user_id = ${userId}::UUID ${searchClause}
@@ -1025,10 +1014,8 @@ export class DatavizService {
     const searchClause = pattern ? Prisma.sql`AND p.nom ILIKE ${pattern} ESCAPE '\\'` : Prisma.empty;
     const rows = await this.prisma.$queryRaw<{ id: string; nom: string }[]>(Prisma.sql`
       SELECT p.id, p.nom, COUNT(*) AS cnt
-      FROM user_watches uw
-      LEFT JOIN episodes e ON e.id = uw.episode_id
-      LEFT JOIN seasons s ON s.id = e.season_id
-      JOIN titles t ON t.id = COALESCE(uw.title_id, s.title_id)
+      FROM int_watches_enriched uw
+      JOIN titles t ON t.id = uw.title_id
       JOIN (
         SELECT DISTINCT cr.title_id, cr.person_id
         FROM credits cr

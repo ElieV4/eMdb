@@ -472,12 +472,12 @@ describe('DatavizService', () => {
 
       await service.query(userId, { ...base, aggregation: 'min' } as any);
       expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
-        expect.stringContaining('MIN(COALESCE(e.duree_minutes, t.duree_minutes, 0))'),
+        expect.stringContaining('MIN(uw.duree_minutes)'),
       );
 
       await service.query(userId, { ...base, aggregation: 'avg' } as any);
       expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
-        expect.stringContaining('AVG(COALESCE(e.duree_minutes, t.duree_minutes, 0))'),
+        expect.stringContaining('AVG(uw.duree_minutes)'),
       );
     });
 

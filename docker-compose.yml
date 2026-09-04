@@ -15,7 +15,9 @@ services:
       # Après le premier `docker compose up -d`, appliquer (une fois) :
       #   npm run prisma:migrate:deploy   (tables, via packages/db/prisma/migrations)
       #   npm run prisma:apply-raw-sql    (extension, trigger, fonctions)
-      #   npm run dbt -- build             (les 8 tables dataviz, cf. packages/dbt-analytics)
+      #   npm run dbt -- build             (requis : la page Profil dépend en
+      #                                      direct de la vue int_watches_enriched,
+      #                                      pas seulement les 8 tables dataviz)
       # cf. wiki/Architecture pour le détail du workflow de migration.
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U emdb -d emdb']
