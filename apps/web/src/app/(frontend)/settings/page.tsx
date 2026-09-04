@@ -18,6 +18,7 @@ import { clearAuthCookie, clearRefreshCookie } from "@/lib/auth/authCookie";
 import { TraktImportButton } from "@/components/profile/TraktImportButton";
 import { ImportCreditsButton } from "@/components/profile/ImportCreditsButton";
 import { FreeWatchSitesSection } from "@/components/settings/FreeWatchSitesSection";
+import { AccountRequestsSection } from "@/components/settings/AccountRequestsSection";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -200,6 +201,8 @@ export default function SettingsPage() {
           </p>
           <FreeWatchSitesSection />
         </section>
+
+        <AccountRequestsSection />
 
         <section className="space-y-3 border-t pt-8">
           <h2 className="text-lg font-semibold flex items-center gap-2 text-destructive">

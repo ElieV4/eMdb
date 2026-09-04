@@ -41,6 +41,7 @@ import {
   NOTE_IMDB_MAX,
 } from "@/lib/titleFilters";
 import { Filter, Film, Tv, Users, Search, Building2 } from "lucide-react";
+import { NotificationBell } from "./NotificationBell";
 
 const FILTER_TABS: FilterTab[] = [
   { id: "tout", label: "Tout", icon: <Search className="h-3.5 w-3.5" /> },
@@ -256,6 +257,7 @@ export function Header() {
 
         {/* Actions droite */}
         <div className="flex items-center justify-end gap-2">
+          <NotificationBell />
           {/* Bouton "Filtres" — déploie le panneau de filtres (sidebar
               droite si assez de place, sinon feuille du bas, cf.
               FilterSidebar) ; absent sur Profil, cf. isProfilePage. */}
@@ -265,7 +267,7 @@ export function Header() {
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 filterSidebarOpen || hasActiveTitleFilters(filters)
                   ? "bg-primary/20 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
               <Filter className="h-3.5 w-3.5" />

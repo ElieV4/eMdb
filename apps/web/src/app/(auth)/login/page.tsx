@@ -9,9 +9,10 @@ import { LoginForm } from "@/components/auth/LoginForm";
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams?: { redirect?: string };
+  searchParams?: { redirect?: string; demo?: string };
 }) {
   const redirectTo = searchParams?.redirect || "/";
+  const isDemo = searchParams?.demo === "1";
 
   return (
     <>
@@ -24,7 +25,7 @@ export default function LoginPage({
           </Link>
         </p>
       </div>
-      <LoginForm redirectTo={redirectTo} />
+      <LoginForm redirectTo={redirectTo} prefillDemo={isDemo} />
     </>
   );
 }

@@ -14,9 +14,18 @@ import { Button } from "@/components/ui/button";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export function LoginForm({
+  redirectTo = "/",
+  prefillDemo = false,
+}: {
+  redirectTo?: string;
+  /** Arrivée depuis /register via "Essayer avec un compte de démo" — préremplit
+   * les identifiants du compte test@test, l'utilisateur clique lui-même sur
+   * "Se connecter". */
+  prefillDemo?: boolean;
+}) {
+  const [email, setEmail] = useState(prefillDemo ? "test@test.com" : "");
+  const [password, setPassword] = useState(prefillDemo ? "test" : "");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const router = useRouter();

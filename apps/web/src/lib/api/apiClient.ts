@@ -161,7 +161,11 @@ async function doFetch<T>(
       }
 
       if (res.status === 401) {
-        throw new Error("Non autorisé");
+        // /auth/login|register : le 401 porte une raison métier utile pour
+        // l'utilisateur (mauvais mot de passe, compte en attente/refusé,
+        // cf. auth.service.ts) — à afficher telle quelle plutôt que de la
+        // remplacer par le message générique de session expirée.
+        throw new Error(NO_REFRESH_PATHS.includes(path) ? message : "Non autorisé");
       }
 
       if (res.status === 403) throw new Error("Interdit");

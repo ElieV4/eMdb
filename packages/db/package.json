@@ -14,10 +14,12 @@
     "refresh:materialized-views": "dotenv -e ../../.env -- ts-node --transpile-only scripts/refresh-materialized-views.ts",
     "seed:genres": "dotenv -e ../../.env -- ts-node --transpile-only seed/seed_genres.ts",
     "seed:countries": "dotenv -e ../../.env -- ts-node --transpile-only seed/seed_countries.ts",
+    "seed:test-account": "dotenv -e ../../.env -- ts-node --transpile-only seed/seed_test_account.ts",
     "seed": "npm run seed:genres && npm run seed:countries"
   },
   "dependencies": {
     "@prisma/client": "^5.18.0",
+    "bcrypt": "^6.0.0",
     "dotenv": "^16.4.5"
   },
   "devDependencies": {

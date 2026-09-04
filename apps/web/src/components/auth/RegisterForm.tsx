@@ -5,8 +5,8 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { AuthInput } from "@/components/auth/AuthInput";
 import { useRegister } from "@/hooks/auth/useRegister";
@@ -14,22 +14,30 @@ import { Button } from "@/components/ui/button";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function RegisterForm({ redirectTo = "/" }: { redirectTo?: string }) {
+export function RegisterForm({ redirectTo: _redirectTo = "/" }: { redirectTo?: string }) {
   const [email, setEmail] = useState("");
   const [pseudo, setPseudo] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const router = useRouter();
-  const { mutate, isPending, isError, error, isSuccess } = useRegister();
+  const { mutate, isPending, isError, error, isSuccess, data } = useRegister();
 
-  // Redirect on success
-  useEffect(() => {
-    if (isSuccess) {
-      router.push(redirectTo);
-    }
-  }, [isSuccess, router, redirectTo]);
+  // Pas de redirection : le compte reste en attente de validation, on
+  // affiche simplement le message de confirmation à la place du formulaire.
+  if (isSuccess) {
+    return (
+      <div className="space-y-4 text-center">
+        <p className="text-sm">{data.message}</p>
+        <p className="text-sm text-muted-foreground">
+          Vous voulez juste tester l&apos;app ?{" "}
+          <Link href="/login?demo=1" className="text-primary hover:underline">
+            Essayer avec un compte de démo
+          </Link>
+        </p>
+      </div>
+    );
+  }
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -76,6 +84,12 @@ export function RegisterForm({ redirectTo = "/" }: { redirectTo?: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <p className="text-center text-sm text-muted-foreground">
+        Vous voulez juste tester l&apos;app ?{" "}
+        <Link href="/login?demo=1" className="text-primary hover:underline">
+          Essayer avec un compte de démo
+        </Link>
+      </p>
       <AuthInput
         label="Email"
         name="email"

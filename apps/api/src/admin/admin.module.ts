@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { AdminGuard } from './admin.guard';
+import { PrismaModule } from '../prisma/prisma.module';
+import { ListsModule } from '../lists/lists.module';
 
 /**
  * Module admin – Phase 6.2
@@ -12,13 +14,14 @@ import { AdminGuard } from './admin.guard';
  *
  * Dépendances :
  * - ConfigModule : pour lire ADMIN_EMAILS et REDIS_URL
+ * - PrismaModule / ListsModule : gestion des demandes de création de compte
  *
  * Notes :
  * - bullmq et ioredis doivent être installés dans apps/api (package.json)
  * - AdminGuard dépend de JwtAuthGuard (composé via @UseGuards)
  */
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, PrismaModule, ListsModule],
   controllers: [AdminController],
   providers: [AdminService, AdminGuard],
   exports: [AdminService],

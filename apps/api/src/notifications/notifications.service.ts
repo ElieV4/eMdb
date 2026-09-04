@@ -48,6 +48,9 @@ export class NotificationsService {
               },
             },
           },
+          users_notifications_related_user_idTousers: {
+            select: { id: true, pseudo: true, email: true },
+          },
         },
         orderBy: [{ lu: 'asc' }, { created_at: 'desc' }],
         skip,
@@ -60,9 +63,11 @@ export class NotificationsService {
       data: data.map((n) => ({
         id: n.id,
         type: n.type,
+        message: n.message,
         lu: n.lu,
         created_at: n.created_at,
         episode: n.episodes,
+        relatedUser: n.users_notifications_related_user_idTousers,
       })),
       total,
       page,
