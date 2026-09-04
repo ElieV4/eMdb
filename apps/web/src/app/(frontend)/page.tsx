@@ -166,6 +166,29 @@ function HomePageContent() {
     return watch.titles?.type === filters.type;
   });
 
+  // "Continuer à regarder" et "Calendrier" : uniquement des séries, et leurs
+  // réponses backend (GET /continue-watching, GET /calendar) ne portent ni
+  // genre/pays/note/année de sortie — seuls type/listes/statut vu sont
+  // calculables ici (`year`/`note`/`genreIds`/`countryIds` à `undefined` =
+  // non applicable, cf. `FilterableTitle`).
+  const toFilterableSerieEntry = (titleId: string) => ({
+    id: titleId,
+    type: "serie" as const,
+    year: undefined,
+    note: undefined,
+    genreIds: undefined,
+    countryIds: undefined,
+    listIds: listIdsByTitle.get(titleId) ?? [],
+    watched: watchedTitles?.has(titleId) ?? false,
+  });
+
+  const filteredContinueWatching = (continueWatching ?? []).filter((entry) =>
+    titleMatchesFilters(toFilterableSerieEntry(entry.title_id), filters),
+  );
+  const filteredCalendarEntries = (calendarEntries ?? []).filter((entry) =>
+    titleMatchesFilters(toFilterableSerieEntry(entry.title_id), filters),
+  );
+
   const historyCards: DateCardData[] = filteredRecentWatches.map((watch) => {
     const serie = watch.episodes?.seasons.titles;
     const resolvedTitle = watch.titles ?? serie;
@@ -205,7 +228,7 @@ function HomePageContent() {
     };
   });
 
-  const calendarCards: DateCardData[] = [...(calendarEntries ?? [])]
+  const calendarCards: DateCardData[] = [...filteredCalendarEntries]
     .sort((a, b) => {
       const da = a.date_diffusion ? new Date(a.date_diffusion).getTime() : Infinity;
       const db = b.date_diffusion ? new Date(b.date_diffusion).getTime() : Infinity;
@@ -287,23 +310,29 @@ function HomePageContent() {
             continueWatching &&
             continueWatching.length > 0 && (
               <DashboardSection
-                title={`Continuer à regarder (${continueWatching.length})`}
-                actionLabel={continueWatching.length > 10 ? "Voir plus" : undefined}
-                actionHref={continueWatching.length > 10 ? "/continue-watching" : undefined}
+                title={`Continuer à regarder (${filteredContinueWatching.length})`}
+                actionLabel={filteredContinueWatching.length > 10 ? "Voir plus" : undefined}
+                actionHref={filteredContinueWatching.length > 10 ? "/continue-watching" : undefined}
               >
-                <CardSlider
-                  moreHref={continueWatching.length > 10 ? "/continue-watching" : undefined}
-                >
-                  {continueWatching.slice(0, 10).map((entry) => (
-                    <ContinueWatchingCard
-                      key={entry.title_id}
-                      entry={entry}
-                      inWatchlist={watchlistIds.has(entry.title_id)}
-                      inFavorites={favoriteIds.has(entry.title_id)}
-                      watchlistStatus={watchlistStatuses.get(entry.title_id)}
-                    />
-                  ))}
-                </CardSlider>
+                {filteredContinueWatching.length > 0 ? (
+                  <CardSlider
+                    moreHref={filteredContinueWatching.length > 10 ? "/continue-watching" : undefined}
+                  >
+                    {filteredContinueWatching.slice(0, 10).map((entry) => (
+                      <ContinueWatchingCard
+                        key={entry.title_id}
+                        entry={entry}
+                        inWatchlist={watchlistIds.has(entry.title_id)}
+                        inFavorites={favoriteIds.has(entry.title_id)}
+                        watchlistStatus={watchlistStatuses.get(entry.title_id)}
+                      />
+                    ))}
+                  </CardSlider>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-4">
+                    Aucune série en cours ne correspond aux filtres actifs.
+                  </p>
+                )}
               </DashboardSection>
             )
           )}
@@ -445,7 +474,9 @@ function HomePageContent() {
               <DateCardSlider items={calendarCards} moreHref="/calendar" />
             ) : (
               <p className="text-sm text-muted-foreground py-4">
-                Aucun épisode à venir pour le moment.
+                {calendarEntries && calendarEntries.length > 0
+                  ? "Aucun épisode à venir ne correspond aux filtres actifs."
+                  : "Aucun épisode à venir pour le moment."}
               </p>
             )}
           </DashboardSection>

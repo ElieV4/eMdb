@@ -20,7 +20,7 @@ export class UserRecommendationsController {
     @Query('appreciesFr') appreciesFr?: string,
   ) {
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    const safeLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 50) : 20;
+    const safeLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 20;
 
     return this.recommenderService.getUserRecommendations(user.id, {
       limit: safeLimit,

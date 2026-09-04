@@ -6,6 +6,12 @@
  * Format inspiré du widget Outlook Android (modification J) : filtre de
  * période en haut de page, épisodes groupés par période choisie — même
  * comportement que la page Historique.
+ *
+ * Applique les filtres du header type/listes/statut vu — les entrées ne
+ * portent ni genre/pays/note/année de sortie du titre (donnée non
+ * disponible sans changement backend, même limitation que "Continuer à
+ * regarder"). Appliqués côté client, comme listes/statut/année sur
+ * l'historique : le total du header reste le total backend brut.
  */
 
 "use client";
@@ -14,6 +20,7 @@ import { Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useInfiniteCalendar } from "@/hooks/api/useInfiniteCalendar";
+import { useLists, useWatchedTitles } from "@/hooks/api";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { PeriodFilter } from "@/components/common/PeriodFilter";
 import { DateCard } from "@/components/common/DateCard";
@@ -24,11 +31,13 @@ import { groupByPeriod, Period } from "@/lib/periodGrouping";
 import { CalendarEntry } from "@/lib/types/api";
 import { buildEntityUrl } from "@/lib/utils";
 import { buildCardText, formatDuration } from "@/lib/cardFormatting";
+import { parseTitleFilters, titleMatchesFilters, buildListIdsByTitle } from "@/lib/titleFilters";
 
 function CalendarPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const filters = parseTitleFilters(searchParams);
   const period = (searchParams.get("period") as Period | null) || "semaine";
   const {
     data,
@@ -38,9 +47,28 @@ function CalendarPageContent() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteCalendar(isAuthenticated);
-  const entries = data?.pages.flatMap((page) => page.items);
+  const { data: userLists } = useLists(isAuthenticated);
+  const { data: watchedTitles } = useWatchedTitles();
+  const listIdsByTitle = buildListIdsByTitle(userLists);
+  const rawEntries = data?.pages.flatMap((page) => page.items);
+  const entries = rawEntries?.filter((entry) =>
+    titleMatchesFilters(
+      {
+        id: entry.title_id,
+        type: "serie",
+        year: undefined,
+        note: undefined,
+        genreIds: undefined,
+        countryIds: undefined,
+        listIds: listIdsByTitle.get(entry.title_id) ?? [],
+        watched: watchedTitles?.has(entry.title_id) ?? false,
+      },
+      filters,
+    ),
+  );
   // Total réel côté backend — pas seulement ce qui a déjà été chargé par le
-  // scroll infini.
+  // scroll infini (et pas affecté par les filtres client, cf. commentaire
+  // d'en-tête).
   const totalEntries = data?.pages[0]?.total ?? 0;
 
   const setPeriod = (next: Period) => {
@@ -126,7 +154,11 @@ function CalendarPageContent() {
         ) : !entries || entries.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Tv className="mx-auto h-12 w-12 mb-4 opacity-50" />
-            <p>Aucun épisode à venir pour le moment.</p>
+            <p>
+              {rawEntries && rawEntries.length > 0
+                ? "Aucun épisode à venir ne correspond aux filtres actifs."
+                : "Aucun épisode à venir pour le moment."}
+            </p>
           </div>
         ) : (
           <div className="space-y-8">

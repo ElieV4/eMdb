@@ -7,19 +7,40 @@
  * recommandations par-titre (title_recommendations) des titres bien notés
  * ou vus par l'utilisateur. Supporte le filtre "Apprécié en France" du
  * header (paramètre `fr`, cf. lib/titleFilters.ts).
+ *
+ * Pagination par blocs (au moins 20 titres au chargement, +10 à chaque
+ * "Charger plus") : l'algo n'expose pas de curseur, il recalcule un
+ * classement complet pour un `limit` donné (cf. recommender.service.ts) —
+ * "charger plus" redemande donc au backend un `limit` plus grand plutôt
+ * que de paginer un jeu de résultats figé. Les filtres du header
+ * (genre/pays/année/note/vu/listes, non supportés par le backend qui ne
+ * connaît que `appreciesFr`) sont appliqués côté client via
+ * `titleMatchesFilters` ; un changement de filtre réinitialise le bloc à
+ * la taille de départ pour recalculer sur un jeu propre.
  */
 
 "use client";
 
-import { Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { TitleCard } from "@/components/titles/TitleCard";
+import { Button } from "@/components/ui/button";
 import { useRecommendations } from "@/hooks/api/useDashboard";
 import { useWatchedTitles, useListMembership } from "@/hooks/api";
+import { useLists } from "@/hooks/api/useLists";
 import { useAuthStore } from "@/store/authStore";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { parseTitleFilters } from "@/lib/titleFilters";
+import {
+  parseTitleFilters,
+  titleMatchesFilters,
+  toFilterableTitle,
+  buildListIdsByTitle,
+} from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
+
+const INITIAL_LIMIT = 20;
+const LOAD_MORE_STEP = 10;
+const MAX_LIMIT = 100;
 
 function titleToSearchResult(title: Title): TitleSearchResult {
   return {
@@ -42,9 +63,37 @@ function titleToSearchResult(title: Title): TitleSearchResult {
 function RecommendationsPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const filters = parseTitleFilters(useSearchParams());
-  const { data: recommendations, isLoading } = useRecommendations(24, filters.appreciesFr);
+  const filtersKey = JSON.stringify(filters);
+
+  const [limit, setLimit] = useState(INITIAL_LIMIT);
+  // Un changement de filtre invalide le bloc chargé jusqu'ici : on
+  // redémarre à la taille de départ pour que le recalcul reste cohérent.
+  useEffect(() => {
+    setLimit(INITIAL_LIMIT);
+  }, [filtersKey]);
+
+  const { data: recommendations, isLoading, isFetching } = useRecommendations(
+    limit,
+    filters.appreciesFr,
+  );
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
+  const { data: userLists } = useLists(isAuthenticated);
+  const listIdsByTitle = buildListIdsByTitle(userLists);
+
+  const filteredRecommendations = (recommendations ?? []).filter((title) =>
+    titleMatchesFilters(
+      toFilterableTitle(title, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      filters,
+    ),
+  );
+
+  // Le backend recalcule un classement complet pour `limit` — s'il a
+  // renvoyé exactement ce qui a été demandé, d'autres titres sont
+  // potentiellement disponibles au-delà (sinon le pool de candidats est
+  // épuisé, inutile de proposer "charger plus").
+  const canLoadMore =
+    (recommendations?.length ?? 0) >= limit && limit < MAX_LIMIT;
 
   if (isAuthLoading) {
     return (
@@ -83,22 +132,39 @@ function RecommendationsPageContent() {
             />
           ))}
         </div>
-      ) : recommendations && recommendations.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {recommendations.map((title) => (
-            <TitleCard
-              key={title.id}
-              title={titleToSearchResult(title)}
-              compact
-              watched={watchedTitles?.has(title.id)}
-              inWatchlist={watchlistIds.has(title.id)}
-              inFavorites={favoriteIds.has(title.id)}
-            />
-          ))}
-        </div>
+      ) : filteredRecommendations.length > 0 ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {filteredRecommendations.map((title) => (
+              <TitleCard
+                key={title.id}
+                title={titleToSearchResult(title)}
+                compact
+                watched={watchedTitles?.has(title.id)}
+                inWatchlist={watchlistIds.has(title.id)}
+                inFavorites={favoriteIds.has(title.id)}
+              />
+            ))}
+          </div>
+
+          {canLoadMore && (
+            <div className="mt-6 flex justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setLimit((l) => Math.min(l + LOAD_MORE_STEP, MAX_LIMIT))}
+                disabled={isFetching}
+              >
+                {isFetching ? "Chargement..." : "Charger plus"}
+              </Button>
+            </div>
+          )}
+        </>
       ) : (
         <p className="text-sm text-muted-foreground py-4">
-          Commencez à noter des titres pour recevoir des recommandations.
+          {recommendations && recommendations.length > 0
+            ? "Aucune recommandation ne correspond aux filtres actifs."
+            : "Commencez à noter des titres pour recevoir des recommandations."}
         </p>
       )}
     </div>
