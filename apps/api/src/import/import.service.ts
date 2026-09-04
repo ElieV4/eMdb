@@ -79,14 +79,17 @@ export class ImportService {
    * `startTraktImport` (bouton "Importer les credits" de la page Profil,
    * exécuté après un import Trakt fait sans casting pour rester rapide).
    */
-  async startCreditsImport(userId: string): Promise<{ jobId: string | undefined; status: string }> {
+  async startCreditsImport(
+    userId: string,
+    options: { creditRoles?: string[]; maxCast?: number } = {},
+  ): Promise<{ jobId: string | undefined; status: string }> {
     const queue = this.getQueue(CREDITS_IMPORT_QUEUE_NAME);
 
     this.logger.log(`Ajout d'un job credits-import pour l'utilisateur ${userId}`);
 
     const job = await queue.add(
       'credits-import',
-      { userId },
+      { userId, creditRoles: options.creditRoles, maxCast: options.maxCast },
       {
         removeOnComplete: { age: 3600 },
         removeOnFail: { age: 3600 },

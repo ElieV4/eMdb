@@ -6,7 +6,8 @@
       "@emdb/db": ["../db/index.ts"],
       "@emdb/tmdb-client": ["../tmdb-client/src/index.ts"],
       "@emdb/tmdb-mapper": ["../tmdb-mapper/src/index.ts"],
-      "@emdb/wikidata-client": ["../wikidata-client/src/index.ts"]
+      "@emdb/wikidata-client": ["../wikidata-client/src/index.ts"],
+      "@emdb/push": ["../push/src/index.ts"]
     },
     "outDir": "./dist",
     "declaration": true,

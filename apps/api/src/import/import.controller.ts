@@ -49,6 +49,9 @@ const TRAKT_MARKER_FILES = [
 const IMPORT_TMP_DIR = process.env.IMPORT_TMP_DIR || os.tmpdir();
 fs.mkdirSync(IMPORT_TMP_DIR, { recursive: true });
 
+/** Rôles sélectionnables dans le popup de configuration du bouton "Importer les credits". */
+const CREDIT_ROLES = ['acteur', 'realisateur', 'scenariste', 'autre'];
+
 /**
  * Endpoints d'import Trakt (bug #55/#56) — bouton "Importer depuis Trakt"
  * de la page Profil. Accessibles à tout utilisateur connecté (import de ses
@@ -150,14 +153,37 @@ export class ImportController {
   /**
    * POST /import/credits
    * Bouton "Importer les credits" de la page Profil — importe le casting
-   * (acteurs + réalisateurs) de tous les titres avec lesquels l'utilisateur
-   * a interagi (watches/ratings/listes), en tâche de fond. Complète un
-   * import Trakt fait sans casting (`withCredits: false`, pour rester rapide
-   * sur un gros export).
+   * (acteurs + réalisateurs par défaut) de tous les titres avec lesquels
+   * l'utilisateur a interagi (watches/ratings/listes), en tâche de fond.
+   * Complète un import Trakt fait sans casting (`withCredits: false`, pour
+   * rester rapide sur un gros export).
+   *
+   * Corps optionnel (popup de configuration côté page Profil) :
+   * - `creditRoles` (string[]) : rôles à importer, parmi CREDIT_ROLES.
+   *   Omis/vide → défaut du worker (acteurs + réalisateurs).
+   * - `maxCast` (number) : nombre max d'acteurs importés par titre, les
+   *   mieux crédités en premier. Omis → illimité.
    */
   @Post('credits')
-  async importCredits(@CurrentUser() user: any) {
-    return this.importService.startCreditsImport(user.id);
+  async importCredits(
+    @CurrentUser() user: any,
+    @Body('creditRoles') creditRoles?: string[],
+    @Body('maxCast') maxCast?: number,
+  ) {
+    if (creditRoles !== undefined) {
+      if (!Array.isArray(creditRoles) || creditRoles.some((r) => !CREDIT_ROLES.includes(r))) {
+        throw new BadRequestException(`creditRoles doit être un sous-ensemble de : ${CREDIT_ROLES.join(', ')}.`);
+      }
+      if (creditRoles.length === 0) {
+        throw new BadRequestException('Sélectionnez au moins un type de credit à importer.');
+      }
+    }
+
+    if (maxCast !== undefined && (!Number.isInteger(maxCast) || maxCast < 0)) {
+      throw new BadRequestException('maxCast doit être un entier positif.');
+    }
+
+    return this.importService.startCreditsImport(user.id, { creditRoles, maxCast });
   }
 
   /** GET /import/credits/:jobId/status — même contrat que /import/trakt/:jobId/status. */

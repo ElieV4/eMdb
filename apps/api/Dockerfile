@@ -21,12 +21,13 @@ RUN cd /app/packages/db && npx prisma generate --schema=./prisma/schema.prisma
 # Compiler packages/db
 RUN cd /app/packages/db && npx tsc --skipLibCheck
 
-# Compiler packages/tmdb-client, tmdb-mapper, wikidata-client, recommender
+# Compiler packages/tmdb-client, tmdb-mapper, wikidata-client, tmdb-sync, recommender, push
 RUN cd /app/packages/tmdb-client && npx tsc --skipLibCheck
 RUN cd /app/packages/tmdb-mapper && npx tsc --skipLibCheck
 RUN cd /app/packages/wikidata-client && npx tsc --skipLibCheck
 RUN cd /app/packages/tmdb-sync && npx tsc --skipLibCheck
 RUN cd /app/packages/recommender && npx tsc -p tsconfig.json
+RUN cd /app/packages/push && npx tsc --skipLibCheck
 
 # Créer des symlinks pour les packages dans node_modules
 RUN mkdir -p /app/node_modules/@emdb && \
@@ -35,7 +36,8 @@ RUN mkdir -p /app/node_modules/@emdb && \
     ln -s /app/packages/tmdb-mapper /app/node_modules/@emdb/tmdb-mapper && \
     ln -s /app/packages/wikidata-client /app/node_modules/@emdb/wikidata-client && \
     ln -s /app/packages/tmdb-sync /app/node_modules/@emdb/tmdb-sync && \
-    ln -s /app/packages/recommender /app/node_modules/@emdb/recommender
+    ln -s /app/packages/recommender /app/node_modules/@emdb/recommender && \
+    ln -s /app/packages/push /app/node_modules/@emdb/push
 
 # Build de prod de l'API (nest build). `nest start --watch` (mode dev, compilateur
 # webpack incrémental) est bien trop gourmand en mémoire pour une instance à 512 Mo

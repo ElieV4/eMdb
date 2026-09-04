@@ -42,14 +42,25 @@ export type CreditsImportStatus = {
   error: string | null;
 };
 
+export type CreditsImportOptions = {
+  /** Rôles à importer (undefined = défaut serveur : acteurs + réalisateurs). */
+  creditRoles?: string[];
+  /** Nombre max d'acteurs importés par titre (undefined = illimité). */
+  maxCast?: number;
+};
+
 export function useStartCreditsImport() {
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (options: CreditsImportOptions = {}) => {
       const accessToken = useAuthStore.getState().accessToken;
       const res = await fetch(`${API_BASE_URL}/import/credits`, {
         method: "POST",
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         credentials: "include",
+        body: JSON.stringify(options),
       });
 
       if (!res.ok) {

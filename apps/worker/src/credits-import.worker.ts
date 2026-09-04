@@ -7,6 +7,10 @@ import { buildRedisConnection } from './worker';
 
 export type CreditsImportJobData = {
   userId: string;
+  /** Rôles à importer — cf. CREDIT_FILTER pour la valeur par défaut. */
+  creditRoles?: string[];
+  /** Nombre max d'acteurs importés par titre (undefined = illimité). */
+  maxCast?: number;
 };
 
 export type CreditsImportProgress = {
@@ -147,7 +151,8 @@ async function getUserTitlesByYear(userId: string) {
 }
 
 async function runCreditsImport(job: Job<CreditsImportJobData>): Promise<CreditsImportResult> {
-  const { userId } = job.data;
+  const { userId, creditRoles, maxCast } = job.data;
+  const creditFilter = creditRoles?.length ? creditRoles : CREDIT_FILTER;
 
   const allTitles = await getUserTitlesByYear(userId);
   const titles = await filterTitlesMissingCredits(allTitles);
@@ -163,7 +168,8 @@ async function runCreditsImport(job: Job<CreditsImportJobData>): Promise<Credits
     for (const { titleId, tmdbId, titre } of batch) {
       try {
         await importCreditsForTitle(titleId, {
-          creditFilter: CREDIT_FILTER,
+          creditFilter,
+          maxCast,
         });
         imported++;
       } catch (e) {

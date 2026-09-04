@@ -10,7 +10,8 @@
       "@emdb/tmdb-sync": ["../../packages/tmdb-sync/src/index.ts"],
       "@emdb/tmdb-client": ["../../packages/tmdb-client/src/index.ts"],
       "@emdb/tmdb-mapper": ["../../packages/tmdb-mapper/src/index.ts"],
-      "@emdb/wikidata-client": ["../../packages/wikidata-client/src/index.ts"]
+      "@emdb/wikidata-client": ["../../packages/wikidata-client/src/index.ts"],
+      "@emdb/push": ["../../packages/push/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"],

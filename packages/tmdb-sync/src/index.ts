@@ -446,7 +446,7 @@ export async function importTitleByTmdbId(
  */
 export async function importCreditsForTitle(
   titleId: string,
-  options: { creditFilter?: string[] } = {},
+  options: { creditFilter?: string[]; maxCast?: number } = {},
 ) {
   const title = await prisma.titles.findUnique({ where: { id: titleId } });
   if (!title?.tmdb_id) {
@@ -463,6 +463,17 @@ export async function importCreditsForTitle(
   let creditInserts = mapTmdbCredits(tmdbData.credits, title.id, null);
   if (options.creditFilter?.length) {
     creditInserts = creditInserts.filter((credit) => options.creditFilter!.includes(credit.role));
+  }
+  // Limite le nombre d'acteurs importés par titre (config popup du bouton
+  // "Importer les credits") — ne touche pas les autres rôles (réalisateurs,
+  // scénaristes...), garde les mieux crédités (ordre TMDB croissant).
+  if (options.maxCast != null && options.maxCast >= 0) {
+    const cast = creditInserts
+      .filter((credit) => credit.role === 'acteur')
+      .sort((a, b) => (a.ordre ?? Infinity) - (b.ordre ?? Infinity))
+      .slice(0, options.maxCast);
+    const nonCast = creditInserts.filter((credit) => credit.role !== 'acteur');
+    creditInserts = [...nonCast, ...cast];
   }
 
   let imported = 0;

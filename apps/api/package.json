@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@emdb/db": "*",
+    "@emdb/push": "*",
     "@emdb/recommender": "*",
     "@emdb/tmdb-client": "*",
     "@emdb/tmdb-sync": "*",
