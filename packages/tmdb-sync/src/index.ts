@@ -12,7 +12,10 @@ import {
   getTvEpisodeDetails,
   getChanges,
   getPersonCombinedCredits,
+  getDiscoverMovie,
+  getDiscoverTv,
 } from '@emdb/tmdb-client';
+import { sendPushToUsers } from '@emdb/push';
 import {
   mapTmdbEpisodeCredits,
   mapTmdbPersonExternalIds,
@@ -654,6 +657,15 @@ export async function generateNewEpisodeNotifications(): Promise<number> {
 
     await prisma.notifications.createMany({ data: notifications });
     totalNotifications += notifications.length;
+
+    await sendPushToUsers(
+      followers.map((f) => f.user_id),
+      {
+        title: serie.titre_vo,
+        body: latestEpisode.titre ? `Nouvel épisode : ${latestEpisode.titre}` : 'Nouvel épisode disponible',
+        data: { type: 'new_episode', episode_id: latestEpisode.id, title_id: serie.id },
+      },
+    );
   }
 
   return totalNotifications;
@@ -707,6 +719,16 @@ export async function generateSeasonPremiereNotification(
   }));
 
   await prisma.notifications.createMany({ data: notifications });
+
+  await sendPushToUsers(
+    followers.map((f) => f.user_id),
+    {
+      title: 'Nouvelle saison disponible',
+      body: `La saison ${seasonNumber} est arrivée`,
+      data: { type: 'season_premiere', episode_id: firstEpisode.id, title_id: titleId },
+    },
+  );
+
   return notifications.length;
 }
 
@@ -771,7 +793,7 @@ export async function checkFollowedPersonsForNewTitles(): Promise<{ titlesAdded:
   for (const { person_id } of followedPersonIds) {
     const person = await prisma.people.findUnique({
       where: { id: person_id },
-      select: { id: true, tmdb_id: true },
+      select: { id: true, tmdb_id: true, nom: true },
     });
     if (!person?.tmdb_id) continue;
 
@@ -808,12 +830,36 @@ export async function checkFollowedPersonsForNewTitles(): Promise<{ titlesAdded:
         where: { tmdb_id: credit.id },
         select: { id: true },
       });
+      const wasNewTitle = !title;
       if (!title) {
         try {
           title = await importTitleByTmdbId(credit.id, type, { withCredits: false });
         } catch (error) {
           console.warn(`[checkFollowedPersonsForNewTitles] Échec import titre TMDB ${credit.id}:`, error);
           continue;
+        }
+      }
+
+      if (wasNewTitle) {
+        try {
+          await prisma.notifications.createMany({
+            data: followers.map((f) => ({
+              user_id: f.user_id,
+              title_id: title!.id,
+              type: 'new_film_person',
+              lu: false,
+            })),
+          });
+          await sendPushToUsers(
+            followers.map((f) => f.user_id),
+            {
+              title: person.nom,
+              body: (title as any).titre_vo ? `Nouveau titre : ${(title as any).titre_vo}` : 'Nouveau titre disponible',
+              data: { type: 'new_film_person', title_id: title!.id },
+            },
+          );
+        } catch (error) {
+          console.warn(`[checkFollowedPersonsForNewTitles] Échec notification/push (titre ${title!.id}):`, error);
         }
       }
 
@@ -846,6 +892,105 @@ export async function checkFollowedPersonsForNewTitles(): Promise<{ titlesAdded:
   }
 
   return { titlesAdded };
+}
+
+/**
+ * Détecte les nouveaux titres (films/séries) pour les studios suivis, via
+ * TMDB discover filtré par with_companies (pas d'endpoint TMDB "tous les
+ * titres d'un studio", même limitation que refreshFilmography côté API).
+ * Contrairement au suivi de personnes, ne touche pas la watchlist — juste
+ * une notification + push par nouveau titre détecté (un studio suivi n'a
+ * pas la même intention "je veux tout voir" qu'une personne suivie).
+ */
+export async function checkFollowedStudiosForNewTitles(): Promise<{ titlesNotified: number }> {
+  const followedStudioIds = await prisma.user_follows_studio.findMany({
+    select: { studio_id: true },
+    distinct: ['studio_id'],
+  });
+
+  let titlesNotified = 0;
+  const MAX_PAGES = 2;
+
+  for (const { studio_id } of followedStudioIds) {
+    const studio = await prisma.studios.findUnique({
+      where: { id: studio_id },
+      select: { id: true, tmdb_id: true, nom: true },
+    });
+    if (!studio?.tmdb_id) continue;
+
+    const followers = await prisma.user_follows_studio.findMany({
+      where: { studio_id },
+      select: { user_id: true },
+    });
+    if (followers.length === 0) continue;
+
+    const tmdbIdsByType: { tmdbId: number; type: 'film' | 'serie' }[] = [];
+
+    for (const [type, discover] of [
+      ['film', getDiscoverMovie],
+      ['serie', getDiscoverTv],
+    ] as const) {
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        let data: any;
+        try {
+          data = await discover({ with_companies: studio.tmdb_id, sort_by: 'release_date.desc', page });
+        } catch (error) {
+          console.warn(`[checkFollowedStudiosForNewTitles] Échec discover TMDB studio ${studio.tmdb_id}:`, error);
+          break;
+        }
+        const results = data?.results ?? [];
+        for (const item of results) {
+          if (item?.id) tmdbIdsByType.push({ tmdbId: item.id, type });
+        }
+        if (page >= (data?.total_pages ?? 1)) break;
+      }
+    }
+
+    const uniqueByKey = new Map(tmdbIdsByType.map((t) => [`${t.type}:${t.tmdbId}`, t]));
+    if (uniqueByKey.size === 0) continue;
+
+    const existing = await prisma.titles.findMany({
+      where: { tmdb_id: { in: [...uniqueByKey.values()].map((t) => t.tmdbId) } },
+      select: { tmdb_id: true },
+    });
+    const existingTmdbIds = new Set(existing.map((t) => t.tmdb_id));
+
+    for (const { tmdbId, type } of uniqueByKey.values()) {
+      if (existingTmdbIds.has(tmdbId)) continue;
+
+      let title;
+      try {
+        title = await importTitleByTmdbId(tmdbId, type, { withCredits: false });
+      } catch (error) {
+        console.warn(`[checkFollowedStudiosForNewTitles] Échec import titre TMDB ${tmdbId}:`, error);
+        continue;
+      }
+
+      try {
+        await prisma.notifications.createMany({
+          data: followers.map((f) => ({
+            user_id: f.user_id,
+            title_id: title.id,
+            type: 'new_film_studio',
+            lu: false,
+          })),
+        });
+        await sendPushToUsers(
+          followers.map((f) => f.user_id),
+          {
+            title: studio.nom,
+            body: `Nouveau titre : ${title.titre_vo}`,
+            data: { type: 'new_film_studio', title_id: title.id },
+          },
+        );
+        titlesNotified++;
+      } catch (error) {
+        console.warn(`[checkFollowedStudiosForNewTitles] Échec notification/push (titre ${title.id}):`, error);
+      }
+    }
+  }
+
+  return { titlesNotified };
 }
 
 export async function weeklyResyncChanges(startDate: string, endDate: string) {

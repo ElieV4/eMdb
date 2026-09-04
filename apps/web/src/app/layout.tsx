@@ -9,6 +9,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/api/queryClient";
 import { useAuthBootstrap } from "@/hooks/auth/useAuthBootstrap";
+import { useRegisterPushToken } from "@/hooks/useRegisterPushToken";
 import { SettingsSync } from "@/components/settings/SettingsSync";
 import { Toaster } from "@/components/ui/toast";
 import "@/styles/globals.css";
@@ -19,6 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   useAuthBootstrap();
+  useRegisterPushToken();
 
   return (
     <html lang="fr" className="dark">

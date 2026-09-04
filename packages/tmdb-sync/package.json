@@ -12,7 +12,8 @@
     "@emdb/tmdb-client": "*",
     "@emdb/tmdb-mapper": "*",
     "@emdb/wikidata-client": "*",
-    "@emdb/db": "*"
+    "@emdb/db": "*",
+    "@emdb/push": "*"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
@@ -31,7 +32,8 @@
       "^@emdb/db$": "<rootDir>/../db/index.ts",
       "^@emdb/tmdb-client$": "<rootDir>/../tmdb-client/src/index.ts",
       "^@emdb/tmdb-mapper$": "<rootDir>/../tmdb-mapper/src/index.ts",
-      "^@emdb/wikidata-client$": "<rootDir>/../wikidata-client/src/index.ts"
+      "^@emdb/wikidata-client$": "<rootDir>/../wikidata-client/src/index.ts",
+      "^@emdb/push$": "<rootDir>/../push/src/index.ts"
     },
     "testRegex": "src/.*\\.spec\\.ts$",
     "transform": {

@@ -17,6 +17,7 @@ import { RatingsModule } from './ratings/ratings.module';
 import { ListsModule } from './lists/lists.module';
 import { RecommenderModule } from './recommender/recommender.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PushModule } from './push/push.module';
 import { ImportModule } from './import/import.module';
 import { FreeWatchSitesModule } from './settings/free-watch-sites/free-watch-sites.module';
 import * as path from 'node:path';
@@ -43,6 +44,7 @@ import * as path from 'node:path';
     ListsModule,
     RecommenderModule,
     NotificationsModule,
+    PushModule,
     ImportModule,
     FreeWatchSitesModule,
   ],

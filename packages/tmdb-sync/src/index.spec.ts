@@ -10,7 +10,7 @@ const prismaMock: any = {
   credits: { create: jest.fn(), findMany: jest.fn() },
   genres: { upsert: jest.fn(), findUnique: jest.fn() },
   countries: { upsert: jest.fn() },
-  studios: { upsert: jest.fn() },
+  studios: { upsert: jest.fn(), findUnique: jest.fn() },
   title_genres: { createMany: jest.fn() },
   title_countries: { createMany: jest.fn() },
   title_studios: { createMany: jest.fn() },
@@ -18,6 +18,7 @@ const prismaMock: any = {
   person_recommendations: { deleteMany: jest.fn(), createMany: jest.fn() },
   user_follows_serie: { findMany: jest.fn() },
   user_follows_person: { findMany: jest.fn() },
+  user_follows_studio: { findMany: jest.fn() },
   user_lists: { findFirst: jest.fn(), create: jest.fn() },
   list_items: { upsert: jest.fn() },
   notifications: { findMany: jest.fn(), findFirst: jest.fn(), createMany: jest.fn() },
@@ -36,6 +37,8 @@ jest.mock('@emdb/tmdb-client', () => ({
   getTvRecommendations: jest.fn(),
   getTvSimilar: jest.fn(),
   getPersonCombinedCredits: jest.fn(),
+  getDiscoverMovie: jest.fn(),
+  getDiscoverTv: jest.fn(),
 }));
 
 jest.mock('@emdb/tmdb-mapper', () => ({
@@ -59,6 +62,11 @@ jest.mock('@emdb/db', () => ({
   prisma: prismaMock,
 }));
 
+const sendPushToUsersMock = jest.fn();
+jest.mock('@emdb/push', () => ({
+  sendPushToUsers: (userIds: string[], payload: unknown) => sendPushToUsersMock(userIds, payload),
+}));
+
 const asMock = (fn: any) => fn as any;
 
 const {
@@ -71,6 +79,7 @@ const {
   generateNewEpisodeNotifications,
   generateSeasonPremiereNotification,
   checkFollowedPersonsForNewTitles,
+  checkFollowedStudiosForNewTitles,
 } = require('./index');
 
 const tmdbClient = require('@emdb/tmdb-client') as any;
@@ -83,6 +92,8 @@ const {
   getMovieRecommendations,
   getMovieSimilar,
   getPersonCombinedCredits,
+  getDiscoverMovie,
+  getDiscoverTv,
 } = tmdbClient;
 
 const tmdbMapper = require('@emdb/tmdb-mapper') as any;
@@ -569,6 +580,13 @@ describe('tmdb-sync', () => {
           where: { list_id_title_id: { list_id: 'watchlist-1', title_id: 'title-999' } },
         }),
       );
+      expect(prismaMock.notifications.createMany).toHaveBeenCalledWith({
+        data: [{ user_id: 'user-1', title_id: 'title-999', type: 'new_film_person', lu: false }],
+      });
+      expect(sendPushToUsersMock).toHaveBeenCalledWith(
+        ['user-1'],
+        expect.objectContaining({ data: { type: 'new_film_person', title_id: 'title-999' } }),
+      );
       expect(result.titlesAdded).toBe(1);
     });
 
@@ -594,6 +612,99 @@ describe('tmdb-sync', () => {
       const result = (await checkFollowedPersonsForNewTitles()) as any;
 
       expect(result.titlesAdded).toBe(0);
+    });
+
+    it('ne crée pas de notification si le titre existait déjà avant le check', async () => {
+      asMock(prismaMock.user_follows_person.findMany)
+        .mockResolvedValueOnce([{ person_id: 'person-1' }])
+        .mockResolvedValueOnce([{ user_id: 'user-1' }]);
+      asMock(prismaMock.people.findUnique).mockResolvedValue({ id: 'person-1', tmdb_id: 12345 });
+      asMock(getPersonCombinedCredits).mockResolvedValue({
+        cast: [{ id: 999, media_type: 'movie', release_date: '2099-01-01' }],
+        crew: [],
+      });
+      asMock(prismaMock.titles.findUnique).mockResolvedValue({ id: 'title-999' });
+      asMock(prismaMock.user_lists.findFirst).mockResolvedValue({ id: 'watchlist-1' });
+      asMock(prismaMock.list_items.upsert).mockResolvedValue({});
+
+      await checkFollowedPersonsForNewTitles();
+
+      expect(prismaMock.notifications.createMany).not.toHaveBeenCalled();
+      expect(sendPushToUsersMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('checkFollowedStudiosForNewTitles', () => {
+    it('notifie les abonnés pour un nouveau titre détecté via discover', async () => {
+      asMock(prismaMock.user_follows_studio.findMany)
+        .mockResolvedValueOnce([{ studio_id: 'studio-1' }])
+        .mockResolvedValueOnce([{ user_id: 'user-1' }]);
+      asMock(prismaMock.studios.findUnique).mockResolvedValue({
+        id: 'studio-1',
+        tmdb_id: 555,
+        nom: 'Warner Bros',
+      });
+      asMock(getDiscoverMovie).mockResolvedValue({
+        results: [{ id: 42 }],
+        total_pages: 1,
+      });
+      asMock(getDiscoverTv).mockResolvedValue({ results: [], total_pages: 1 });
+      asMock(prismaMock.titles.findMany).mockResolvedValue([]); // aucun des tmdb_id n'existe déjà
+
+      const { mapTmdbMovieToTitle, mapTmdbGenres, mapTmdbCountries } = require('@emdb/tmdb-mapper');
+      asMock(mapTmdbMovieToTitle).mockReturnValue({ titre_vo: 'Film 42', tmdb_id: 42, type: 'film' });
+      asMock(mapTmdbGenres).mockReturnValue([]);
+      asMock(mapTmdbCountries).mockReturnValue([]);
+      const { getMovieDetails } = require('@emdb/tmdb-client');
+      asMock(getMovieDetails).mockResolvedValue({ id: 42, credits: { cast: [], crew: [] } });
+      asMock(prismaMock.titles.upsert).mockResolvedValue({ id: 'title-42', titre_vo: 'Film 42' });
+
+      const result = (await checkFollowedStudiosForNewTitles()) as any;
+
+      expect(prismaMock.notifications.createMany).toHaveBeenCalledWith({
+        data: [{ user_id: 'user-1', title_id: 'title-42', type: 'new_film_studio', lu: false }],
+      });
+      expect(sendPushToUsersMock).toHaveBeenCalledWith(
+        ['user-1'],
+        expect.objectContaining({ data: { type: 'new_film_studio', title_id: 'title-42' } }),
+      );
+      expect(result.titlesNotified).toBe(1);
+    });
+
+    it('ignore les titres déjà connus en base', async () => {
+      asMock(prismaMock.user_follows_studio.findMany)
+        .mockResolvedValueOnce([{ studio_id: 'studio-1' }])
+        .mockResolvedValueOnce([{ user_id: 'user-1' }]);
+      asMock(prismaMock.studios.findUnique).mockResolvedValue({
+        id: 'studio-1',
+        tmdb_id: 555,
+        nom: 'Warner Bros',
+      });
+      asMock(getDiscoverMovie).mockResolvedValue({ results: [{ id: 42 }], total_pages: 1 });
+      asMock(getDiscoverTv).mockResolvedValue({ results: [], total_pages: 1 });
+      asMock(prismaMock.titles.findMany).mockResolvedValue([{ tmdb_id: 42 }]); // déjà en base
+
+      const result = (await checkFollowedStudiosForNewTitles()) as any;
+
+      expect(prismaMock.notifications.createMany).not.toHaveBeenCalled();
+      expect(sendPushToUsersMock).not.toHaveBeenCalled();
+      expect(result.titlesNotified).toBe(0);
+    });
+
+    it('ignore les studios sans abonnés', async () => {
+      asMock(prismaMock.user_follows_studio.findMany)
+        .mockResolvedValueOnce([{ studio_id: 'studio-1' }])
+        .mockResolvedValueOnce([]);
+      asMock(prismaMock.studios.findUnique).mockResolvedValue({
+        id: 'studio-1',
+        tmdb_id: 555,
+        nom: 'Warner Bros',
+      });
+
+      const result = (await checkFollowedStudiosForNewTitles()) as any;
+
+      expect(getDiscoverMovie).not.toHaveBeenCalled();
+      expect(result.titlesNotified).toBe(0);
     });
   });
 

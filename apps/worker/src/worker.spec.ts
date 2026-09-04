@@ -86,6 +86,7 @@ describe('worker queue helpers', () => {
         expect.objectContaining({ name: 'refresh-materialized-views' }),
         expect.objectContaining({ name: 'clean-notifications' }),
         expect.objectContaining({ name: 'check-followed-persons' }),
+        expect.objectContaining({ name: 'check-followed-studios' }),
       ]),
     );
   });

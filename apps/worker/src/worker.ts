@@ -9,6 +9,7 @@ import {
   weeklyResyncChanges,
   generateNewEpisodeNotifications,
   checkFollowedPersonsForNewTitles,
+  checkFollowedStudiosForNewTitles,
 } from '@emdb/tmdb-sync';
 
 export type ImportJobData =
@@ -22,7 +23,8 @@ export type CronJobData =
   | { type: 'refresh-materialized-views' }
   | { type: 'generate-notifications' }
   | { type: 'clean-notifications' }
-  | { type: 'check-followed-persons' };
+  | { type: 'check-followed-persons' }
+  | { type: 'check-followed-studios' };
 
 export const IMPORT_QUEUE_NAME = 'tmdb-import';
 export const CRON_QUEUE_NAME = 'tmdb-cron';
@@ -160,6 +162,16 @@ export function getCronRepeatJobs() {
         removeOnFail: true,
       } as JobsOptions,
     },
+    {
+      name: 'check-followed-studios',
+      data: {},
+      options: {
+        jobId: 'check-followed-studios',
+        repeat: { cron: '45 2 * * *' },
+        removeOnComplete: true,
+        removeOnFail: true,
+      } as JobsOptions,
+    },
   ];
 }
 
@@ -252,6 +264,11 @@ export function createCronWorker(redisUrl: string) {
         case 'check-followed-persons': {
           const result = await checkFollowedPersonsForNewTitles();
           console.log(`Personnes suivies : ${result.titlesAdded} ajouts à des watchlists`);
+          return result;
+        }
+        case 'check-followed-studios': {
+          const result = await checkFollowedStudiosForNewTitles();
+          console.log(`Studios suivis : ${result.titlesNotified} nouveaux titres notifiés`);
           return result;
         }
         default:

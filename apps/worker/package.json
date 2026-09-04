@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@emdb/db": "*",
+    "@emdb/push": "*",
     "@emdb/recommender": "*",
     "@emdb/tmdb-sync": "*",
     "bullmq": "^5.12.1",
