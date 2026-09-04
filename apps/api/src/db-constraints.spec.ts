@@ -147,7 +147,7 @@ describe('Phase 1.5 - cohérence base de données', () => {
         id: listId,
         user_id: userId,
         nom: 'Liste de test',
-        type: 'personnalisee',
+        type: 'custom',
       },
     });
 

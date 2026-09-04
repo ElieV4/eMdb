@@ -217,6 +217,7 @@ describe('ListsService', () => {
           _count: { select: { list_items: true } },
           list_items: {
             select: {
+              statut: true,
               titles: {
                 select: {
                   id: true,

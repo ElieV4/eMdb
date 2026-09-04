@@ -31,6 +31,8 @@ describe('CreditsService', () => {
       prismaServiceMock.credits.findMany.mockResolvedValue([
         {
           id: 'credit-1',
+          person_id: 'person-1',
+          role_id: 'role-acteur',
           personnage: 'Hero',
           ordre: 0,
           people: {
@@ -43,6 +45,8 @@ describe('CreditsService', () => {
         },
         {
           id: 'credit-2',
+          person_id: 'person-2',
+          role_id: 'role-realisateur',
           personnage: null,
           ordre: null,
           people: {
@@ -55,6 +59,8 @@ describe('CreditsService', () => {
         },
         {
           id: 'credit-3',
+          person_id: 'person-3',
+          role_id: 'role-acteur',
           personnage: 'Villain',
           ordre: 1,
           people: {

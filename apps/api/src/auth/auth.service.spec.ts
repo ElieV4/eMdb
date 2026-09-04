@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ListsService } from '../lists/lists.service';
 import * as bcrypt from 'bcrypt';
 
 const prismaServiceMock = {
@@ -11,6 +12,8 @@ const prismaServiceMock = {
     create: jest.fn(),
   },
 };
+
+const listsServiceMock = {};
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -39,6 +42,10 @@ describe('AuthService', () => {
         {
           provide: PrismaService,
           useValue: prismaServiceMock,
+        },
+        {
+          provide: ListsService,
+          useValue: listsServiceMock,
         },
       ],
     }).compile();
