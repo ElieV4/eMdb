@@ -5,7 +5,6 @@
  * Ce fichier est la source de vérité pour toutes les valeurs de design.
  * Il sera consommé par tailwind.config.js et les composants.
  *
- * @see docs/frontend-design-choices.md pour les décisions de design
  */
 
 // ============================================================================

@@ -7,7 +7,7 @@
  * déjà en place).
  * TMDB n'a pas d'équivalent direct pour "Attendus" (most anticipated) :
  * substitué par les titres non encore sortis triés par popularité TMDB
- * décroissante (algo documenté dans docs/bugs.md, modification G).
+ * décroissante.
  * Correspondance backend : GET /discover/:module
  * Modification N : chaque module s'affiche ici en une seule ligne
  * scrollable, avec un "Voir davantage" vers sa page dédiée

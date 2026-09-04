@@ -10,7 +10,7 @@ export interface WorkerStatus {
 
 /**
  * Gère le cycle de vie du worker BullMQ embarqué (process enfant lancé par
- * apps/api quand EMBED_WORKER=true, cf. docs/DEPLOIEMENT.md).
+ * apps/api quand EMBED_WORKER=true, cf. wiki/Déploiement).
  *
  * Permet de le stopper/relancer à la demande (endpoints admin) sans
  * redéploiement : utile pour couper la consommation de commandes Redis en

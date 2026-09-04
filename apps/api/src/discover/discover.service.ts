@@ -53,7 +53,7 @@ type RawTmdbItem = {
  *
  * TMDB n'a pas d'équivalent direct pour "Attendus" (most anticipated) : on
  * substitue par les titres non encore sortis triés par popularité TMDB
- * décroissante, algo proposé et documenté dans docs/bugs.md (modification G).
+ * décroissante.
  */
 @Injectable()
 export class DiscoverService {

@@ -13,7 +13,7 @@ export class AppController {
   }
 
   // Ping DB pour le workflow keep-alive (évite la mise en pause du projet
-  // Supabase après 1 semaine d'inactivité, cf. docs/DEPLOIEMENT.md).
+  // Supabase après 1 semaine d'inactivité, cf. wiki/Déploiement).
   @Get('health/db')
   async healthDb() {
     await this.prisma.$queryRawUnsafe('SELECT 1');

@@ -60,3 +60,7 @@ supabase/.temp
 # --- Divers ---
 *.pem
 .env.vault
+.tmp-*.json
+
+# --- Claude Code (config locale, jamais partagee) ---
+.claude/settings.local.json
