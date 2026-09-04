@@ -195,6 +195,7 @@ export function createCreditsImportWorker(redisUrl: string) {
       concurrency: 1,
       lockDuration: 60 * 60 * 1000,
       drainDelay: 30,
+      stalledInterval: 300_000,
     },
   );
 }

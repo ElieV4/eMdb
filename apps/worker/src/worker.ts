@@ -214,6 +214,12 @@ export function createImportWorker(redisUrl: string) {
       // Défaut BullMQ (5s) trop agressif pour un free tier Redis facturé à
       // la commande (Upstash) — rien ici n'est urgent à la seconde près.
       drainDelay: 30,
+      // Idem pour la vérification des jobs "stalled" (défaut 30s) : avec un
+      // lockDuration déjà d'au moins 10 min sur ces workers, un stall
+      // détecté 5 min plus tard au lieu de 30s plus tard ne change rien en
+      // pratique, et divise par 10 le coût Redis de fond (perf(worker)
+      // 565dfc3 avait déjà traité drainDelay mais pas ce deuxième minuteur).
+      stalledInterval: 300_000,
     },
   );
 }
@@ -280,6 +286,7 @@ export function createCronWorker(redisUrl: string) {
       concurrency: 1,
       lockDuration: 600_000,
       drainDelay: 30,
+      stalledInterval: 300_000,
     },
   );
 }

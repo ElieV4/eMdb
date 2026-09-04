@@ -33,6 +33,7 @@ export function createRecommendationsWorker(redisUrl: string) {
       concurrency: 1,
       lockDuration: 30 * 60 * 1000,
       drainDelay: 30,
+      stalledInterval: 300_000,
     },
   );
 }
