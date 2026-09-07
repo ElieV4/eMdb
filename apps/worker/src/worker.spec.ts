@@ -91,6 +91,30 @@ describe('worker queue helpers', () => {
       ]),
     );
   });
+
+  // Régression : `job.data` sans `type` ne matche aucun `case` du switch de
+  // `createCronWorker` (qui dispatch sur `data.type`, pas sur `job.name`) —
+  // le job tombe silencieusement dans le `default: throw`, et avec
+  // `removeOnFail: true` il ne reste ensuite aucune trace de l'échec. Les 7
+  // jobs cron automatiques (sync quotidien des épisodes inclus) ont ainsi pu
+  // échouer en prod sans qu'aucune alerte ne se déclenche.
+  it("chaque job cron porte un data.type reconnu par le switch de createCronWorker", () => {
+    const jobs = getCronRepeatJobs();
+    const validTypes = [
+      'daily-sync-new-episodes',
+      'weekly-resync-changes',
+      'refresh-materialized-views',
+      'generate-notifications',
+      'clean-notifications',
+      'check-followed-persons',
+      'check-followed-studios',
+      'check-festival-selections',
+    ];
+
+    for (const job of jobs) {
+      expect(validTypes).toContain((job.data as { type?: string }).type);
+    }
+  });
 });
 
 describe('notification cleanup functions', () => {

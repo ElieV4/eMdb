@@ -121,11 +121,11 @@ export async function cleanStaleNotifications(): Promise<number> {
   return result.count;
 }
 
-export function getCronRepeatJobs() {
+export function getCronRepeatJobs(): Array<{ name: string; data: CronJobData; options: JobsOptions }> {
   return [
     {
       name: 'daily-sync-new-episodes',
-      data: {},
+      data: { type: 'daily-sync-new-episodes' },
       options: {
         jobId: 'daily-sync-new-episodes',
         repeat: { cron: '0 2 * * *' },
@@ -135,7 +135,7 @@ export function getCronRepeatJobs() {
     },
     {
       name: 'weekly-resync-changes',
-      data: {},
+      data: { type: 'weekly-resync-changes' },
       options: {
         jobId: 'weekly-resync-changes',
         repeat: { cron: '0 3 * * 1' },
@@ -145,7 +145,7 @@ export function getCronRepeatJobs() {
     },
     {
       name: 'refresh-materialized-views',
-      data: {},
+      data: { type: 'refresh-materialized-views' },
       options: {
         jobId: 'refresh-materialized-views',
         repeat: { cron: '0 4 * * *' },
@@ -155,7 +155,7 @@ export function getCronRepeatJobs() {
     },
     {
       name: 'clean-notifications',
-      data: {},
+      data: { type: 'clean-notifications' },
       options: {
         jobId: 'clean-notifications',
         repeat: { cron: '0 4 * * 0' },
@@ -165,7 +165,7 @@ export function getCronRepeatJobs() {
     },
     {
       name: 'check-followed-persons',
-      data: {},
+      data: { type: 'check-followed-persons' },
       options: {
         jobId: 'check-followed-persons',
         repeat: { cron: '30 2 * * *' },
@@ -175,7 +175,7 @@ export function getCronRepeatJobs() {
     },
     {
       name: 'check-followed-studios',
-      data: {},
+      data: { type: 'check-followed-studios' },
       options: {
         jobId: 'check-followed-studios',
         repeat: { cron: '45 2 * * *' },
@@ -185,7 +185,7 @@ export function getCronRepeatJobs() {
     },
     {
       name: 'check-festival-selections',
-      data: {},
+      data: { type: 'check-festival-selections' },
       options: {
         jobId: 'check-festival-selections',
         repeat: { cron: '15 3 * * *' },
