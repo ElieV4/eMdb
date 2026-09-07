@@ -26,6 +26,7 @@ export function LoginForm({
 }) {
   const [email, setEmail] = useState(prefillDemo ? "test@test.com" : "");
   const [password, setPassword] = useState(prefillDemo ? "test" : "");
+  const [staySignedIn, setStaySignedIn] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const router = useRouter();
@@ -55,7 +56,7 @@ export function LoginForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      mutate({ email, password });
+      mutate({ email, password, staySignedIn });
     }
   };
 
@@ -85,6 +86,15 @@ export function LoginForm({
         autoComplete="current-password"
         required
       />
+      <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={staySignedIn}
+          onChange={(e) => setStaySignedIn(e.target.checked)}
+          className="h-4 w-4 rounded border-input accent-primary"
+        />
+        Rester connecté
+      </label>
       {apiError && <p className="text-sm text-destructive">{apiError}</p>}
       <Button type="submit" className="w-full" disabled={isPending}>
         {isPending ? (

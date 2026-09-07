@@ -7,11 +7,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/apiClient";
 import { useAuthStore } from "@/store/authStore";
-import { setAuthCookie, setRefreshCookie } from "@/lib/auth/authCookie";
+import { setAuthCookie, setRefreshCookie, setStaySignedIn } from "@/lib/auth/authCookie";
 
 export type LoginInput = {
   email: string;
   password: string;
+  /** Défaut `true` si omis — cf. authCookie.ts (getStaySignedIn). */
+  staySignedIn?: boolean;
 };
 
 export type LoginResult = {
@@ -32,14 +34,17 @@ export function useLogin() {
   const setRefreshToken = useAuthStore((s) => s.setRefreshToken);
 
   return useMutation({
-    mutationFn: async (input: LoginInput) => {
+    mutationFn: async ({ staySignedIn, ...input }: LoginInput) => {
       const data = await apiFetch<LoginResult>("/auth/login", {
         method: "POST",
         body: input,
       });
-      return data;
+      return { data, staySignedIn: staySignedIn ?? true };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ data, staySignedIn }) => {
+      // Avant de poser les cookies : setAuthCookie/setRefreshCookie lisent
+      // cette préférence pour décider d'un cookie de session ou persistant.
+      setStaySignedIn(staySignedIn);
       setAccessToken(data.accessToken);
       setRefreshToken(data.refreshToken);
       setUser(data.user);

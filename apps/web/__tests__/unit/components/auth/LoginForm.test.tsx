@@ -88,6 +88,24 @@ describe("LoginForm", () => {
     expect(mockMutate).toHaveBeenCalledWith({
       email: "test@test.com",
       password: "password123",
+      staySignedIn: true,
+    });
+  });
+
+  it("décoche « Rester connecté » et le répercute sur mutate", () => {
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "test@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Mot de passe"), {
+      target: { value: "password123" },
+    });
+    fireEvent.click(screen.getByLabelText("Rester connecté"));
+    fireEvent.click(screen.getByRole("button", { name: "Se connecter" }));
+    expect(mockMutate).toHaveBeenCalledWith({
+      email: "test@test.com",
+      password: "password123",
+      staySignedIn: false,
     });
   });
 

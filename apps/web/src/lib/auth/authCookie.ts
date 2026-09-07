@@ -12,6 +12,15 @@
  *
  * Centralisé ici : était dupliqué indépendamment dans useLogin.ts,
  * useRegister.ts et useAuthBootstrap.ts.
+ *
+ * Toggle "Rester connecté" (LoginForm) : la préférence est mémorisée dans
+ * localStorage (persiste, contrairement au store Zustand qui ne vit qu'en
+ * mémoire) et lue ici à chaque pose de cookie — y compris lors des
+ * rafraîchissements silencieux (`apiClient.ts`, `useAuthBootstrap.ts`), qui
+ * n'ont pas connaissance du choix fait au login. Off : cookies de session
+ * (sans `max-age`), effacés à la fermeture du navigateur/de l'app plutôt
+ * que de survivre 7 jours — important sur l'app Android (device partagé
+ * possible), d'où le rappel "notamment pour l'app".
  */
 
 export const AUTH_COOKIE_NAME = "emdb_access_token";
@@ -20,16 +29,41 @@ export const AUTH_COOKIE_MAX_AGE_SECONDS = 900;
 export const REFRESH_COOKIE_NAME = "emdb_refresh_token";
 export const REFRESH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
+const STAY_SIGNED_IN_KEY = "emdb_stay_signed_in";
+
+/** Défaut à `true` : comportement historique (avant l'ajout du toggle). */
+export function getStaySignedIn(): boolean {
+  if (typeof localStorage === "undefined") return true;
+  try {
+    const stored = localStorage.getItem(STAY_SIGNED_IN_KEY);
+    return stored === null ? true : stored === "true";
+  } catch {
+    return true;
+  }
+}
+
+export function setStaySignedIn(value: boolean) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(STAY_SIGNED_IN_KEY, String(value));
+  } catch {
+    // localStorage indisponible (navigation privée stricte, quota...) —
+    // on retombe simplement sur le défaut (true) au prochain appel.
+  }
+}
+
 function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-function setCookie(name: string, value: string, maxAgeSeconds: number) {
-  if (typeof document !== "undefined") {
-    document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSeconds}`;
-  }
+function setCookie(name: string, value: string, persistentMaxAgeSeconds: number) {
+  if (typeof document === "undefined") return;
+  // Sans `max-age` : cookie de session, effacé à la fermeture du
+  // navigateur/de l'app plutôt que de survivre `persistentMaxAgeSeconds`.
+  const maxAgePart = getStaySignedIn() ? `; max-age=${persistentMaxAgeSeconds}` : "";
+  document.cookie = `${name}=${value}; path=/${maxAgePart}`;
 }
 
 function clearCookie(name: string) {
