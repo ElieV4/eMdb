@@ -32,6 +32,7 @@ import {
   buildListIdsByTitle,
 } from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
+import { cn } from "@/lib/utils";
 
 function titleToSearchResult(title: Title): TitleSearchResult {
   return {
@@ -70,6 +71,12 @@ function ListDetailPageContent() {
   const filters = parseTitleFilters(searchParams);
   const listIdsByTitle = buildListIdsByTitle(allLists);
 
+  // Filtre de progression (watchlist uniquement — modification T/pendant du
+  // module déjà présent sur /watchlist) : "tous" (défaut), "a_jour",
+  // "en_cours", "abandonnee". Sans objet pour les listes personnalisées/
+  // favoris, qui n'ont pas de notion de statut de progression.
+  const progressionFilter = searchParams.get("progression") ?? "tous";
+
   if (isAuthLoading) {
     return (
       <div className="container mx-auto max-w-7xl px-4 py-12">
@@ -89,13 +96,22 @@ function ListDetailPageContent() {
     );
   }
 
+  const isWatchlist = list?.type === "watchlist";
   const items = list?.items ?? [];
-  const filteredItems = items.filter((item) =>
-    titleMatchesFilters(
-      toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
-      filters,
-    ),
-  );
+  const filteredItems = items.filter((item) => {
+    if (
+      !titleMatchesFilters(
+        toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+        filters,
+      )
+    )
+      return false;
+    if (!isWatchlist || progressionFilter === "tous") return true;
+    // Les films n'ont pas de statut de progression — retirés quand un
+    // filtre de progression est actif (cohérent avec /watchlist).
+    if (item.type === "film") return false;
+    return (item.statut ?? "en_cours") === progressionFilter;
+  });
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
@@ -151,6 +167,40 @@ function ListDetailPageContent() {
           ) : null}
         </div>
 
+        {isWatchlist && !editMode && !isLoading && !error && items.length > 0 && (
+          <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
+            {[
+              { value: "tous", label: "Tous" },
+              { value: "a_jour", label: "À jour" },
+              { value: "en_cours", label: "En cours" },
+              { value: "abandonnee", label: "Abandonnée" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  if (option.value === "tous") {
+                    params.delete("progression");
+                  } else {
+                    params.set("progression", option.value);
+                  }
+                  const qs = params.toString();
+                  window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+                }}
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                  progressionFilter === option.value
+                    ? "bg-primary text-white"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -187,6 +237,7 @@ function ListDetailPageContent() {
                 watched={watchedTitles?.has(title.id)}
                 inWatchlist={watchlistIds.has(title.id)}
                 inFavorites={favoriteIds.has(title.id)}
+                watchlistStatus={title.statut}
               />
             ))}
           </div>
