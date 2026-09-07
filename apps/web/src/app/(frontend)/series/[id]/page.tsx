@@ -10,6 +10,7 @@
 
 import { notFound } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { BackButton } from "@/components/common/BackButton";
 import { TitleHero } from "@/components/titles/TitleHero";
 import { TitleCreditsSplit } from "@/components/titles/TitleCreditsSplit";
 import { TitleRecommendations } from "@/components/titles/TitleRecommendations";
@@ -78,6 +79,8 @@ export default function SeriesDetailPage({
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8">
       <div className="space-y-10">
+        <BackButton />
+
         {/* Hero (actions utilisateur regroupées en bas du module) */}
         <TitleHero title={title} credits={credits} />
 

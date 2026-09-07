@@ -7,8 +7,9 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { BackButton } from "@/components/common/BackButton";
 import { EpisodeRow, EpisodeCard } from "@/components/seasons";
 import { useSeason } from "@/hooks/api/useSeason";
 import { useTitle } from "@/hooks/api/useTitles";
@@ -60,24 +61,22 @@ export default function SeasonDetailPage({
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="space-y-8">
-        {/* Navigation vers la série */}
-        <Link
-          href={titleHref}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Retour à la série
-        </Link>
+        <BackButton />
 
         {/* Header saison */}
         <div>
+          {/* Arborescence Titre > Saison (courante, non lien) */}
           {title && (
-            <Link
-              href={titleHref}
-              className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-            >
-              {title.titre_vf || title.titre_vo}
-            </Link>
+            <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+              <Link
+                href={titleHref}
+                className="hover:text-foreground hover:underline"
+              >
+                {title.titre_vf || title.titre_vo}
+              </Link>
+              <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Saison {seasonNumero}</span>
+            </p>
           )}
           <h1 className="text-3xl font-bold">
             {titre || `Saison ${seasonNumero}`}

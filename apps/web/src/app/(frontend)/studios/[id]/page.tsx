@@ -9,6 +9,7 @@
 
 import { notFound } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { BackButton } from "@/components/common/BackButton";
 import { RefreshDataButton } from "@/components/common/RefreshDataButton";
 import { StudioHero } from "@/components/studios/StudioHero";
 import { Filmography } from "@/components/people/Filmography";
@@ -56,6 +57,8 @@ export default function StudioDetailPage({
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8">
       <div className="space-y-10">
+        <BackButton />
+
         {/* Hero */}
         <StudioHero studio={studio} />
 

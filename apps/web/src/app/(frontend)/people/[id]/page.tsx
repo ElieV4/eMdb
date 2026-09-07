@@ -9,6 +9,7 @@
 import { useEffect, useRef } from "react";
 import { notFound } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { BackButton } from "@/components/common/BackButton";
 import { PersonHero } from "@/components/people/PersonHero";
 import { Filmography } from "@/components/people/Filmography";
 import { usePerson } from "@/hooks/api/usePeople";
@@ -84,6 +85,8 @@ export default function PersonDetailPage({
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8">
       <div className="space-y-10">
+        <BackButton />
+
         {/* Hero */}
         <PersonHero person={person} />
 

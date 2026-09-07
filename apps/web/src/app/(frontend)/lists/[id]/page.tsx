@@ -22,6 +22,7 @@ import { ListActionsMenu } from "@/components/lists/ListActionsMenu";
 import { ListReorder } from "@/components/lists/ListReorder";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { BackButton } from "@/components/common/BackButton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Check } from "lucide-react";
@@ -116,6 +117,8 @@ function ListDetailPageContent() {
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="space-y-6">
+        <BackButton />
+
         <div>
           <Link
             href="/lists"

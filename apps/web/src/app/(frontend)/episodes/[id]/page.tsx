@@ -7,8 +7,9 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Calendar, Clock, ArrowLeft, ExternalLink } from "lucide-react";
+import { Calendar, Clock, ChevronRight, ExternalLink } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { BackButton } from "@/components/common/BackButton";
 import { TitleCredits } from "@/components/titles/TitleCredits";
 import { WatchLinksSection } from "@/components/titles/WatchLinksSection";
 import { WatchButton } from "@/components/watches/WatchButton";
@@ -101,16 +102,7 @@ export default function EpisodeDetailPage({
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="space-y-8">
-        {/* Navigation vers la saison */}
-        {titleId && (
-          <Link
-            href={seasonHref}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Retour à la saison {seasonNumero}
-          </Link>
-        )}
+        <BackButton />
 
         {/* Header épisode */}
         <div className="flex flex-col md:flex-row gap-6">
@@ -137,7 +129,10 @@ export default function EpisodeDetailPage({
           <div className="flex-1 space-y-4">
             <div>
               <h1 className="text-3xl font-bold">{titre}</h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              {/* Arborescence Titre > Saison > Épisode, chaque niveau lien vers
+                  sa propre fiche (sauf le niveau courant) — modification demandée
+                  en remplacement du simple lien "Retour à la saison". */}
+              <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground mt-1">
                 {titleId && (
                   <>
                     <Link
@@ -146,10 +141,17 @@ export default function EpisodeDetailPage({
                     >
                       {title?.titre_vf || title?.titre_vo}
                     </Link>
-                    {" • "}
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Link
+                      href={seasonHref}
+                      className="hover:text-foreground hover:underline"
+                    >
+                      Saison {seasonNumero}
+                    </Link>
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </>
                 )}
-                Saison {seasonNumero} • Épisode {numero}
+                <span>Épisode {numero}</span>
               </p>
             </div>
 
