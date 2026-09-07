@@ -40,6 +40,12 @@ describe('Phase 1.5 - cohérence base de données', () => {
 
   beforeAll(async () => {
     await prisma.$connect();
+    // Ce fichier manipule directement le singleton Prisma (setup/teardown de
+    // fixtures), pas via PrismaService.forUser() — bypass RLS explicite pour
+    // toute la session de test plutôt que d'envelopper chaque appel (migration
+    // enable_rls_user_scoped_tables ; sans ça DATABASE_URL=emdb_app bloquerait
+    // silencieusement ces CRUD directs).
+    await prisma.$executeRawUnsafe(`SELECT set_config('app.bypass_rls', 'true', false)`);
     await prisma.users.create({
       data: {
         id: userId,

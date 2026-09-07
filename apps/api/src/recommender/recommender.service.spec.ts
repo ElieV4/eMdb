@@ -9,6 +9,8 @@ const mockQueueGetJob = jest.fn();
 const mockQueueGetJobs = jest.fn();
 
 const mockPrismaService = {
+  forUser: jest.fn((_userId: string, fn: any) => fn(mockPrismaService)),
+  asSystem: jest.fn((fn: any) => fn(mockPrismaService)),
   $queryRawUnsafe: jest.fn(),
   user_ratings: { findMany: jest.fn() },
   user_watches: { findMany: jest.fn() },

@@ -4,6 +4,8 @@ import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const prismaServiceMock = {
+  forUser: jest.fn((_userId: string, fn: any) => fn(prismaServiceMock)),
+  asSystem: jest.fn((fn: any) => fn(prismaServiceMock)),
   notifications: {
     findMany: jest.fn(),
     findUnique: jest.fn(),

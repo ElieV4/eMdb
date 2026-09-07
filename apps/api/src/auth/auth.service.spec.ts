@@ -7,8 +7,13 @@ import { ListsService } from '../lists/lists.service';
 import * as bcrypt from 'bcrypt';
 
 const prismaServiceMock = {
+  forUser: jest.fn((_userId: string, fn: any) => fn(prismaServiceMock)),
+  asSystem: jest.fn((fn: any) => fn(prismaServiceMock)),
   users: {
     findUnique: jest.fn(),
+    create: jest.fn(),
+  },
+  notifications: {
     create: jest.fn(),
   },
 };

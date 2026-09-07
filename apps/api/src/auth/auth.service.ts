@@ -211,14 +211,20 @@ export class AuthService {
         return;
       }
 
-      await this.prisma.notifications.create({
-        data: {
-          user_id: adminId,
-          related_user_id: relatedUserId,
-          type,
-          message,
-        },
-      });
+      // Ecrit une notification pour l'admin depuis la requête d'un AUTRE
+      // utilisateur (inscription/connexion) — jamais "pour soi-même" :
+      // bypass RLS explicite plutôt que forUser(relatedUserId), qui
+      // écrirait par erreur une notification appartenant à ce dernier.
+      await this.prisma.asSystem((tx) =>
+        tx.notifications.create({
+          data: {
+            user_id: adminId,
+            related_user_id: relatedUserId,
+            type,
+            message,
+          },
+        }),
+      );
     } catch (error) {
       // Une notif ratée ne doit jamais faire échouer l'inscription/connexion.
       this.logger.warn(`Échec de la notification admin (${type}): ${error}`);

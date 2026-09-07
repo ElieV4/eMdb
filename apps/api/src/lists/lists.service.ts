@@ -32,21 +32,29 @@ export class ListsService {
    * Vérifie qu'une liste existe et retourne ses informations de base.
    * Lance NotFound si la liste n'existe pas.
    *
+   * `userId` scope la visibilité RLS (propriétaire ou partagée avec lui,
+   * cf. migration enable_rls_user_scoped_tables) — une liste appartenant à
+   * un autre utilisateur et non partagée est donc invisible ici, remontée
+   * comme NotFound plutôt que Forbidden (pas de fuite d'existence).
+   *
    * @param listId - UUID de la liste
+   * @param userId - UUID de l'utilisateur connecté
    * @returns La liste brute
    */
-  private async findListOrThrow(listId: string) {
-    const list = await this.prisma.user_lists.findUnique({
-      where: { id: listId },
-      select: {
-        id: true,
-        user_id: true,
-        nom: true,
-        type: true,
-        description: true,
-        created_at: true,
-      },
-    });
+  private async findListOrThrow(listId: string, userId: string) {
+    const list = await this.prisma.forUser(userId, (tx) =>
+      tx.user_lists.findUnique({
+        where: { id: listId },
+        select: {
+          id: true,
+          user_id: true,
+          nom: true,
+          type: true,
+          description: true,
+          created_at: true,
+        },
+      }),
+    );
 
     if (!list) {
       throw new NotFoundException('Liste introuvable.');
@@ -66,16 +74,34 @@ export class ListsService {
    * @throws ForbiddenException si l'utilisateur n'a pas accès
    */
   private async checkListAccess(listId: string, userId: string, requireEdit = false) {
-    const list = await this.prisma.user_lists.findUnique({
-      where: { id: listId },
-      select: {
-        id: true,
-        user_id: true,
-        nom: true,
-        type: true,
-        description: true,
-        created_at: true,
-      },
+    const { list, share } = await this.prisma.forUser(userId, async (tx) => {
+      const list = await tx.user_lists.findUnique({
+        where: { id: listId },
+        select: {
+          id: true,
+          user_id: true,
+          nom: true,
+          type: true,
+          description: true,
+          created_at: true,
+        },
+      });
+
+      if (!list || list.user_id === userId) {
+        return { list, share: null };
+      }
+
+      const share = await tx.list_shares.findUnique({
+        where: {
+          list_id_shared_with_user_id: {
+            list_id: listId,
+            shared_with_user_id: userId,
+          },
+        },
+        select: { permission: true },
+      });
+
+      return { list, share };
     });
 
     if (!list) {
@@ -88,16 +114,6 @@ export class ListsService {
     }
 
     // Non propriétaire => vérifier les partages
-    const share = await this.prisma.list_shares.findUnique({
-      where: {
-        list_id_shared_with_user_id: {
-          list_id: listId,
-          shared_with_user_id: userId,
-        },
-      },
-      select: { permission: true },
-    });
-
     if (!share) {
       throw new ForbiddenException("Vous n'avez pas accès à cette liste.");
     }
@@ -128,23 +144,25 @@ export class ListsService {
    * @returns La liste créée, ou la liste existante si `type` est `watchlist`/`favoris` et qu'une existe déjà
    */
   async createList(userId: string, dto: CreateListDto) {
-    if (dto.type === 'watchlist' || dto.type === 'favoris') {
-      const existing = await this.prisma.user_lists.findFirst({
-        where: { user_id: userId, type: dto.type },
-        orderBy: { created_at: 'asc' },
-      });
-      if (existing) {
-        return existing;
+    return this.prisma.forUser(userId, async (tx) => {
+      if (dto.type === 'watchlist' || dto.type === 'favoris') {
+        const existing = await tx.user_lists.findFirst({
+          where: { user_id: userId, type: dto.type },
+          orderBy: { created_at: 'asc' },
+        });
+        if (existing) {
+          return existing;
+        }
       }
-    }
 
-    return this.prisma.user_lists.create({
-      data: {
-        user_id: userId,
-        nom: dto.nom,
-        type: dto.type,
-        description: dto.description ?? null,
-      },
+      return tx.user_lists.create({
+        data: {
+          user_id: userId,
+          nom: dto.nom,
+          type: dto.type,
+          description: dto.description ?? null,
+        },
+      });
     });
   }
 
@@ -161,30 +179,32 @@ export class ListsService {
    * @returns Tableau des listes
    */
   async getUserLists(userId: string) {
-    const lists = await this.prisma.user_lists.findMany({
-      where: { user_id: userId },
-      include: {
-        _count: {
-          select: { list_items: true },
-        },
-        list_items: {
-          select: {
-            statut: true,
-            titles: {
-              select: {
-                id: true,
-                type: true,
-                date_sortie: true,
-                note_imdb: true,
-                title_genres: { select: { genre_id: true } },
-                title_countries: { select: { country_id: true } },
+    const lists = await this.prisma.forUser(userId, (tx) =>
+      tx.user_lists.findMany({
+        where: { user_id: userId },
+        include: {
+          _count: {
+            select: { list_items: true },
+          },
+          list_items: {
+            select: {
+              statut: true,
+              titles: {
+                select: {
+                  id: true,
+                  type: true,
+                  date_sortie: true,
+                  note_imdb: true,
+                  title_genres: { select: { genre_id: true } },
+                  title_countries: { select: { country_id: true } },
+                },
               },
             },
           },
         },
-      },
-      orderBy: { created_at: 'desc' },
-    });
+        orderBy: { created_at: 'desc' },
+      }),
+    );
 
     return lists.map(({ list_items, ...list }) => ({
       ...list,
@@ -212,13 +232,15 @@ export class ListsService {
     const lists = await this.getUserLists(userId);
 
     // Vérifier quels items existent pour ce titre
-    const existingItems = await this.prisma.list_items.findMany({
-      where: {
-        list_id: { in: lists.map((l) => l.id) },
-        title_id: titleId,
-      },
-      select: { list_id: true },
-    });
+    const existingItems = await this.prisma.forUser(userId, (tx) =>
+      tx.list_items.findMany({
+        where: {
+          list_id: { in: lists.map((l) => l.id) },
+          title_id: titleId,
+        },
+        select: { list_id: true },
+      }),
+    );
 
     const listIdsWithTitle = new Set(existingItems.map((i) => i.list_id));
 
@@ -240,33 +262,35 @@ export class ListsService {
   async getListDetail(listId: string, userId: string) {
     const list = await this.checkListAccess(listId, userId, false);
 
-    const items = await this.prisma.list_items.findMany({
-      where: { list_id: listId },
-      orderBy: { position: 'asc' },
-      include: {
-        titles: {
-          select: {
-            id: true,
-            tmdb_id: true,
-            titre_vo: true,
-            titre_vf: true,
-            affiche_url: true,
-            type: true,
-            date_sortie: true,
-            note_imdb: true,
-            duree_minutes: true,
-            // Nombre total d'épisodes (hors saison 0/spéciaux) affiché sur les
-            // cards série de la watchlist — sommé depuis le compte par saison.
-            seasons: {
-              where: { numero: { not: 0 } },
-              select: { _count: { select: { episodes: true } } },
+    const items = await this.prisma.forUser(userId, (tx) =>
+      tx.list_items.findMany({
+        where: { list_id: listId },
+        orderBy: { position: 'asc' },
+        include: {
+          titles: {
+            select: {
+              id: true,
+              tmdb_id: true,
+              titre_vo: true,
+              titre_vf: true,
+              affiche_url: true,
+              type: true,
+              date_sortie: true,
+              note_imdb: true,
+              duree_minutes: true,
+              // Nombre total d'épisodes (hors saison 0/spéciaux) affiché sur les
+              // cards série de la watchlist — sommé depuis le compte par saison.
+              seasons: {
+                where: { numero: { not: 0 } },
+                select: { _count: { select: { episodes: true } } },
+              },
+              title_genres: { include: { genres: { select: { id: true, nom: true } } } },
+              title_countries: { include: { countries: { select: { id: true, nom: true } } } },
             },
-            title_genres: { include: { genres: { select: { id: true, nom: true } } } },
-            title_countries: { include: { countries: { select: { id: true, nom: true } } } },
           },
         },
-      },
-    });
+      }),
+    );
 
     return {
       id: list.id,
@@ -328,10 +352,7 @@ export class ListsService {
     if (dto.nom !== undefined) data.nom = dto.nom;
     if (dto.description !== undefined) data.description = dto.description;
 
-    return this.prisma.user_lists.update({
-      where: { id: listId },
-      data,
-    });
+    return this.prisma.forUser(userId, (tx) => tx.user_lists.update({ where: { id: listId }, data }));
   }
 
   /**
@@ -343,15 +364,13 @@ export class ListsService {
    * @param userId - UUID de l'utilisateur connecté
    */
   async deleteList(listId: string, userId: string): Promise<void> {
-    const list = await this.findListOrThrow(listId);
+    const list = await this.findListOrThrow(listId, userId);
 
     if (list.user_id !== userId) {
       throw new ForbiddenException('Seul le propriétaire peut supprimer cette liste.');
     }
 
-    await this.prisma.user_lists.delete({
-      where: { id: listId },
-    });
+    await this.prisma.forUser(userId, (tx) => tx.user_lists.delete({ where: { id: listId } }));
   }
 
   // ======================================================================
@@ -383,60 +402,49 @@ export class ListsService {
       throw new NotFoundException('Titre introuvable.');
     }
 
-    // Vérifier si le titre est déjà dans la liste (évite les doublons)
-    const existingItem = await this.prisma.list_items.findUnique({
-      where: {
-        list_id_title_id: { list_id: listId, title_id: titleId },
-      },
-    });
+    const titlesSelect = {
+      id: true,
+      tmdb_id: true,
+      titre_vo: true,
+      titre_vf: true,
+      affiche_url: true,
+      type: true,
+    } as const;
 
-    if (existingItem) {
-      // Déjà présent, retourner l'existant avec les infos du titre
-      return this.prisma.list_items.findUnique({
+    return this.prisma.forUser(userId, async (tx) => {
+      // Vérifier si le titre est déjà dans la liste (évite les doublons)
+      const existingItem = await tx.list_items.findUnique({
         where: {
           list_id_title_id: { list_id: listId, title_id: titleId },
         },
-        include: {
-          titles: {
-            select: {
-              id: true,
-              tmdb_id: true,
-              titre_vo: true,
-              titre_vf: true,
-              affiche_url: true,
-              type: true,
-            },
-          },
-        },
       });
-    }
 
-    // Trouver la position max actuelle
-    const lastItem = await this.prisma.list_items.findFirst({
-      where: { list_id: listId },
-      orderBy: { position: 'desc' },
-      select: { position: true },
-    });
-    const nextPosition = (lastItem?.position ?? -1) + 1;
-
-    return this.prisma.list_items.create({
-      data: {
-        list_id: listId,
-        title_id: titleId,
-        position: nextPosition,
-      },
-      include: {
-        titles: {
-          select: {
-            id: true,
-            tmdb_id: true,
-            titre_vo: true,
-            titre_vf: true,
-            affiche_url: true,
-            type: true,
+      if (existingItem) {
+        // Déjà présent, retourner l'existant avec les infos du titre
+        return tx.list_items.findUnique({
+          where: {
+            list_id_title_id: { list_id: listId, title_id: titleId },
           },
+          include: { titles: { select: titlesSelect } },
+        });
+      }
+
+      // Trouver la position max actuelle
+      const lastItem = await tx.list_items.findFirst({
+        where: { list_id: listId },
+        orderBy: { position: 'desc' },
+        select: { position: true },
+      });
+      const nextPosition = (lastItem?.position ?? -1) + 1;
+
+      return tx.list_items.create({
+        data: {
+          list_id: listId,
+          title_id: titleId,
+          position: nextPosition,
         },
-      },
+        include: { titles: { select: titlesSelect } },
+      });
     });
   }
 
@@ -453,21 +461,23 @@ export class ListsService {
     // Vérifier l'accès édition
     await this.checkListAccess(listId, userId, true);
 
-    // Vérifier que l'item existe dans la liste
-    const item = await this.prisma.list_items.findUnique({
-      where: {
-        list_id_title_id: { list_id: listId, title_id: titleId },
-      },
-    });
+    await this.prisma.forUser(userId, async (tx) => {
+      // Vérifier que l'item existe dans la liste
+      const item = await tx.list_items.findUnique({
+        where: {
+          list_id_title_id: { list_id: listId, title_id: titleId },
+        },
+      });
 
-    if (!item) {
-      throw new NotFoundException('Cet item ne fait pas partie de la liste.');
-    }
+      if (!item) {
+        throw new NotFoundException('Cet item ne fait pas partie de la liste.');
+      }
 
-    await this.prisma.list_items.delete({
-      where: {
-        list_id_title_id: { list_id: listId, title_id: titleId },
-      },
+      await tx.list_items.delete({
+        where: {
+          list_id_title_id: { list_id: listId, title_id: titleId },
+        },
+      });
     });
   }
 
@@ -486,22 +496,24 @@ export class ListsService {
     // Vérifier l'accès édition
     await this.checkListAccess(listId, userId, true);
 
-    // Vérifier que l'item existe dans la liste
-    const item = await this.prisma.list_items.findUnique({
-      where: {
-        list_id_title_id: { list_id: listId, title_id: titleId },
-      },
-    });
+    return this.prisma.forUser(userId, async (tx) => {
+      // Vérifier que l'item existe dans la liste
+      const item = await tx.list_items.findUnique({
+        where: {
+          list_id_title_id: { list_id: listId, title_id: titleId },
+        },
+      });
 
-    if (!item) {
-      throw new NotFoundException('Cet item ne fait pas partie de la liste.');
-    }
+      if (!item) {
+        throw new NotFoundException('Cet item ne fait pas partie de la liste.');
+      }
 
-    return this.prisma.list_items.update({
-      where: {
-        list_id_title_id: { list_id: listId, title_id: titleId },
-      },
-      data: { statut: dto.statut } as any,
+      return tx.list_items.update({
+        where: {
+          list_id_title_id: { list_id: listId, title_id: titleId },
+        },
+        data: { statut: dto.statut } as any,
+      });
     });
   }
 
@@ -518,32 +530,33 @@ export class ListsService {
     // Vérifier l'accès édition
     await this.checkListAccess(listId, userId, true);
 
-    // Vérifier que tous les title_id appartiennent bien à la liste
-    const existingItems = await this.prisma.list_items.findMany({
-      where: { list_id: listId },
-      select: { title_id: true },
-    });
+    await this.prisma.forUser(userId, async (tx) => {
+      // Vérifier que tous les title_id appartiennent bien à la liste
+      const existingItems = await tx.list_items.findMany({
+        where: { list_id: listId },
+        select: { title_id: true },
+      });
 
-    const existingTitleIds = new Set(existingItems.map((i) => i.title_id));
-    const dtoTitleIds = dto.items.map((i) => i.title_id);
+      const existingTitleIds = new Set(existingItems.map((i) => i.title_id));
+      const dtoTitleIds = dto.items.map((i) => i.title_id);
 
-    for (const tid of dtoTitleIds) {
-      if (!existingTitleIds.has(tid)) {
-        throw new NotFoundException(`Le titre ${tid} ne fait pas partie de la liste.`);
+      for (const tid of dtoTitleIds) {
+        if (!existingTitleIds.has(tid)) {
+          throw new NotFoundException(`Le titre ${tid} ne fait pas partie de la liste.`);
+        }
       }
-    }
 
-    // Mettre à jour les positions dans une transaction
-    await this.prisma.$transaction(
-      dto.items.map((item) =>
-        this.prisma.list_items.update({
+      // Mettre à jour les positions (même transaction : app.user_id ne
+      // survivrait pas à un $transaction([...]) séparé, cf. forUser()).
+      for (const item of dto.items) {
+        await tx.list_items.update({
           where: {
             list_id_title_id: { list_id: listId, title_id: item.title_id },
           },
           data: { position: item.position },
-        }),
-      ),
-    );
+        });
+      }
+    });
   }
 
   // ======================================================================
@@ -562,7 +575,7 @@ export class ListsService {
    */
   async shareList(listId: string, userId: string, dto: ShareListDto) {
     // Vérifier que la liste existe et appartient à l'utilisateur
-    const list = await this.findListOrThrow(listId);
+    const list = await this.findListOrThrow(listId, userId);
     if (list.user_id !== userId) {
       throw new ForbiddenException('Seul le propriétaire peut partager cette liste.');
     }
@@ -605,7 +618,7 @@ export class ListsService {
    * @returns Tableau des partages
    */
   async getShares(listId: string, userId: string) {
-    const list = await this.findListOrThrow(listId);
+    const list = await this.findListOrThrow(listId, userId);
     if (list.user_id !== userId) {
       throw new ForbiddenException('Seul le propriétaire peut voir les partages.');
     }
@@ -635,7 +648,7 @@ export class ListsService {
    * @param sharedWithUserId - UUID de l'utilisateur dont on retire l'accès
    */
   async removeShare(listId: string, userId: string, sharedWithUserId: string): Promise<void> {
-    const list = await this.findListOrThrow(listId);
+    const list = await this.findListOrThrow(listId, userId);
     if (list.user_id !== userId) {
       throw new ForbiddenException('Seul le propriétaire peut retirer un partage.');
     }
@@ -671,26 +684,28 @@ export class ListsService {
    * @returns Tableau des listes partagées
    */
   async getSharedLists(userId: string) {
-    const shares = await this.prisma.list_shares.findMany({
-      where: { shared_with_user_id: userId },
-      include: {
-        user_lists: {
-          include: {
-            users: {
-              select: {
-                id: true,
-                pseudo: true,
-                avatar_url: true,
+    const shares = await this.prisma.forUser(userId, (tx) =>
+      tx.list_shares.findMany({
+        where: { shared_with_user_id: userId },
+        include: {
+          user_lists: {
+            include: {
+              users: {
+                select: {
+                  id: true,
+                  pseudo: true,
+                  avatar_url: true,
+                },
               },
-            },
-            _count: {
-              select: { list_items: true },
+              _count: {
+                select: { list_items: true },
+              },
             },
           },
         },
-      },
-      orderBy: { shared_at: 'desc' },
-    });
+        orderBy: { shared_at: 'desc' },
+      }),
+    );
 
     return shares.map((share) => ({
       list_id: share.list_id,

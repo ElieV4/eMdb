@@ -11,6 +11,8 @@ jest.mock('@emdb/db', () => ({
 import { getSerieProgress } from '@emdb/db';
 
 const prismaServiceMock = {
+  forUser: jest.fn((_userId: string, fn: any) => fn(prismaServiceMock)),
+  asSystem: jest.fn((fn: any) => fn(prismaServiceMock)),
   titles: {
     findUnique: jest.fn(),
   },
@@ -482,7 +484,7 @@ describe('WatchesService', () => {
       const result = await service.getSerieProgress(userId, titleId);
 
       expect(result).toEqual(mockProgress);
-      expect(getSerieProgress).toHaveBeenCalledWith(userId, titleId);
+      expect(getSerieProgress).toHaveBeenCalledWith(userId, titleId, prismaServiceMock);
     });
 
     it("lève NotFound si le titre n'existe pas", async () => {

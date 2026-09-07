@@ -96,6 +96,45 @@ export class PrismaService implements OnModuleDestroy {
     return prisma.$transaction(operations);
   }
 
+  /**
+   * Exécute `fn` dans une transaction où les policies RLS (migration
+   * `enable_rls_user_scoped_tables`) scopent user_watches/user_ratings/
+   * push_tokens/notifications/user_lists/list_items à `userId` (+ listes
+   * partagées avec lui). `SET LOCAL` via `set_config(..., true)` : la
+   * portée est strictement la transaction courante, jamais la connexion
+   * (qui repasse dans le pool Prisma après coup) — indispensable pour ne
+   * jamais faire fuiter le contexte d'un utilisateur vers la requête
+   * suivante réutilisant la même connexion.
+   *
+   * À utiliser pour toute opération sur ces tables agissant au nom de
+   * l'utilisateur authentifié de la requête en cours. Pour une opération
+   * légitimement transverse à tous les utilisateurs (stats admin,
+   * vérification avant suppression, notification à l'admin), voir
+   * `asSystem()`.
+   */
+  async forUser<T>(userId: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.user_id', ${userId}, true)`;
+      return fn(tx);
+    });
+  }
+
+  /**
+   * Exécute `fn` dans une transaction qui contourne explicitement les
+   * policies RLS pour une opération légitimement transverse à tous les
+   * utilisateurs (ex. compter les references d'un titre avant suppression,
+   * stats admin du recommender, notification à l'admin lors d'une
+   * inscription). Réservé aux call sites qui ne dépendent d'aucune entrée
+   * utilisateur pour décider du bypass — jamais conditionné par une donnée
+   * de requête.
+   */
+  async asSystem<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.bypass_rls', 'true', true)`;
+      return fn(tx);
+    });
+  }
+
   onModuleDestroy() {
     return prisma.$disconnect();
   }

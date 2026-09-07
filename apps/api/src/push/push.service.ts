@@ -14,14 +14,16 @@ export class PushService {
   constructor(private readonly prisma: PrismaService) {}
 
   async registerToken(userId: string, token: string, platform: string): Promise<void> {
-    await this.prisma.push_tokens.upsert({
-      where: { token },
-      update: { user_id: userId, platform, last_seen_at: new Date() },
-      create: { user_id: userId, token, platform },
-    });
+    await this.prisma.forUser(userId, (tx) =>
+      tx.push_tokens.upsert({
+        where: { token },
+        update: { user_id: userId, platform, last_seen_at: new Date() },
+        create: { user_id: userId, token, platform },
+      }),
+    );
   }
 
   async unregisterToken(userId: string, token: string): Promise<void> {
-    await this.prisma.push_tokens.deleteMany({ where: { token, user_id: userId } });
+    await this.prisma.forUser(userId, (tx) => tx.push_tokens.deleteMany({ where: { token, user_id: userId } }));
   }
 }

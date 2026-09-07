@@ -9,6 +9,9 @@
  */
 
 import { prisma } from '../';
+import type { Prisma, PrismaClient } from '@prisma/client';
+
+type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 // ============================================================================
 // TYPES
@@ -88,12 +91,23 @@ export async function countEpisodesNonVus(
  * // => [{ saison: 1, vus: 10, total: 12 }, { saison: 2, vus: 5, total: 12 }]
  * ```
  */
+/**
+ * `client` : passer le `tx` d'un `PrismaService.forUser()`/`asSystem()`
+ * quand l'appelant est soumis aux policies RLS sur user_watches (migration
+ * enable_rls_user_scoped_tables) — `fn_progress_serie` fait un
+ * `LEFT JOIN user_watches` en interne, donc sans contexte `app.user_id` la
+ * fonction ne verrait aucun visionnage (RLS fermé par défaut) et
+ * retournerait un progrès toujours à 0, silencieusement. Par défaut le
+ * singleton partagé (`@emdb/db`), adapté aux appelants non soumis à RLS
+ * (ex. le worker, connecté avec un rôle BYPASSRLS).
+ */
 export async function getSerieProgress(
   userId: string,
   titleId: string,
+  client: PrismaLike = prisma,
 ): Promise<ProgressSerieResult[]> {
   // @ts-ignore - Prisma $queryRawUnsafe type issue
-  const results = await prisma.$queryRawUnsafe<ProgressSerieResult[]>(
+  const results = await client.$queryRawUnsafe<ProgressSerieResult[]>(
     `SELECT * FROM fn_progress_serie('${userId}'::UUID, '${titleId}'::UUID)`,
   );
 

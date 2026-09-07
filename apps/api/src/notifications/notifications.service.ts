@@ -34,30 +34,32 @@ export class NotificationsService {
 
     const where = { user_id: userId };
 
-    const [data, total] = await Promise.all([
-      this.prisma.notifications.findMany({
-        where,
-        include: {
-          episodes: {
-            select: {
-              id: true,
-              numero: true,
-              titre: true,
-              seasons: {
-                select: { numero: true },
+    const [data, total] = await this.prisma.forUser(userId, (tx) =>
+      Promise.all([
+        tx.notifications.findMany({
+          where,
+          include: {
+            episodes: {
+              select: {
+                id: true,
+                numero: true,
+                titre: true,
+                seasons: {
+                  select: { numero: true },
+                },
               },
             },
+            users_notifications_related_user_idTousers: {
+              select: { id: true, pseudo: true, email: true },
+            },
           },
-          users_notifications_related_user_idTousers: {
-            select: { id: true, pseudo: true, email: true },
-          },
-        },
-        orderBy: [{ lu: 'asc' }, { created_at: 'desc' }],
-        skip,
-        take: limit,
-      }),
-      this.prisma.notifications.count({ where }),
-    ]);
+          orderBy: [{ lu: 'asc' }, { created_at: 'desc' }],
+          skip,
+          take: limit,
+        }),
+        tx.notifications.count({ where }),
+      ]),
+    );
 
     return {
       data: data.map((n) => ({
@@ -84,21 +86,23 @@ export class NotificationsService {
    * @param userId - UUID de l'utilisateur connecté
    */
   async markAsRead(notificationId: string, userId: string): Promise<void> {
-    const notification = await this.prisma.notifications.findUnique({
-      where: { id: notificationId },
-    });
+    await this.prisma.forUser(userId, async (tx) => {
+      const notification = await tx.notifications.findUnique({
+        where: { id: notificationId },
+      });
 
-    if (!notification) {
-      throw new NotFoundException('Notification introuvable.');
-    }
+      if (!notification) {
+        throw new NotFoundException('Notification introuvable.');
+      }
 
-    if (notification.user_id !== userId) {
-      throw new ForbiddenException('Cette notification ne vous appartient pas.');
-    }
+      if (notification.user_id !== userId) {
+        throw new ForbiddenException('Cette notification ne vous appartient pas.');
+      }
 
-    await this.prisma.notifications.update({
-      where: { id: notificationId },
-      data: { lu: true },
+      await tx.notifications.update({
+        where: { id: notificationId },
+        data: { lu: true },
+      });
     });
   }
 
@@ -109,10 +113,12 @@ export class NotificationsService {
    * @returns Nombre de notifications marquées
    */
   async markAllAsRead(userId: string): Promise<{ marked_count: number }> {
-    const result = await this.prisma.notifications.updateMany({
-      where: { user_id: userId, lu: false },
-      data: { lu: true },
-    });
+    const result = await this.prisma.forUser(userId, (tx) =>
+      tx.notifications.updateMany({
+        where: { user_id: userId, lu: false },
+        data: { lu: true },
+      }),
+    );
 
     return { marked_count: result.count };
   }
@@ -124,9 +130,9 @@ export class NotificationsService {
    * @returns Nombre de notifications non lues
    */
   async getUnreadCount(userId: string): Promise<{ count: number }> {
-    const count = await this.prisma.notifications.count({
-      where: { user_id: userId, lu: false },
-    });
+    const count = await this.prisma.forUser(userId, (tx) =>
+      tx.notifications.count({ where: { user_id: userId, lu: false } }),
+    );
 
     return { count };
   }

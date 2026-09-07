@@ -30,6 +30,10 @@ describe('PL/pgSQL functions', () => {
 
   beforeAll(async () => {
     await prisma.$connect();
+    // cf. db-constraints.spec.ts : bypass RLS explicite pour toute la
+    // session (setup direct + fn_progress_serie/fn_episodes_non_vus qui
+    // lisent user_watches en interne).
+    await prisma.$executeRawUnsafe(`SELECT set_config('app.bypass_rls', 'true', false)`);
     await prisma.users.create({
       data: {
         id: userId,

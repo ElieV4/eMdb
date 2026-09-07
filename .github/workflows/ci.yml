@@ -58,6 +58,9 @@ jobs:
       - name: Format check
         run: npm run format:check
 
+      - name: Crée le rôle restreint emdb_app (RLS, cf. packages/db/sql/setup_roles.sql)
+        run: npx prisma db execute --url "$DATABASE_URL" --file packages/db/sql/setup_roles.sql
+
       - name: Prisma — applique l'historique de migrations
         run: |
           cd packages/db
@@ -88,4 +91,12 @@ jobs:
         run: npm run dbt -- build --select marts.dataviz
 
       - name: Tests
+        # DATABASE_URL restreint (emdb_app, sans BYPASSRLS) pour cette étape
+        # uniquement : c'est le rôle que l'app utilise réellement en
+        # exécution (cf. wiki/Architecture#securite), donc celui sous lequel
+        # les tests doivent tourner — y compris rls-isolation.spec.ts, qui ne
+        # prouve rien sous le rôle superuser utilisé pour les étapes
+        # d'administration ci-dessus (migrations, dbt, ...).
         run: npm run test --workspaces --if-present
+        env:
+          DATABASE_URL: postgresql://emdb_app:emdb_app@localhost:5432/emdb

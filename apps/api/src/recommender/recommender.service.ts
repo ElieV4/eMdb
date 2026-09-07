@@ -166,49 +166,64 @@ export class RecommenderService {
     const limit = options.limit ?? 20;
     const POOR_RATING_THRESHOLD = 5;
 
-    const recentWatches = await this.prisma.user_watches.findMany({
-      where: { user_id: userId, title_id: { not: null } },
-      select: { title_id: true },
-      distinct: ['title_id'],
-      orderBy: { date_vue: 'desc' },
-      take: 30,
-    });
-
-    if (recentWatches.length === 0) {
-      return [];
-    }
-
-    const recentTitleIds = recentWatches.map((w) => w.title_id as string);
-    const ratingsForRecent = await this.prisma.user_ratings.findMany({
-      where: { user_id: userId, title_id: { in: recentTitleIds } },
-      select: { title_id: true, note_perso: true },
-    });
-    const noteByTitleId = new Map(
-      ratingsForRecent.map((r) => [r.title_id as string, Number(r.note_perso)]),
-    );
-
-    const sourceTitles: { titleId: string; weight: number }[] = recentTitleIds
-      .filter((id) => (noteByTitleId.get(id) ?? Infinity) >= POOR_RATING_THRESHOLD)
-      .map((id) => ({
-        titleId: id,
-        weight: noteByTitleId.has(id) ? noteByTitleId.get(id)! / 10 : 1,
-      }));
-
-    if (sourceTitles.length === 0) {
-      return [];
-    }
-
-    const [watchedRows, ratedRows] = await Promise.all([
-      this.prisma.user_watches.findMany({
+    // Court-circuite à chaque étape (pas de watches / pas de source valable)
+    // sans quitter la transaction forUser() — sinon les requêtes suivantes
+    // perdraient le contexte RLS (app.user_id, scope à la transaction).
+    const recoData = await this.prisma.forUser(userId, async (tx) => {
+      const recentWatches = await tx.user_watches.findMany({
         where: { user_id: userId, title_id: { not: null } },
         select: { title_id: true },
         distinct: ['title_id'],
-      }),
-      this.prisma.user_ratings.findMany({
-        where: { user_id: userId, title_id: { not: null } },
-        select: { title_id: true },
-      }),
-    ]);
+        orderBy: { date_vue: 'desc' },
+        take: 30,
+      });
+
+      if (recentWatches.length === 0) {
+        return null;
+      }
+
+      const recentTitleIds = recentWatches.map((w) => w.title_id as string);
+      const ratingsForRecent = await tx.user_ratings.findMany({
+        where: { user_id: userId, title_id: { in: recentTitleIds } },
+        select: { title_id: true, note_perso: true },
+      });
+
+      const noteByTitleId = new Map(
+        ratingsForRecent.map((r) => [r.title_id as string, Number(r.note_perso)]),
+      );
+
+      const sourceTitles: { titleId: string; weight: number }[] = recentTitleIds
+        .filter((id) => (noteByTitleId.get(id) ?? Infinity) >= POOR_RATING_THRESHOLD)
+        .map((id) => ({
+          titleId: id,
+          weight: noteByTitleId.has(id) ? noteByTitleId.get(id)! / 10 : 1,
+        }));
+
+      if (sourceTitles.length === 0) {
+        return null;
+      }
+
+      const [watchedRows, ratedRows] = await Promise.all([
+        tx.user_watches.findMany({
+          where: { user_id: userId, title_id: { not: null } },
+          select: { title_id: true },
+          distinct: ['title_id'],
+        }),
+        tx.user_ratings.findMany({
+          where: { user_id: userId, title_id: { not: null } },
+          select: { title_id: true },
+        }),
+      ]);
+
+      return { sourceTitles, watchedRows, ratedRows };
+    });
+
+    if (!recoData) {
+      return [];
+    }
+
+    const { sourceTitles, watchedRows, ratedRows } = recoData;
+
     const excludeIds = new Set<string>([
       ...watchedRows.map((w) => w.title_id as string),
       ...ratedRows.map((r) => r.title_id as string),

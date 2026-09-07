@@ -58,6 +58,25 @@ La CI applique l'historique de migrations sur une base fraîche, puis compare le
 
 ---
 
+## 🔒 Row-Level Security (defense-in-depth)
+
+Migration `enable_rls_user_scoped_tables` : policies RLS sur `user_watches`, `user_ratings`, `push_tokens`, `notifications`, `user_lists`, `list_items` — défense en profondeur en complément des contrôles d'autorisation déjà vérifiés au niveau service (ex. `ForbiddenException` dans `lists.service.ts`).
+
+**Mécanisme** : `PrismaService.forUser(userId, fn)` déclare `set_config('app.user_id', userId, true)` (SET LOCAL, portée à la transaction) avant d'exécuter la requête ; `PrismaService.asSystem(fn)` déclare `app.bypass_rls = 'true'` pour les opérations légitimement transverses à tous les utilisateurs (stats admin, vérification avant suppression d'un titre, notification à l'admin). Sans contexte défini, la policy est fermée par défaut. Ces deux méthodes sont **indispensables** dès qu'un appel touche une des 6 tables ci-dessus — sinon la requête échoue silencieusement (rôle restreint) ou n'a aucun effet (superuser).
+
+**Deux rôles Postgres distincts** (`packages/db/sql/setup_roles.sql`) :
+
+- `emdb_app` (sans `BYPASSRLS`) : celui que l'API doit utiliser (`DATABASE_URL`), sinon les policies n'ont strictement aucun effet.
+- Rôle d'origine (`emdb` en local, `postgres` sur Supabase, avec `BYPASSRLS`) : celui du worker (`WORKER_DATABASE_URL`), dont les jobs sont par nature transverses à tous les utilisateurs.
+
+**⚠️ Supabase active RLS par défaut sur *toute* nouvelle table** (indépendamment de cette migration) — sans policy, ça bloque tout accès pour un rôle sans bypass. La migration `disable_default_rls_non_user_scoped_tables` désactive ce défaut sur les 21 autres tables (catalogue/techniques, pas de notion d'utilisateur).
+
+### Statut production (Supabase)
+
+**Fonctionne en local (connexion directe), pas encore en production.** Testé et validé de bout en bout en local (`rls-isolation.spec.ts`, + test manuel via l'API réelle) avec le rôle restreint. En production, basculer `DATABASE_URL` vers `emdb_app` provoque des rejets RLS (`42501`) sur les écritures pourtant légitimes (ex. créer une liste) — `pgbouncer=true` sur l'URL ne suffit pas à corriger ça. Suspicion : le pooler Supabase (Supavisor) filtre/ignore les `SET`/`set_config` sur des paramètres custom comme `app.user_id`, même en mode session. **Non résolu** — l'API en production reste donc sur le rôle d'origine (bypass), RLS actif côté base mais sans effet réel tant que ce point n'est pas éclairci (accès direct psql à Supabase nécessaire pour investiguer plus loin). Les policies elles-mêmes sont déjà appliquées sur Supabase (inertes tant que le rôle de connexion bypass).
+
+---
+
 ## 🛠️ Objets SQL "Hors Prisma"
 
 Prisma **ne gère pas** les objets suivants (extension `pgcrypto`, triggers, fonctions, vues matérialisées). Ils sont définis dans `../sql/db_init.sql` et appliqués via `npm run apply:raw-sql` (script `../scripts/apply-raw-sql.ts`, idempotent).

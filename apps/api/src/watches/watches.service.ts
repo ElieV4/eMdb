@@ -100,48 +100,52 @@ export class WatchesService {
       episodeSerieId = episode.seasons.title_id;
     }
 
-    const watch = await this.prisma.user_watches.create({
-      data: {
-        user_id: userId,
-        title_id: title_id ?? null,
-        episode_id: episode_id ?? null,
-        date_vue: date_vue ?? new Date(),
-      },
-      include: {
-        titles: {
-          select: {
-            id: true,
-            tmdb_id: true,
-            titre_vo: true,
-            titre_vf: true,
-            affiche_url: true,
-            type: true,
-          },
+    const watch = await this.prisma.forUser(userId, async (tx) => {
+      const watch = await tx.user_watches.create({
+        data: {
+          user_id: userId,
+          title_id: title_id ?? null,
+          episode_id: episode_id ?? null,
+          date_vue: date_vue ?? new Date(),
         },
-        episodes: {
-          select: {
-            id: true,
-            numero: true,
-            titre: true,
-            seasons: { select: { numero: true } },
+        include: {
+          titles: {
+            select: {
+              id: true,
+              tmdb_id: true,
+              titre_vo: true,
+              titre_vf: true,
+              affiche_url: true,
+              type: true,
+            },
           },
-        },
-      },
-    });
-
-    // Un film marqué vu sort automatiquement de la watchlist (retour
-    // utilisateur) — n'a de sens que pour un film (visionnage complet en un
-    // seul événement) : une série marquée "vue" épisode par épisode n'a pas
-    // ce même moment "terminé" univoque, donc la watchlist série n'est
-    // jamais retirée automatiquement.
-    if (title && title.type === 'film') {
-      await this.prisma.list_items.deleteMany({
-        where: {
-          title_id: title.id,
-          user_lists: { user_id: userId, type: 'watchlist' },
+          episodes: {
+            select: {
+              id: true,
+              numero: true,
+              titre: true,
+              seasons: { select: { numero: true } },
+            },
+          },
         },
       });
-    }
+
+      // Un film marqué vu sort automatiquement de la watchlist (retour
+      // utilisateur) — n'a de sens que pour un film (visionnage complet en un
+      // seul événement) : une série marquée "vue" épisode par épisode n'a pas
+      // ce même moment "terminé" univoque, donc la watchlist série n'est
+      // jamais retirée automatiquement.
+      if (title && title.type === 'film') {
+        await tx.list_items.deleteMany({
+          where: {
+            title_id: title.id,
+            user_lists: { user_id: userId, type: 'watchlist' },
+          },
+        });
+      }
+
+      return watch;
+    });
 
     // Voir un épisode d'une série l'ajoute automatiquement à la watchlist
     // (retour utilisateur).
@@ -159,20 +163,22 @@ export class WatchesService {
    * @param userId - UUID de l'utilisateur connecté (vérification d'appartenance)
    */
   async deleteWatch(id: string, userId: string): Promise<void> {
-    const watch = await this.prisma.user_watches.findUnique({
-      where: { id },
-      select: { id: true, user_id: true },
+    await this.prisma.forUser(userId, async (tx) => {
+      const watch = await tx.user_watches.findUnique({
+        where: { id },
+        select: { id: true, user_id: true },
+      });
+
+      if (!watch) {
+        throw new NotFoundException('Visionnage introuvable.');
+      }
+
+      if (watch.user_id !== userId) {
+        throw new ForbiddenException('Ce visionnage ne vous appartient pas.');
+      }
+
+      await tx.user_watches.delete({ where: { id } });
     });
-
-    if (!watch) {
-      throw new NotFoundException('Visionnage introuvable.');
-    }
-
-    if (watch.user_id !== userId) {
-      throw new ForbiddenException('Ce visionnage ne vous appartient pas.');
-    }
-
-    await this.prisma.user_watches.delete({ where: { id } });
   }
 
   /**
@@ -186,26 +192,28 @@ export class WatchesService {
    * @param dto - Champs de contexte à mettre à jour
    */
   async updateWatchContext(id: string, userId: string, dto: UpdateWatchContextDto) {
-    const watch = await this.prisma.user_watches.findUnique({
-      where: { id },
-      select: { id: true, user_id: true },
-    });
+    return this.prisma.forUser(userId, async (tx) => {
+      const watch = await tx.user_watches.findUnique({
+        where: { id },
+        select: { id: true, user_id: true },
+      });
 
-    if (!watch) {
-      throw new NotFoundException('Visionnage introuvable.');
-    }
+      if (!watch) {
+        throw new NotFoundException('Visionnage introuvable.');
+      }
 
-    if (watch.user_id !== userId) {
-      throw new ForbiddenException('Ce visionnage ne vous appartient pas.');
-    }
+      if (watch.user_id !== userId) {
+        throw new ForbiddenException('Ce visionnage ne vous appartient pas.');
+      }
 
-    return this.prisma.user_watches.update({
-      where: { id },
-      data: {
-        ...(dto.support !== undefined && { support: dto.support }),
-        ...(dto.compagnie !== undefined && { compagnie: dto.compagnie }),
-        ...(dto.emotion !== undefined && { emotion: dto.emotion }),
-      },
+      return tx.user_watches.update({
+        where: { id },
+        data: {
+          ...(dto.support !== undefined && { support: dto.support }),
+          ...(dto.compagnie !== undefined && { compagnie: dto.compagnie }),
+          ...(dto.emotion !== undefined && { emotion: dto.emotion }),
+        },
+      });
     });
   }
 
@@ -216,9 +224,9 @@ export class WatchesService {
    * @param userId - UUID de l'utilisateur connecté
    */
   async deleteAllWatchesByTitle(titleId: string, userId: string): Promise<void> {
-    await this.prisma.user_watches.deleteMany({
-      where: { title_id: titleId, user_id: userId },
-    });
+    await this.prisma.forUser(userId, (tx) =>
+      tx.user_watches.deleteMany({ where: { title_id: titleId, user_id: userId } }),
+    );
   }
 
   /**
@@ -232,9 +240,9 @@ export class WatchesService {
    * @param userId - UUID de l'utilisateur connecté
    */
   async deleteAllWatchesByEpisode(episodeId: string, userId: string): Promise<void> {
-    await this.prisma.user_watches.deleteMany({
-      where: { episode_id: episodeId, user_id: userId },
-    });
+    await this.prisma.forUser(userId, (tx) =>
+      tx.user_watches.deleteMany({ where: { episode_id: episodeId, user_id: userId } }),
+    );
   }
 
   /**
@@ -299,38 +307,46 @@ export class WatchesService {
     }
 
     // Vérifier quels épisodes sont déjà vus pour éviter les doublons
-    const existingWatches = await this.prisma.user_watches.findMany({
-      where: {
-        user_id: userId,
-        episode_id: { in: episodesToMark.map((e) => e.id) },
-      },
-      select: { episode_id: true },
+    const newWatches = await this.prisma.forUser(userId, async (tx) => {
+      const existingWatches = await tx.user_watches.findMany({
+        where: {
+          user_id: userId,
+          episode_id: { in: episodesToMark.map((e) => e.id) },
+        },
+        select: { episode_id: true },
+      });
+
+      const existingEpisodeIds = new Set(
+        existingWatches.map((w) => w.episode_id),
+      );
+
+      const newWatches = episodesToMark.filter(
+        (e) => !existingEpisodeIds.has(e.id),
+      );
+
+      if (newWatches.length === 0) {
+        return newWatches;
+      }
+
+      // title_id reste null sur les visionnages d'épisode (même invariant que
+      // createWatch : jamais les deux à la fois, cf. bug #22/#24 — sinon
+      // useWatchedTitles() marquerait toute la série "vue" dès le premier
+      // "vu jusqu'ici" au lieu de suivre l'avancement épisode par épisode).
+      await tx.user_watches.createMany({
+        data: newWatches.map((e) => ({
+          user_id: userId,
+          title_id: null,
+          episode_id: e.id,
+          date_vue: dateVueValue,
+        })),
+      });
+
+      return newWatches;
     });
-
-    const existingEpisodeIds = new Set(
-      existingWatches.map((w) => w.episode_id),
-    );
-
-    const newWatches = episodesToMark.filter(
-      (e) => !existingEpisodeIds.has(e.id),
-    );
 
     if (newWatches.length === 0) {
       return 0;
     }
-
-    // title_id reste null sur les visionnages d'épisode (même invariant que
-    // createWatch : jamais les deux à la fois, cf. bug #22/#24 — sinon
-    // useWatchedTitles() marquerait toute la série "vue" dès le premier
-    // "vu jusqu'ici" au lieu de suivre l'avancement épisode par épisode).
-    await this.prisma.user_watches.createMany({
-      data: newWatches.map((e) => ({
-        user_id: userId,
-        title_id: null,
-        episode_id: e.id,
-        date_vue: dateVueValue,
-      })),
-    });
 
     // Voir un épisode d'une série l'ajoute automatiquement à la watchlist
     // (retour utilisateur) — même comportement que createWatch.
@@ -357,13 +373,15 @@ export class WatchesService {
    * notamment après un import Trakt).
    */
   async getWatchedTitleIds(userId: string): Promise<string[]> {
-    const watches = await this.prisma.user_watches.findMany({
-      where: { user_id: userId },
-      select: {
-        title_id: true,
-        episodes: { select: { seasons: { select: { title_id: true } } } },
-      },
-    });
+    const watches = await this.prisma.forUser(userId, (tx) =>
+      tx.user_watches.findMany({
+        where: { user_id: userId },
+        select: {
+          title_id: true,
+          episodes: { select: { seasons: { select: { title_id: true } } } },
+        },
+      }),
+    );
 
     const titleIds = new Set<string>();
     for (const watch of watches) {
@@ -433,72 +451,76 @@ export class WatchesService {
       where.AND = andConditions;
     }
 
-    const [data, total] = await Promise.all([
-      this.prisma.user_watches.findMany({
-        where,
-        orderBy: { date_vue: 'desc' },
-        skip,
-        take: limit,
-        include: {
-          titles: {
-            select: {
-              id: true,
-              tmdb_id: true,
-              titre_vo: true,
-              titre_vf: true,
-              affiche_url: true,
-              type: true,
-              date_sortie: true,
+    const { data, total, ratings } = await this.prisma.forUser(userId, async (tx) => {
+      const [data, total] = await Promise.all([
+        tx.user_watches.findMany({
+          where,
+          orderBy: { date_vue: 'desc' },
+          skip,
+          take: limit,
+          include: {
+            titles: {
+              select: {
+                id: true,
+                tmdb_id: true,
+                titre_vo: true,
+                titre_vf: true,
+                affiche_url: true,
+                type: true,
+                date_sortie: true,
+              },
             },
-          },
-          episodes: {
-            select: {
-              id: true,
-              numero: true,
-              titre: true,
-              duree_minutes: true,
-              seasons: {
-                select: {
-                  numero: true,
-                  titles: {
-                    select: {
-                      id: true,
-                      tmdb_id: true,
-                      titre_vo: true,
-                      titre_vf: true,
-                      affiche_url: true,
-                      type: true,
-                      date_sortie: true,
+            episodes: {
+              select: {
+                id: true,
+                numero: true,
+                titre: true,
+                duree_minutes: true,
+                seasons: {
+                  select: {
+                    numero: true,
+                    titles: {
+                      select: {
+                        id: true,
+                        tmdb_id: true,
+                        titre_vo: true,
+                        titre_vf: true,
+                        affiche_url: true,
+                        type: true,
+                        date_sortie: true,
+                      },
                     },
                   },
                 },
               },
             },
           },
-        },
-      }),
-      this.prisma.user_watches.count({ where }),
-    ]);
+        }),
+        tx.user_watches.count({ where }),
+      ]);
 
-    // Note personnelle par visionnage (affichée en sous-titre à la place de
-    // la durée dans l'Historique) — pas de relation directe user_watches ->
-    // user_ratings, jointure manuelle limitée aux titres/épisodes de cette
-    // page plutôt qu'un lookup par item.
-    const titleIds = [...new Set(data.filter((w) => w.title_id).map((w) => w.title_id as string))];
-    const episodeIds = [...new Set(data.filter((w) => w.episode_id).map((w) => w.episode_id as string))];
-    const ratings =
-      titleIds.length > 0 || episodeIds.length > 0
-        ? await this.prisma.user_ratings.findMany({
-            where: {
-              user_id: userId,
-              OR: [
-                ...(titleIds.length > 0 ? [{ title_id: { in: titleIds } }] : []),
-                ...(episodeIds.length > 0 ? [{ episode_id: { in: episodeIds } }] : []),
-              ],
-            },
-            select: { title_id: true, episode_id: true, note_perso: true },
-          })
-        : [];
+      // Note personnelle par visionnage (affichée en sous-titre à la place de
+      // la durée dans l'Historique) — pas de relation directe user_watches ->
+      // user_ratings, jointure manuelle limitée aux titres/épisodes de cette
+      // page plutôt qu'un lookup par item.
+      const titleIds = [...new Set(data.filter((w) => w.title_id).map((w) => w.title_id as string))];
+      const episodeIds = [...new Set(data.filter((w) => w.episode_id).map((w) => w.episode_id as string))];
+      const ratings =
+        titleIds.length > 0 || episodeIds.length > 0
+          ? await tx.user_ratings.findMany({
+              where: {
+                user_id: userId,
+                OR: [
+                  ...(titleIds.length > 0 ? [{ title_id: { in: titleIds } }] : []),
+                  ...(episodeIds.length > 0 ? [{ episode_id: { in: episodeIds } }] : []),
+                ],
+              },
+              select: { title_id: true, episode_id: true, note_perso: true },
+            })
+          : [];
+
+      return { data, total, ratings };
+    });
     const ratingByTitleId = new Map(ratings.filter((r) => r.title_id).map((r) => [r.title_id, Number(r.note_perso)]));
     const ratingByEpisodeId = new Map(
       ratings.filter((r) => r.episode_id).map((r) => [r.episode_id, Number(r.note_perso)]),
@@ -542,7 +564,7 @@ export class WatchesService {
       throw new BadRequestException('La progression est uniquement disponible pour les séries.');
     }
 
-    return getSerieProgress(userId, titleId);
+    return this.prisma.forUser(userId, (tx) => getSerieProgress(userId, titleId, tx));
   }
 
   /**
@@ -584,28 +606,35 @@ export class WatchesService {
       OR: [{ date_sortie: { gte: startOfToday } }, { date_sortie: null }],
     };
 
-    const [episodes, total] = await Promise.all([
-      this.prisma.episodes.findMany({
-        where,
-        select: {
-          numero: true,
-          titre: true,
-          date_sortie: true,
-          duree_minutes: true,
-          seasons: {
-            select: {
-              numero: true,
-              title_id: true,
-              titles: { select: { titre_vo: true, titre_vf: true, affiche_url: true } },
+    // where.user_watches (relation "none") touche user_watches (RLS) même si
+    // `episodes` lui-même n'est pas une table protégée — sans contexte, la
+    // condition "aucun visionnage" serait vraie pour TOUT épisode (RLS
+    // masque tous les visionnages par défaut), affichant des épisodes déjà
+    // vus comme non vus. forUser() indispensable ici.
+    const [episodes, total] = await this.prisma.forUser(userId, (tx) =>
+      Promise.all([
+        tx.episodes.findMany({
+          where,
+          select: {
+            numero: true,
+            titre: true,
+            date_sortie: true,
+            duree_minutes: true,
+            seasons: {
+              select: {
+                numero: true,
+                title_id: true,
+                titles: { select: { titre_vo: true, titre_vf: true, affiche_url: true } },
+              },
             },
           },
-        },
-        orderBy: { date_sortie: 'asc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.episodes.count({ where }),
-    ]);
+          orderBy: { date_sortie: 'asc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        tx.episodes.count({ where }),
+      ]),
+    );
 
     // Calculé sur la page courante plutôt que via countEpisodesNonVus()/
     // fn_episodes_non_vus (PL/pgSQL) : évite une dépendance à une fonction
@@ -667,13 +696,15 @@ export class WatchesService {
 
     // Exclure les séries de la watchlist marquées "à jour" ou "abandonnée"
     // (elles ne doivent plus apparaître dans "Continuer à regarder").
-    const watchlist = await this.prisma.user_lists.findFirst({
-      where: { user_id: userId, type: 'watchlist' },
-      select: { id: true },
-    });
-    let excludedTitleIds = new Set<string>();
-    if (watchlist) {
-      const excludedItems = await this.prisma.list_items.findMany({
+    const excludedTitleIds = await this.prisma.forUser(userId, async (tx) => {
+      const watchlist = await tx.user_lists.findFirst({
+        where: { user_id: userId, type: 'watchlist' },
+        select: { id: true },
+      });
+      if (!watchlist) {
+        return new Set<string>();
+      }
+      const excludedItems = await tx.list_items.findMany({
         where: {
           list_id: watchlist.id,
           title_id: { in: titleIds },
@@ -681,8 +712,8 @@ export class WatchesService {
         },
         select: { title_id: true },
       });
-      excludedTitleIds = new Set(excludedItems.map((item) => item.title_id));
-    }
+      return new Set(excludedItems.map((item) => item.title_id));
+    });
     const activeTitleIds = titleIds.filter((id) => !excludedTitleIds.has(id));
     if (activeTitleIds.length === 0) {
       return [];
@@ -698,27 +729,31 @@ export class WatchesService {
     // "X/Y" affiche un max que l'utilisateur ne peut pas encore atteindre.
     const today = new Date();
     today.setHours(23, 59, 59, 999);
-    const episodes = await this.prisma.episodes.findMany({
-      where: {
-        seasons: { title_id: { in: activeTitleIds }, numero: { not: 0 } },
-        date_sortie: { lte: today },
-      },
-      select: {
-        id: true,
-        numero: true,
-        titre: true,
-        date_sortie: true,
-        duree_minutes: true,
-        seasons: { select: { numero: true, title_id: true } },
-        user_watches: {
-          where: { user_id: userId },
-          select: { date_vue: true },
-          orderBy: { date_vue: 'desc' },
-          take: 1,
+    // include.user_watches touche la table RLS-protegee : forUser() requis
+    // (sinon aucun visionnage visible, "prochain episode" toujours faux).
+    const episodes = await this.prisma.forUser(userId, (tx) =>
+      tx.episodes.findMany({
+        where: {
+          seasons: { title_id: { in: activeTitleIds }, numero: { not: 0 } },
+          date_sortie: { lte: today },
         },
-      },
-      orderBy: [{ seasons: { numero: 'asc' } }, { numero: 'asc' }],
-    });
+        select: {
+          id: true,
+          numero: true,
+          titre: true,
+          date_sortie: true,
+          duree_minutes: true,
+          seasons: { select: { numero: true, title_id: true } },
+          user_watches: {
+            where: { user_id: userId },
+            select: { date_vue: true },
+            orderBy: { date_vue: 'desc' },
+            take: 1,
+          },
+        },
+        orderBy: [{ seasons: { numero: 'asc' } }, { numero: 'asc' }],
+      }),
+    );
 
     type Agg = {
       total: number;

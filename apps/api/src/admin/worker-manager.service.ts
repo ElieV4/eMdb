@@ -59,7 +59,13 @@ export class WorkerManagerService {
     const workerDir = path.resolve(process.cwd(), '..', 'worker');
     this.child = spawn('npx', ['ts-node', '--transpile-only', 'src/index.ts'], {
       cwd: workerDir,
-      env: process.env,
+      // Le process enfant hérite de l'env de l'API, dont DATABASE_URL
+      // pointe vers le rôle restreint emdb_app (soumis au RLS, cf. migration
+      // enable_rls_user_scoped_tables) — mais le worker doit rester sur le
+      // rôle BYPASSRLS (jobs transverses à tous les utilisateurs). Surchargé
+      // ici via WORKER_DATABASE_URL si définie (repli sur DATABASE_URL si
+      // absente : environnement pas encore migré vers deux rôles distincts).
+      env: { ...process.env, DATABASE_URL: process.env.WORKER_DATABASE_URL || process.env.DATABASE_URL },
       stdio: 'inherit',
       shell: process.platform === 'win32',
     });

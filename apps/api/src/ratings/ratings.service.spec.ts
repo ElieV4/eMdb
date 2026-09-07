@@ -4,6 +4,10 @@ import { RatingsService } from './ratings.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const prismaServiceMock = {
+  // Le tx passé aux callbacks est le mock lui-même : les assertions
+  // existantes sur prismaServiceMock.<model>.<method> restent valides.
+  forUser: jest.fn((_userId: string, fn: any) => fn(prismaServiceMock)),
+  asSystem: jest.fn((fn: any) => fn(prismaServiceMock)),
   titles: {
     findUnique: jest.fn(),
   },

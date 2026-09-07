@@ -177,18 +177,6 @@ export class RatingsService {
       }
     }
 
-    // Chercher un existant
-    let existing: any = null;
-    if (title_id) {
-      existing = await this.prisma.user_ratings.findUnique({
-        where: { user_id_title_id: { user_id: userId, title_id } },
-      });
-    } else if (episode_id) {
-      existing = await this.prisma.user_ratings.findUnique({
-        where: { user_id_episode_id: { user_id: userId, episode_id } },
-      });
-    }
-
     const data: any = {};
 
     if (note_perso !== undefined) {
@@ -224,28 +212,42 @@ export class RatingsService {
       },
     } as const;
 
-    if (existing) {
-      // UPDATE
-      const updated = await this.prisma.user_ratings.update({
-        where: { id: existing.id },
-        data,
+    const rating = await this.prisma.forUser(userId, async (tx) => {
+      // Chercher un existant
+      let existing: any = null;
+      if (title_id) {
+        existing = await tx.user_ratings.findUnique({
+          where: { user_id_title_id: { user_id: userId, title_id } },
+        });
+      } else if (episode_id) {
+        existing = await tx.user_ratings.findUnique({
+          where: { user_id_episode_id: { user_id: userId, episode_id } },
+        });
+      }
+
+      if (existing) {
+        // UPDATE
+        return tx.user_ratings.update({
+          where: { id: existing.id },
+          data,
+          include,
+        });
+      }
+
+      // CREATE
+      return tx.user_ratings.create({
+        data: {
+          user_id: userId,
+          title_id: title_id ?? null,
+          episode_id: episode_id ?? null,
+          note_perso: note_perso ?? null,
+          commentaire: commentaire ?? null,
+        },
         include,
       });
-      return this.formatRating(updated as unknown as RawRating);
-    }
-
-    // CREATE
-    const created = await this.prisma.user_ratings.create({
-      data: {
-        user_id: userId,
-        title_id: title_id ?? null,
-        episode_id: episode_id ?? null,
-        note_perso: note_perso ?? null,
-        commentaire: commentaire ?? null,
-      },
-      include,
     });
-    return this.formatRating(created as unknown as RawRating);
+
+    return this.formatRating(rating as unknown as RawRating);
   }
 
   // ======================================================================
@@ -261,20 +263,22 @@ export class RatingsService {
    * @param userId - UUID de l'utilisateur connecté
    */
   async deleteRating(id: string, userId: string): Promise<void> {
-    const rating = await this.prisma.user_ratings.findUnique({
-      where: { id },
-      select: { id: true, user_id: true },
+    await this.prisma.forUser(userId, async (tx) => {
+      const rating = await tx.user_ratings.findUnique({
+        where: { id },
+        select: { id: true, user_id: true },
+      });
+
+      if (!rating) {
+        throw new NotFoundException('Note introuvable.');
+      }
+
+      if (rating.user_id !== userId) {
+        throw new ForbiddenException('Cette note ne vous appartient pas.');
+      }
+
+      await tx.user_ratings.delete({ where: { id } });
     });
-
-    if (!rating) {
-      throw new NotFoundException('Note introuvable.');
-    }
-
-    if (rating.user_id !== userId) {
-      throw new ForbiddenException('Cette note ne vous appartient pas.');
-    }
-
-    await this.prisma.user_ratings.delete({ where: { id } });
   }
 
   // ======================================================================
@@ -327,16 +331,18 @@ export class RatingsService {
       },
     } as const;
 
-    const [rawData, total] = await Promise.all([
-      this.prisma.user_ratings.findMany({
-        where,
-        orderBy: { updated_at: 'desc' },
-        skip,
-        take: limit,
-        include,
-      }),
-      this.prisma.user_ratings.count({ where }),
-    ]);
+    const [rawData, total] = await this.prisma.forUser(userId, (tx) =>
+      Promise.all([
+        tx.user_ratings.findMany({
+          where,
+          orderBy: { updated_at: 'desc' },
+          skip,
+          take: limit,
+          include,
+        }),
+        tx.user_ratings.count({ where }),
+      ]),
+    );
 
     const items = (rawData as unknown as RawRating[]).map((r) => this.formatRating(r));
 
@@ -372,11 +378,15 @@ export class RatingsService {
       throw new NotFoundException('Titre introuvable.');
     }
 
-    // Récupérer toutes les notes pour ce titre
-    const ratings = await this.prisma.user_ratings.findMany({
-      where: { title_id: titleId },
-      select: { note_perso: true },
-    });
+    // Récupérer toutes les notes pour ce titre, tous utilisateurs confondus
+    // (résumé public) — hors périmètre RLS "un utilisateur voit ses propres
+    // notes", d'où le bypass explicite.
+    const ratings = await this.prisma.asSystem((tx) =>
+      tx.user_ratings.findMany({
+        where: { title_id: titleId },
+        select: { note_perso: true },
+      }),
+    );
 
     const count = ratings.length;
 

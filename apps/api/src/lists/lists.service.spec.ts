@@ -4,6 +4,8 @@ import { ListsService } from './lists.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const prismaServiceMock = {
+  forUser: jest.fn((_userId: string, fn: any) => fn(prismaServiceMock)),
+  asSystem: jest.fn((fn: any) => fn(prismaServiceMock)),
   user_lists: {
     create: jest.fn(),
     findUnique: jest.fn(),

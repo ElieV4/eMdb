@@ -3,6 +3,8 @@ import { PushService } from './push.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const prismaServiceMock = {
+  forUser: jest.fn((_userId: string, fn: any) => fn(prismaServiceMock)),
+  asSystem: jest.fn((fn: any) => fn(prismaServiceMock)),
   push_tokens: {
     upsert: jest.fn(),
     deleteMany: jest.fn(),

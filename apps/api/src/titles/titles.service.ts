@@ -530,12 +530,18 @@ export class TitlesService {
       throw new NotFoundException('Titre introuvable.');
     }
 
-    // Vérifier les références
-    const [ratingsCount, watchesCount, listItemsCount] = await Promise.all([
-      this.prisma.user_ratings.count({ where: { title_id: id } }),
-      this.prisma.user_watches.count({ where: { title_id: id } }),
-      this.prisma.list_items.count({ where: { title_id: id } }),
-    ]);
+    // Vérifier les références, tous utilisateurs confondus — sécurité
+    // avant suppression, pas une lecture scopée à l'utilisateur courant :
+    // bypass RLS explicite (une simple absence de contexte cacherait les
+    // références des AUTRES utilisateurs et laisserait supprimer un titre
+    // encore référencé chez eux).
+    const [ratingsCount, watchesCount, listItemsCount] = await this.prisma.asSystem((tx) =>
+      Promise.all([
+        tx.user_ratings.count({ where: { title_id: id } }),
+        tx.user_watches.count({ where: { title_id: id } }),
+        tx.list_items.count({ where: { title_id: id } }),
+      ]),
+    );
 
     const totalRefs = ratingsCount + watchesCount + listItemsCount;
 

@@ -11,14 +11,17 @@ services:
       - '5432:5432'
     volumes:
       - emdb_postgres_data:/var/lib/postgresql/data
-      # Base vierge au premier démarrage : le schéma n'est PAS auto-init ici.
-      # Après le premier `docker compose up -d`, appliquer (une fois) :
+      # Seul le rôle `emdb_app` (restreint, sans BYPASSRLS — cf.
+      # packages/db/sql/setup_roles.sql) est auto-créé au premier démarrage.
+      # Le schéma n'est PAS auto-init : après le premier `docker compose up -d`,
+      # appliquer (une fois) :
       #   npm run prisma:migrate:deploy   (tables, via packages/db/prisma/migrations)
       #   npm run prisma:apply-raw-sql    (extension, trigger, fonctions)
       #   npm run dbt -- build             (requis : la page Profil dépend en
       #                                      direct de la vue int_watches_enriched,
       #                                      pas seulement les 8 tables dataviz)
       # cf. wiki/Architecture pour le détail du workflow de migration.
+      - ./packages/db/sql/setup_roles.sql:/docker-entrypoint-initdb.d/01-setup_roles.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U emdb -d emdb']
       interval: 5s
@@ -52,7 +55,11 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://emdb:emdb@postgres:5432/emdb
+      # Rôle restreint (sans BYPASSRLS) : c'est ce conteneur qui sert les
+      # requêtes utilisateur, donc celui qui doit être soumis aux policies
+      # RLS (migration enable_rls_user_scoped_tables). Le worker garde le
+      # rôle d'origine (bypass) — cf. service `worker` ci-dessous.
+      DATABASE_URL: postgresql://emdb_app:emdb_app@postgres:5432/emdb
       REDIS_URL: redis://redis:6379
       IMPORT_TMP_DIR: /tmp/emdb-import
       # false en local : le conteneur `worker` gère déjà les jobs BullMQ,
@@ -80,6 +87,9 @@ services:
     env_file:
       - .env
     environment:
+      # Rôle d'origine (BYPASSRLS) : les jobs du worker sont par nature
+      # transverses à tous les utilisateurs (sync TMDB, notifications...),
+      # jamais scopés à un seul — cf. wiki/Architecture#securite.
       DATABASE_URL: postgresql://emdb:emdb@postgres:5432/emdb
       REDIS_URL: redis://redis:6379
     depends_on:

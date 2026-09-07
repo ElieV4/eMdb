@@ -36,13 +36,17 @@ Prérequis : Node.js 20+, Docker.
 ```bash
 cp .env.example .env   # renseigner TMDB_API_KEY au minimum
 npm install
-docker compose up -d   # PostgreSQL + Redis (base vierge)
-npm run prisma:migrate:deploy   # tables, via l'historique de migrations
-npm run prisma:apply-raw-sql     # extension, trigger, fonctions
+docker compose up -d   # PostgreSQL (rôle restreint emdb_app auto-créé) + Redis
+
+# Étapes suivantes avec le rôle superuser (WORKER_DATABASE_URL de .env) :
+# migrations/objets SQL/dbt nécessitent des privilèges que emdb_app n'a pas.
+DATABASE_URL="postgresql://emdb:emdb@localhost:5432/emdb" npm run prisma:migrate:deploy
+DATABASE_URL="postgresql://emdb:emdb@localhost:5432/emdb" npm run prisma:apply-raw-sql
+DATABASE_URL="postgresql://emdb:emdb@localhost:5432/emdb" npm run dbt -- build   # requis (page Profil incluse), voir packages/dbt-analytics
 npm run prisma:generate
-npm run dbt -- build              # requis (page Profil incluse) — nécessite Python, voir packages/dbt-analytics
-npm run dev:api         # apps/api sur :3001
-npm run dev:worker       # apps/worker
+
+npm run dev:api          # apps/api sur :3001 (rôle emdb_app, DATABASE_URL de .env)
+npm run dev:worker        # apps/worker (rôle superuser, WORKER_DATABASE_URL de .env)
 ```
 
 Le frontend (`apps/web`) se lance séparément avec `npm run dev --workspace=apps/web` (Next.js sur `:3000`).

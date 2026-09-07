@@ -20,6 +20,8 @@ import { getMovieRecommendations, getMovieSimilar } from '@emdb/tmdb-client';
 import { importTitleByTmdbId } from '@emdb/tmdb-sync';
 
 const prismaServiceMock = {
+  forUser: jest.fn((_userId: string, fn: any) => fn(prismaServiceMock)),
+  asSystem: jest.fn((fn: any) => fn(prismaServiceMock)),
   titles: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
