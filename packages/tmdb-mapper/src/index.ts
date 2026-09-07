@@ -179,7 +179,16 @@ export function resolveCrewRole(job?: string | null): { code: string; libelle: s
 export type PersonInsert = {
   tmdb_id: number;
   nom: string;
-  genre: 'homme' | 'femme' | 'autre';
+  /**
+   * `null` = genre TMDB non renseigné (code 0) — distinct de `'autre'`, qui
+   * signifie non-binaire (code TMDB 3). Les deux étaient auparavant fusionnés
+   * sous `'autre'`, ce qui masquait la vraie répartition (la quasi-totalité
+   * du bucket `'autre'` était en réalité "non renseigné") et faussait tout
+   * calcul basé sur le genre (ex. recommandations "personnes connexes").
+   * `null` reste backfillable a posteriori via Wikidata (P21), cf.
+   * `resolvePersonWikiUrl` dans @emdb/tmdb-sync.
+   */
+  genre: 'homme' | 'femme' | 'autre' | null;
   date_naissance: Date | null;
   pays_id: string | null;
   photo_url: string | null;
@@ -310,12 +319,15 @@ export function mapTmdbPerson(tmdbPerson: TmdbPersonDetails, wikiUrl: string | n
   const genderMap: Record<number, PersonInsert['genre']> = {
     1: 'femme',
     2: 'homme',
+    3: 'autre', // non-binaire
   };
 
   return {
     tmdb_id: tmdbPerson.id,
     nom: tmdbPerson.name,
-    genre: genderMap[tmdbPerson.gender ?? 0] ?? 'autre',
+    // 0 (non renseigné) ou toute autre valeur inattendue → `null`, pas
+    // `'autre'` (cf. doc de PersonInsert.genre).
+    genre: genderMap[tmdbPerson.gender ?? 0] ?? null,
     date_naissance: tmdbPerson.birthday ? new Date(tmdbPerson.birthday) : null,
     pays_id: null,
     photo_url: tmdbPerson.profile_path

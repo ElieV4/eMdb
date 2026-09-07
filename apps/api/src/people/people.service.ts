@@ -208,12 +208,14 @@ export class PeopleService {
       throw new NotFoundException('Personne introuvable.');
     }
 
-    // wiki_url résolu à la demande, ici seulement (jamais pendant un import
-    // de titre, cf. importPersonByTmdbId) : la fiche de CETTE personne vient
-    // d'être consultée, c'est le seul moment pertinent pour cet appel
-    // Wikidata. `resolvePersonWikiUrl` sert le cache déjà en base s'il
-    // existe, sinon résout et persiste pour les consultations suivantes.
-    if (!person.wiki_url) {
+    // wiki_url ET genre résolus à la demande, ici seulement (jamais pendant
+    // un import de titre, cf. importPersonByTmdbId) : la fiche de CETTE
+    // personne vient d'être consultée, c'est le seul moment pertinent pour
+    // cet appel Wikidata. `resolvePersonWikiUrl` sert le cache déjà en base
+    // pour chacun des deux champs, sinon résout et persiste pour les
+    // consultations suivantes (genre : uniquement si `null`, c-à-d TMDB
+    // gender=0 non renseigné — jamais retenté pour `'autre'`/non-binaire).
+    if (!person.wiki_url || person.genre === null) {
       const wikiUrl = await resolvePersonWikiUrl(id);
       if (wikiUrl) {
         person.wiki_url = wikiUrl;

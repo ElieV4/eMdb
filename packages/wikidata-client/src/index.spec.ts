@@ -1,4 +1,9 @@
-import { getWikipediaUrlFromWikidataId, getRecentEditions, getEditionSelection } from './index';
+import {
+  getWikipediaUrlFromWikidataId,
+  getGenderFromWikidataId,
+  getRecentEditions,
+  getEditionSelection,
+} from './index';
 
 describe('wikidata-client', () => {
   const originalFetch = globalThis.fetch;
@@ -29,6 +34,54 @@ describe('wikidata-client', () => {
     it('doit retourner l URL Wikipedia pour un wikidataId', async () => {
       const url = await getWikipediaUrlFromWikidataId('Q12345', 'fr');
       expect(url).toBe('https://fr.wikipedia.org/wiki/Test');
+    });
+  });
+
+  describe('getGenderFromWikidataId', () => {
+    function mockClaims(gender: { id: string } | null) {
+      globalThis.fetch = jest.fn(
+        async () =>
+          ({
+            ok: true,
+            json: async () => ({
+              entities: {
+                Q999: {
+                  claims: gender ? { P21: [{ mainsnak: { datavalue: { value: { id: gender.id } } } }] } : {},
+                },
+              },
+            }),
+          }) as any,
+      );
+    }
+
+    it('mappe Q6581072 (femme cisgenre) sur "femme"', async () => {
+      mockClaims({ id: 'Q6581072' });
+      expect(await getGenderFromWikidataId('Q999')).toBe('femme');
+    });
+
+    it('mappe Q6581097 (homme cisgenre) sur "homme"', async () => {
+      mockClaims({ id: 'Q6581097' });
+      expect(await getGenderFromWikidataId('Q999')).toBe('homme');
+    });
+
+    it('mappe Q48270 (non-binaire) sur "autre"', async () => {
+      mockClaims({ id: 'Q48270' });
+      expect(await getGenderFromWikidataId('Q999')).toBe('autre');
+    });
+
+    it('retourne null si P21 absent', async () => {
+      mockClaims(null);
+      expect(await getGenderFromWikidataId('Q999')).toBeNull();
+    });
+
+    it('retourne null pour un QID non reconnu plutôt que de mal classer', async () => {
+      mockClaims({ id: 'Q99999999' });
+      expect(await getGenderFromWikidataId('Q999')).toBeNull();
+    });
+
+    it('retourne null (pas d’exception) sur un 429', async () => {
+      globalThis.fetch = jest.fn(async () => ({ ok: false, status: 429 }) as any);
+      expect(await getGenderFromWikidataId('Q999')).toBeNull();
     });
   });
 

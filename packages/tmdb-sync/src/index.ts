@@ -29,7 +29,7 @@ import {
   mapTmdbPerson,
   resolveCrewRole,
 } from '@emdb/tmdb-mapper';
-import { getWikipediaUrlFromWikidataId } from '@emdb/wikidata-client';
+import { getWikipediaUrlFromWikidataId, getGenderFromWikidataId } from '@emdb/wikidata-client';
 
 export { resolveCrewRole };
 
@@ -142,38 +142,52 @@ export async function importPersonByTmdbId(tmdbId: number) {
 }
 
 /**
- * Résout l'URL Wikipedia d'une personne à la demande — appelée uniquement
- * quand sa fiche (GET /people/:id) est consultée, jamais pendant un import
- * de titre (cf. importPersonByTmdbId, qui ne résout plus wiki_url du tout).
+ * Résout l'URL Wikipedia ET, en même temps, backfill le genre d'une
+ * personne à la demande — appelée uniquement quand sa fiche (GET
+ * /people/:id) est consultée, jamais pendant un import de titre (cf.
+ * importPersonByTmdbId, qui ne résout ni l'un ni l'autre).
  *
- * `people.wiki_url` sert de cache d'écriture : déjà résolu → retourné sans
- * appel réseau ; sinon résolu via Wikidata puis persisté pour les
- * consultations suivantes (évite de re-frapper l'API Wikidata, sujette au
- * rate-limit, à chaque vue de la même fiche). Toute erreur (réseau, 429,
- * personne sans wikidata_id) est avalée : wiki_url reste null, retenté à la
- * prochaine consultation.
+ * `people.wiki_url`/`people.genre` servent chacun de cache d'écriture : déjà
+ * résolus → pas de nouvel appel réseau pour ce champ ; sinon résolus via
+ * Wikidata (wiki_url : sitelinks ; genre : propriété P21) puis persistés
+ * pour les consultations suivantes (évite de re-frapper l'API Wikidata,
+ * sujette au rate-limit, à chaque vue de la même fiche). Le genre n'est
+ * tenté que si `genre` est `null` en base — TMDB gender=0 (non renseigné),
+ * cf. mapTmdbPerson/refreshPersonData ; `'autre'` (non-binaire, TMDB
+ * gender=3) n'est jamais retenté. Toute erreur (réseau, 429, personne sans
+ * wikidata_id) est avalée : les champs non résolus restent tels quels,
+ * retentés à la prochaine consultation.
  */
 export async function resolvePersonWikiUrl(personId: string): Promise<string | null> {
   const person = await prisma.people.findUnique({
     where: { id: personId },
-    select: { tmdb_id: true, wiki_url: true },
+    select: { tmdb_id: true, wiki_url: true, genre: true },
   });
   if (!person) return null;
-  if (person.wiki_url) return person.wiki_url;
-  if (!person.tmdb_id) return null;
+  if (person.wiki_url && person.genre !== null) return person.wiki_url;
+  if (!person.tmdb_id) return person.wiki_url;
 
   try {
     const externalIds = await getPersonExternalIds(person.tmdb_id);
     const { wikidata_id } = mapTmdbPersonExternalIds(externalIds);
-    if (!wikidata_id) return null;
+    if (!wikidata_id) return person.wiki_url;
 
-    const wikiUrl = await getWikipediaUrlFromWikidataId(wikidata_id);
-    if (wikiUrl) {
-      await prisma.people.update({ where: { id: personId }, data: { wiki_url: wikiUrl } });
+    const [wikiUrl, genre] = await Promise.all([
+      person.wiki_url ? null : getWikipediaUrlFromWikidataId(wikidata_id).catch(() => null),
+      person.genre !== null ? null : getGenderFromWikidataId(wikidata_id).catch(() => null),
+    ]);
+
+    const data: { wiki_url?: string; genre?: 'homme' | 'femme' | 'autre' } = {};
+    if (wikiUrl) data.wiki_url = wikiUrl;
+    if (genre) data.genre = genre;
+
+    if (Object.keys(data).length > 0) {
+      await prisma.people.update({ where: { id: personId }, data });
     }
-    return wikiUrl;
+
+    return wikiUrl ?? person.wiki_url;
   } catch {
-    return null;
+    return person.wiki_url;
   }
 }
 
@@ -564,11 +578,24 @@ export async function refreshPersonData(personId: string) {
   const { wikidata_id } = mapTmdbPersonExternalIds(externalIds);
   const wikiUrl = wikidata_id ? await getWikipediaUrlFromWikidataId(wikidata_id) : null;
 
+  // 0 (non renseigné) ou toute autre valeur inattendue → tente un backfill
+  // Wikidata (P21) avant de retomber sur `null` — jamais `'autre'`, réservé
+  // au non-binaire (TMDB gender=3). Cf. doc de PersonInsert.genre.
+  const tmdbGenderMap: Record<number, 'homme' | 'femme' | 'autre'> = {
+    1: 'femme',
+    2: 'homme',
+    3: 'autre',
+  };
+  let genre = tmdbGenderMap[tmdbPerson.gender ?? 0] ?? null;
+  if (genre === null && wikidata_id) {
+    genre = await getGenderFromWikidataId(wikidata_id).catch(() => null);
+  }
+
   return prisma.people.update({
     where: { id: personId },
     data: {
       nom: tmdbPerson.name,
-      genre: tmdbPerson.gender === 1 ? 'femme' : tmdbPerson.gender === 2 ? 'homme' : 'autre',
+      genre,
       date_naissance: tmdbPerson.birthday ? new Date(tmdbPerson.birthday) : null,
       photo_url: tmdbPerson.profile_path
         ? `https://image.tmdb.org/t/p/w500${tmdbPerson.profile_path}`
@@ -1040,14 +1067,84 @@ export async function weeklyResyncChanges(startDate: string, endDate: string) {
 const TMDB_RECOMMENDATION_LIMIT = 10;
 
 /**
+ * Poids d'un credit acteur selon son rang de billing (`order` TMDB /
+ * `ordre` local, 0 = tête d'affiche) — plus le rang grandit, plus le poids
+ * s'approche de 0 sans jamais l'atteindre. `null`/`undefined` (rang inconnu,
+ * ex. credit crew côté seed) reçoit un poids faible mais non nul plutôt que
+ * d'être ignoré.
+ */
+function billingWeight(order: number | null | undefined): number {
+  if (order === null || order === undefined || order < 0) return 0.1;
+  return 1 / (1 + order);
+}
+
+/**
+ * Poids de la pertinence (score) face à la diversité dans le re-ranking des
+ * "personnes connexes" (`diversifyByGender`) — proche de 1 : la diversité ne
+ * départage que des candidats de score déjà proche, jamais au détriment
+ * d'un candidat nettement plus pertinent. Mettre à `1` désactive
+ * complètement le re-ranking (équivalent à un tri par score pur).
+ */
+export const PERSON_RECOMMENDATIONS_DIVERSITY_LAMBDA = 0.85;
+
+/**
+ * Re-ranking façon MMR (Maximal Marginal Relevance) : à chaque étape,
+ * choisit parmi les candidats restants celui qui maximise
+ * `λ·score - (1-λ)·pénalité`, la pénalité augmentant avec le nombre de
+ * personnes déjà sélectionnées du même genre. Ce n'est PAS un quota strict —
+ * un candidat nettement plus pertinent reste choisi malgré la pénalité —
+ * juste un garde-fou contre un top 10 totalement homogène alors que des
+ * candidats à peine moins pertinents et plus divers existaient.
+ */
+function diversifyByGender(
+  pool: Array<{ personId: string; score: number }>,
+  limit: number,
+  genderByPersonId: Map<string, string | null>,
+  lambda: number,
+): Array<{ personId: string; score: number }> {
+  const remaining = [...pool];
+  const selected: Array<{ personId: string; score: number }> = [];
+  const selectedGenderCounts = new Map<string, number>();
+  const maxScore = pool[0]?.score || 1;
+
+  while (remaining.length > 0 && selected.length < limit) {
+    let bestIndex = 0;
+    let bestValue = -Infinity;
+
+    for (let i = 0; i < remaining.length; i++) {
+      const candidate = remaining[i];
+      const genderKey = genderByPersonId.get(candidate.personId) ?? 'inconnu';
+      const alreadySelected = selectedGenderCounts.get(genderKey) ?? 0;
+      const diversityPenalty = alreadySelected / limit;
+      const value = lambda * (candidate.score / maxScore) - (1 - lambda) * diversityPenalty;
+
+      if (value > bestValue) {
+        bestValue = value;
+        bestIndex = i;
+      }
+    }
+
+    const [chosen] = remaining.splice(bestIndex, 1);
+    selected.push(chosen);
+    const genderKey = genderByPersonId.get(chosen.personId) ?? 'inconnu';
+    selectedGenderCounts.set(genderKey, (selectedGenderCounts.get(genderKey) ?? 0) + 1);
+  }
+
+  return selected;
+}
+
+/**
  * Bootstrap les recommandations TMDB pour une personne.
  *
  * Stratégie :
  * 1. Fetch getPersonCombinedCredits(personTmdbId) → tous les titres TMDB de cette personne
  * 2. Filtrer les titres déjà présents en local (prisma.titles.findMany)
- * 3. Pour chaque titre local, trouver les autres personnes (credits) qui y ont participé
- * 4. Calculer le score de similarité : Jaccard = intersection / union des credits
- * 5. Top 10 → person_recommendations
+ * 3. Pour chaque titre local, trouver les autres ACTEURS (credits) qui y ont participé
+ * 4. Calculer le score de similarité : Jaccard pondéré par le rang de
+ *    billing (têtes d'affiche comptent plus que rôles mineurs) —
+ *    intersection/union en somme de poids, pas en cardinal d'ensemble
+ * 5. Re-ranking diversité (genre) façon MMR sur les meilleurs candidats
+ * 6. Top 10 → person_recommendations
  *
  * @param personId - UUID de la personne en base
  * @returns Nombre de recommandations insérées
@@ -1085,7 +1182,7 @@ export async function bootstrapPersonRecommendationsFromTmdb(personId: string): 
   // 3. Trouver les titres locaux correspondant à ces TMDB IDs
   const localTitles = await prisma.titles.findMany({
     where: { tmdb_id: { in: Array.from(tmdbTitleIds) } },
-    select: { id: true },
+    select: { id: true, tmdb_id: true },
   });
 
   const localTitleIds = localTitles.map((t) => t.id);
@@ -1093,46 +1190,106 @@ export async function bootstrapPersonRecommendationsFromTmdb(personId: string): 
     return 0; // Aucun titre local → pas de base pour calculer la similarité
   }
 
+  // Rang de billing (côté seed) par tmdb_id de titre, quand connu — garde le
+  // meilleur rang si la personne apparaît plusieurs fois pour un même titre
+  // (rare, ex. doublage + rôle).
+  const seedOrderByTmdbId = new Map<number, number>();
+  for (const credit of tmdbCredits.cast ?? []) {
+    if (credit.id == null || typeof credit.order !== 'number') continue;
+    const existing = seedOrderByTmdbId.get(credit.id);
+    if (existing === undefined || credit.order < existing) {
+      seedOrderByTmdbId.set(credit.id, credit.order);
+    }
+  }
+  const seedTitleWeight = new Map<string, number>();
+  for (const title of localTitles) {
+    const order = title.tmdb_id != null ? seedOrderByTmdbId.get(title.tmdb_id) : undefined;
+    seedTitleWeight.set(title.id, billingWeight(order));
+  }
+
   // 4. Trouver les autres personnes ayant participé aux mêmes titres locaux
+  // en tant qu'acteurs (retour utilisateur : incluait tout le crew —
+  // réalisateur, scénariste, compositeur... — des rôles où le déséquilibre
+  // hommes/femmes du catalogue est bien plus marqué que côté casting, ex.
+  // ~70/30 pour "acteur" contre ~94/6 pour "réalisateur" ou ~97/3 pour
+  // "scénariste" sur ce catalogue. Comme un film compte souvent plus de
+  // credits crew que de têtes d'affiche, ce bruit noyait le signal
+  // "a joué avec" et biaisait fortement les recommandations vers des hommes,
+  // sans même être le signal le plus pertinent pour "personnes connexes"
+  // (l'intérêt attendu est "a joué avec", pas "a été dirigé par").
   const otherCredits = await prisma.credits.findMany({
     where: {
       title_id: { in: localTitleIds },
       person_id: { not: personId },
       episode_id: null, // Seulement les credits au niveau titre
+      roles: { code: 'acteur' },
     },
     select: {
       person_id: true,
       title_id: true,
+      ordre: true,
     },
   });
 
-  // 5. Indexer : Map<person_id, Set<title_id>>
-  const personTitles = new Map<string, Set<string>>();
+  // 5. Indexer : Map<person_id, Map<title_id, poids de billing>> — garde le
+  // meilleur poids si un même acteur a plusieurs credits pour un même titre.
+  const personTitleWeights = new Map<string, Map<string, number>>();
   for (const credit of otherCredits) {
-    if (!personTitles.has(credit.person_id)) {
-      personTitles.set(credit.person_id, new Set());
+    if (!personTitleWeights.has(credit.person_id)) {
+      personTitleWeights.set(credit.person_id, new Map());
     }
-    personTitles.get(credit.person_id)!.add(credit.title_id);
+    const titleWeights = personTitleWeights.get(credit.person_id)!;
+    const weight = billingWeight(credit.ordre);
+    const existing = titleWeights.get(credit.title_id);
+    if (existing === undefined || weight > existing) {
+      titleWeights.set(credit.title_id, weight);
+    }
   }
 
-  // 6. Calculer le score Jaccard pour chaque personne candidate
-  const personTitleSet = new Set(localTitleIds);
+  // 6. Score de similarité : Jaccard pondéré par le rang de billing —
+  // intersection/union en somme de poids (min/max par titre commun ou
+  // propre à un seul côté) plutôt qu'en cardinal d'ensemble brut, pour que
+  // deux têtes d'affiche partagées comptent plus que deux apparitions en
+  // fond de casting.
   const candidates: Array<{ personId: string; score: number }> = [];
 
-  for (const [otherPersonId, otherTitles] of personTitles) {
-    // @ts-ignore - Type issue with Set elements
-    const intersection = new Set([...personTitleSet].filter((x) => otherTitles.has(x)));
-    const union = new Set([...personTitleSet, ...otherTitles]);
+  for (const [otherPersonId, otherWeights] of personTitleWeights) {
+    const allTitleIds = new Set([...seedTitleWeight.keys(), ...otherWeights.keys()]);
+    let intersectionWeight = 0;
+    let unionWeight = 0;
+    for (const titleId of allTitleIds) {
+      const w1 = seedTitleWeight.get(titleId) ?? 0;
+      const w2 = otherWeights.get(titleId) ?? 0;
+      intersectionWeight += Math.min(w1, w2);
+      unionWeight += Math.max(w1, w2);
+    }
 
-    const jaccard = intersection.size / union.size;
-    if (jaccard > 0) {
-      candidates.push({ personId: otherPersonId, score: jaccard });
+    const score = unionWeight > 0 ? intersectionWeight / unionWeight : 0;
+    if (score > 0) {
+      candidates.push({ personId: otherPersonId, score });
     }
   }
 
-  // 7. Top 10
+  // 7. Top 10, avec re-ranking diversité (genre) sur les meilleurs candidats
+  // — la fenêtre est plus large que la limite finale pour laisser au
+  // re-ranking une marge de manoeuvre réelle sans jamais avoir à puiser
+  // dans des candidats nettement moins pertinents.
   candidates.sort((a, b) => b.score - a.score);
-  const top10 = candidates.slice(0, TMDB_RECOMMENDATION_LIMIT);
+  const DIVERSITY_POOL_SIZE = TMDB_RECOMMENDATION_LIMIT * 3;
+  const pool = candidates.slice(0, DIVERSITY_POOL_SIZE);
+
+  const poolPeople = await prisma.people.findMany({
+    where: { id: { in: pool.map((c) => c.personId) } },
+    select: { id: true, genre: true },
+  });
+  const genderByPersonId = new Map(poolPeople.map((p) => [p.id, p.genre]));
+
+  const top10 = diversifyByGender(
+    pool,
+    TMDB_RECOMMENDATION_LIMIT,
+    genderByPersonId,
+    PERSON_RECOMMENDATIONS_DIVERSITY_LAMBDA,
+  );
 
   // 8. Insérer dans person_recommendations
   const records = top10.map((c) => ({

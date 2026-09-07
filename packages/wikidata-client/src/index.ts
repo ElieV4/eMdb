@@ -412,6 +412,61 @@ export async function getEditionSelection(editionId: string): Promise<FestivalNo
   return getFestivalSelection(parentSource, editionId, annee);
 }
 
+/**
+ * Mapping des QID Wikidata les plus courants pour la propriété P21
+ * (sexe/genre) vers les 3 valeurs supportées localement. Non exhaustif à
+ * dessein : un QID absent (valeur rare/ambiguë) retourne `null` plutôt que
+ * d'être mal classé.
+ */
+const WIKIDATA_GENDER_MAP: Record<string, 'homme' | 'femme' | 'autre'> = {
+  Q6581097: 'homme', // homme cisgenre
+  Q6581072: 'femme', // femme cisgenre
+  Q2449503: 'autre', // homme trans
+  Q1052281: 'autre', // femme trans
+  Q48270: 'autre', // non-binaire
+  Q1097630: 'autre', // intersexe
+  Q301702: 'autre', // travesti
+  Q18116794: 'autre', // genderfluid
+};
+
+/**
+ * Backfill du genre via la propriété Wikidata P21 (sexe/genre) — utilisé
+ * quand TMDB ne renseigne pas le genre (code 0), cf. `resolvePersonWikiUrl`
+ * dans @emdb/tmdb-sync. Toute erreur réseau/429 ou QID non reconnu retourne
+ * `null` (jamais d'exception) : cet enrichissement est toujours facultatif,
+ * jamais bloquant pour l'appelant.
+ */
+export async function getGenderFromWikidataId(
+  wikidataId: string,
+): Promise<'homme' | 'femme' | 'autre' | null> {
+  const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(
+    wikidataId,
+  )}&props=claims&format=json&formatversion=2`;
+
+  const res = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    if (res.status === 429) {
+      return null;
+    }
+    throw new Error(`Wikidata request failed ${res.status}: ${res.statusText}`);
+  }
+
+  const json = (await res.json()) as any;
+  const claims = json.entities?.[wikidataId]?.claims?.P21;
+  const qid = claims?.[0]?.mainsnak?.datavalue?.value?.id;
+
+  if (!qid) {
+    return null;
+  }
+
+  return WIKIDATA_GENDER_MAP[qid] ?? null;
+}
+
 export async function getWikipediaUrlFromWikidataId(
   wikidataId: string,
   lang = 'fr',

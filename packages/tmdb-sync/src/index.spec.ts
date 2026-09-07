@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 
 const prismaMock: any = {
-  people: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+  people: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn(), findMany: jest.fn() },
   titles: { findUnique: jest.fn(), upsert: jest.fn(), findMany: jest.fn(), update: jest.fn() },
   title_recommendations: { createMany: jest.fn() },
   seasons: { upsert: jest.fn(), findMany: jest.fn() },
@@ -721,11 +721,12 @@ describe('tmdb-sync', () => {
         { id: 'title-3' },
       ]);
       asMock(prismaMock.credits.findMany).mockResolvedValue([
-        { person_id: 'other-1', title_id: 'title-1' },
-        { person_id: 'other-1', title_id: 'title-2' },
-        { person_id: 'other-2', title_id: 'title-1' },
-        { person_id: 'other-3', title_id: 'title-3' },
+        { person_id: 'other-1', title_id: 'title-1', ordre: 0 },
+        { person_id: 'other-1', title_id: 'title-2', ordre: 1 },
+        { person_id: 'other-2', title_id: 'title-1', ordre: 2 },
+        { person_id: 'other-3', title_id: 'title-3', ordre: 0 },
       ]);
+      asMock(prismaMock.people.findMany).mockResolvedValue([]);
 
       // Mock $transaction to execute the callback
       asMock(prismaMock.$transaction).mockImplementation(async (cb: any) => {
@@ -783,8 +784,10 @@ describe('tmdb-sync', () => {
       const manyCredits = Array.from({ length: 15 }, (_, i) => ({
         person_id: `other-${i}`,
         title_id: 'title-1',
+        ordre: i,
       }));
       asMock(prismaMock.credits.findMany).mockResolvedValue(manyCredits);
+      asMock(prismaMock.people.findMany).mockResolvedValue([]);
 
       asMock(prismaMock.$transaction).mockImplementation(async (cb: any) => {
         const tx = {
@@ -816,6 +819,114 @@ describe('tmdb-sync', () => {
       const result = await bootstrapPersonRecommendationsFromTmdb('person-uuid');
 
       expect(result).toBe(0);
+    });
+
+    it('classe un co-acteur en tête d’affiche devant un simple figurant du même titre', async () => {
+      asMock(prismaMock.people.findUnique).mockResolvedValue({ id: 'person-uuid', tmdb_id: 42 });
+      // La personne elle-même est tête d'affiche (order 0) du titre partagé.
+      asMock(getPersonCombinedCredits).mockResolvedValue({
+        cast: [{ id: 100, order: 0 }],
+        crew: [],
+      });
+      asMock(prismaMock.titles.findMany).mockResolvedValue([{ id: 'title-1', tmdb_id: 100 }]);
+      asMock(prismaMock.credits.findMany).mockResolvedValue([
+        { person_id: 'co-lead', title_id: 'title-1', ordre: 0 },
+        { person_id: 'figurant', title_id: 'title-1', ordre: 15 },
+      ]);
+      asMock(prismaMock.people.findMany).mockResolvedValue([]);
+
+      asMock(prismaMock.$transaction).mockImplementation(async (cb: any) => {
+        const tx = {
+          person_recommendations: {
+            deleteMany: prismaMock.person_recommendations.deleteMany,
+            createMany: prismaMock.person_recommendations.createMany,
+          },
+        };
+        return cb(tx);
+      });
+
+      await bootstrapPersonRecommendationsFromTmdb('person-uuid');
+
+      const { data } = asMock(prismaMock.person_recommendations.createMany).mock.calls[0][0] as {
+        data: Array<{ recommended_id: string; score: number }>;
+      };
+      const coLead = data.find((r) => r.recommended_id === 'co-lead')!;
+      const figurant = data.find((r) => r.recommended_id === 'figurant')!;
+      expect(coLead.score).toBeGreaterThan(figurant.score);
+    });
+
+    it('ne remonte que des acteurs, jamais le crew (réalisateur, scénariste...)', async () => {
+      asMock(prismaMock.people.findUnique).mockResolvedValue({ id: 'person-uuid', tmdb_id: 42 });
+      asMock(getPersonCombinedCredits).mockResolvedValue({
+        cast: [{ id: 100, order: 0 }],
+        crew: [],
+      });
+      asMock(prismaMock.titles.findMany).mockResolvedValue([{ id: 'title-1', tmdb_id: 100 }]);
+      asMock(prismaMock.people.findMany).mockResolvedValue([]);
+      asMock(prismaMock.$transaction).mockImplementation(async (cb: any) => {
+        const tx = {
+          person_recommendations: {
+            deleteMany: prismaMock.person_recommendations.deleteMany,
+            createMany: prismaMock.person_recommendations.createMany,
+          },
+        };
+        return cb(tx);
+      });
+
+      await bootstrapPersonRecommendationsFromTmdb('person-uuid');
+
+      // Le crew (réalisateur, scénariste, etc.) doit être exclu au niveau
+      // de la requête elle-même — c'est la garantie que le bruit identifié
+      // (déséquilibre de genre bien plus marqué côté crew) ne peut plus
+      // polluer le score, quelle que soit la donnée réellement retournée.
+      expect(prismaMock.credits.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ roles: { code: 'acteur' } }),
+        }),
+      );
+    });
+
+    it('re-classe la diversité de genre entre candidats de score proche', async () => {
+      asMock(prismaMock.people.findUnique).mockResolvedValue({ id: 'person-uuid', tmdb_id: 42 });
+      asMock(getPersonCombinedCredits).mockResolvedValue({
+        cast: [{ id: 100, order: 0 }],
+        crew: [],
+      });
+      asMock(prismaMock.titles.findMany).mockResolvedValue([{ id: 'title-1', tmdb_id: 100 }]);
+      // 15 hommes mieux billés qu'une unique femme, tous sur le même titre
+      // partagé — un tri par score pur classerait la candidate femme 16ème
+      // sur 16, hors du top 10 (homme-0..homme-9 l'occuperaient entièrement) ;
+      // avec le re-ranking diversité (pool de 30), elle doit réapparaître
+      // dans le top 10 retenu malgré un score plus faible.
+      const menCredits = Array.from({ length: 15 }, (_, i) => ({
+        person_id: `homme-${i}`,
+        title_id: 'title-1',
+        ordre: i,
+      }));
+      asMock(prismaMock.credits.findMany).mockResolvedValue([
+        ...menCredits,
+        { person_id: 'femme-1', title_id: 'title-1', ordre: 15 },
+      ]);
+      asMock(prismaMock.people.findMany).mockResolvedValue([
+        ...menCredits.map((c) => ({ id: c.person_id, genre: 'homme' })),
+        { id: 'femme-1', genre: 'femme' },
+      ]);
+      asMock(prismaMock.$transaction).mockImplementation(async (cb: any) => {
+        const tx = {
+          person_recommendations: {
+            deleteMany: prismaMock.person_recommendations.deleteMany,
+            createMany: prismaMock.person_recommendations.createMany,
+          },
+        };
+        return cb(tx);
+      });
+
+      await bootstrapPersonRecommendationsFromTmdb('person-uuid');
+
+      const { data } = asMock(prismaMock.person_recommendations.createMany).mock.calls[0][0] as {
+        data: Array<{ recommended_id: string }>;
+      };
+      expect(data.map((r) => r.recommended_id)).toContain('femme-1');
     });
   });
 });
