@@ -168,11 +168,11 @@ export function BulkActionsBar({
           <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={handleFollow} disabled={!watchlistId} className="cursor-pointer">
               <BookmarkPlus className="mr-2 h-4 w-4" />
-              Suivre
+              Ajouter à la watchlist
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleUnfollow} disabled={!watchlistId} className="cursor-pointer">
               <BookmarkMinus className="mr-2 h-4 w-4" />
-              Ne plus suivre
+              Retirer de la watchlist
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={handleAbandon}

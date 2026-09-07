@@ -235,12 +235,12 @@ export function TitleQuickActionsMenu({
               {inWatchlist ? (
                 <>
                   <BookmarkMinus className="mr-2 h-4 w-4" />
-                  Ne plus suivre
+                  Retirer de la watchlist
                 </>
               ) : (
                 <>
                   <BookmarkPlus className="mr-2 h-4 w-4" />
-                  Suivre
+                  Ajouter à la watchlist
                 </>
               )}
             </DropdownMenuItem>

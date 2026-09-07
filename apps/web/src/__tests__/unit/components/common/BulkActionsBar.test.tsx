@@ -37,8 +37,8 @@ describe("BulkActionsBar", () => {
 
     await user.click(screen.getByRole("button", { name: /Actions/i }));
 
-    await waitFor(() => expect(screen.getByText("Suivre")).toBeInTheDocument());
-    expect(screen.getByText("Ne plus suivre")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Ajouter à la watchlist")).toBeInTheDocument());
+    expect(screen.getByText("Retirer de la watchlist")).toBeInTheDocument();
     expect(screen.getByText("Abandonner la série")).toBeInTheDocument();
     expect(screen.getByText("Ajouter aux favoris")).toBeInTheDocument();
     expect(screen.getByText("Supprimer des favoris")).toBeInTheDocument();
