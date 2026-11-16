@@ -1,6 +1,6 @@
 /**
- * Hook API pour retirer un partage (DELETE /lists/:listId/shares/:userId).
- * Phase 4.3 — Lists
+ * Hook API pour retirer un membre d'une liste
+ * (DELETE /lists/:listId/shares/:userId). Créateur uniquement.
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,7 +14,7 @@ export function useRemoveShare() {
       apiFetch(`/lists/${listId}/shares/${userId}`, { method: "DELETE" }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["shares", variables.listId] });
-      queryClient.invalidateQueries({ queryKey: ["shared-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["lists"] });
     },
   });
 }

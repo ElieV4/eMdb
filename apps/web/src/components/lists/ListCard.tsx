@@ -7,6 +7,7 @@
 "use client";
 
 import Link from "next/link";
+import { Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ListActionsMenu } from "./ListActionsMenu";
@@ -26,6 +27,7 @@ const typeLabels: Record<string, string> = {
 
 export function ListCard({ list, className }: ListCardProps) {
   const itemCount = list._count?.list_items ?? list.items?.length ?? 0;
+  const memberCount = list._count?.list_shares ?? 0;
   const isCustom = list.type === "custom";
 
   return (
@@ -49,8 +51,16 @@ export function ListCard({ list, className }: ListCardProps) {
               {list.description}
             </p>
           )}
-          <p className="text-xs text-muted-foreground">
-            {itemCount} titre{itemCount !== 1 ? "s" : ""}
+          <p className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span>
+              {itemCount} titre{itemCount !== 1 ? "s" : ""}
+            </span>
+            {memberCount > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <Users className="h-3 w-3" aria-hidden />
+                Partagée avec {memberCount}
+              </span>
+            )}
           </p>
         </Card>
       </Link>

@@ -33,6 +33,7 @@ import {
   buildListIdsByTitle,
 } from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
+import { SHARE_MODE_LABELS } from "@/lib/shareModes";
 import { cn } from "@/lib/utils";
 
 function titleToSearchResult(title: Title): TitleSearchResult {
@@ -98,6 +99,7 @@ function ListDetailPageContent() {
   }
 
   const isWatchlist = list?.type === "watchlist";
+  const isMember = list?.role === "member";
   const items = list?.items ?? [];
   const filteredItems = items.filter((item) => {
     if (
@@ -125,7 +127,7 @@ function ListDetailPageContent() {
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
           >
             <ArrowLeft className="h-4 w-4" />
-            Mes listes
+            {isMember ? "Listes partagées" : "Mes listes"}
           </Link>
 
           {isLoading ? (
@@ -140,7 +142,17 @@ function ListDetailPageContent() {
                   <span className="text-xs rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">
                     {typeLabels[list.type] ?? list.type}
                   </span>
+                  {isMember && (
+                    <span className="text-xs rounded-full border px-2 py-0.5 text-muted-foreground">
+                      Partagée · {SHARE_MODE_LABELS[list.share_mode]}
+                    </span>
+                  )}
                 </div>
+                {isMember && list.owner && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Créée par {list.owner.pseudo}
+                  </p>
+                )}
                 {list.description && (
                   <p className="text-sm text-muted-foreground mt-1">
                     {list.description}
@@ -161,6 +173,8 @@ function ListDetailPageContent() {
               ) : (
                 <ListActionsMenu
                   list={list}
+                  capabilities={list.capabilities}
+                  role={list.role}
                   variant="buttons"
                   onEditContent={() => setEditMode(true)}
                   onDeleted={() => router.push("/lists")}
@@ -219,13 +233,19 @@ function ListDetailPageContent() {
           </Alert>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Cette liste est vide. Ajoutez des titres depuis leur fiche.
+            {list?.capabilities.canAddItems
+              ? "Cette liste est vide. Ajoutez des titres depuis leur fiche."
+              : "Cette liste est vide."}
           </p>
         ) : editMode ? (
           // Mode édition : glisser-déposer + retrait en un clic, sur la
           // liste complète non filtrée (réordonner un sous-ensemble filtré
           // réattribuerait des positions incohérentes aux items masqués).
-          <ListReorder listId={list?.id ?? ""} items={items.map(titleToSearchResult)} />
+          <ListReorder
+            listId={list?.id ?? ""}
+            items={items.map(titleToSearchResult)}
+            canRemove={list?.capabilities.canRemoveItems ?? false}
+          />
         ) : filteredItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Aucun titre de cette liste ne correspond aux filtres actifs.

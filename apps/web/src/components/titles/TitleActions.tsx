@@ -252,7 +252,12 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
                     isInList(list.id) && "text-primary",
                   )}
                 />
-                {list.nom}
+                <span className="truncate">{list.nom}</span>
+                {list.shared && list.owner && (
+                  <span className="ml-auto pl-2 text-xs text-muted-foreground shrink-0">
+                    {list.owner.pseudo}
+                  </span>
+                )}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />

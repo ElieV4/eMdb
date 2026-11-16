@@ -10,7 +10,7 @@ Monorepo TypeScript : API REST (NestJS), worker asynchrone (BullMQ/Redis), front
 
 - Recherche et fiches détaillées films/séries (casting, saisons/épisodes, titres similaires)
 - Fiches personnes avec filmographie
-- Visionnages, notation, listes personnalisées et partageables
+- Visionnages, notation, listes personnalisées et partagées entre utilisateurs (modes lecture, collaboratif ou ouvert)
 - Suivi de séries avec calendrier des épisodes non vus
 - Découverte : tendances, sorties à venir, sélections festivals & cérémonies
 - Recommandations (algorithme de similarité maison, calcul batch asynchrone)

@@ -1,7 +1,10 @@
 /**
  * Page de gestion des listes de l'utilisateur.
  * Route : /lists
- * Backend : GET /lists, POST /lists
+ * Backend : GET /lists, POST /lists, GET /shared-lists
+ *
+ * Deux sections : les listes de l'utilisateur, puis celles que d'autres
+ * utilisateurs partagent avec lui (masquée s'il n'y en a aucune).
  *
  * Phase 4.3 — Lists
  */
@@ -15,8 +18,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Plus } from "lucide-react";
 import { ListCard } from "@/components/lists/ListCard";
+import { SharedListCard } from "@/components/lists/SharedListCard";
 import { ListDialog } from "@/components/lists/ListDialog";
 import { useLists } from "@/hooks/api/useLists";
+import { useSharedLists } from "@/hooks/api/useSharedLists";
 import { useWatchedTitles } from "@/hooks/api";
 import { useAuthStore } from "@/store/authStore";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -33,7 +38,16 @@ function ListsPageContent() {
   const filters = parseTitleFilters(searchParams);
 
   const { data: lists, isLoading, error } = useLists(isAuthenticated);
+  const { data: sharedLists } = useSharedLists(isAuthenticated);
   const { data: watchedTitles } = useWatchedTitles();
+
+  // Les filtres de titres ne s'appliquent pas aux listes partagées (GET
+  // /shared-lists ne renvoie pas leurs titres) ; seul le filtre "Listes"
+  // (par id) les concerne.
+  const filteredSharedLists =
+    filters.listIds.length > 0
+      ? sharedLists?.filter((entry) => filters.listIds.includes(entry.list_id))
+      : sharedLists;
 
   // Une liste "correspond" aux filtres actifs si au moins un de ses titres y
   // correspond (bug filtres header sur accueil/watchlist/listes/historique).
@@ -115,6 +129,19 @@ function ListsPageContent() {
               <ListCard key={list.id} list={list} />
             ))}
           </div>
+        )}
+
+        {(filteredSharedLists?.length ?? 0) > 0 && (
+          <section className="space-y-4 pt-4" aria-labelledby="shared-lists-heading">
+            <h2 id="shared-lists-heading" className="text-xl font-semibold">
+              Partagées avec moi
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filteredSharedLists?.map((entry) => (
+                <SharedListCard key={entry.list_id} entry={entry} />
+              ))}
+            </div>
+          </section>
         )}
 
         <ListDialog open={dialogOpen} onOpenChange={setDialogOpen} />
