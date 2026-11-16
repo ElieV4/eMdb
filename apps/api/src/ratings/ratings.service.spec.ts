@@ -403,6 +403,19 @@ describe('RatingsService', () => {
       expect(result.repartition[1]).toBe(0);
     });
 
+    it("ignore les lignes qui n'ont qu'un commentaire (note_perso null)", async () => {
+      prismaServiceMock.titles.findUnique.mockResolvedValue({ id: titleId });
+      prismaServiceMock.user_ratings.findMany.mockResolvedValue([{ note_perso: 9 }]);
+
+      const result = await service.getTitleRatingsSummary(titleId);
+
+      expect(prismaServiceMock.user_ratings.findMany).toHaveBeenCalledWith({
+        where: { title_id: titleId, note_perso: { not: null } },
+        select: { note_perso: true },
+      });
+      expect(result).toMatchObject({ moyenne: 9, count: 1 });
+    });
+
     it('retourne moyenne=null, count=0 si aucune note', async () => {
       prismaServiceMock.titles.findUnique.mockResolvedValue({
         id: titleId,

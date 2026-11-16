@@ -405,7 +405,9 @@ export class RatingsService {
     // notes", d'où le bypass explicite.
     const ratings = await this.prisma.asSystem((tx) =>
       tx.user_ratings.findMany({
-        where: { title_id: titleId },
+        // Une ligne peut ne porter qu'un commentaire (note_perso null) : elle
+        // ne compte ni dans la moyenne ni dans le nombre de notes.
+        where: { title_id: titleId, note_perso: { not: null } },
         select: { note_perso: true },
       }),
     );
