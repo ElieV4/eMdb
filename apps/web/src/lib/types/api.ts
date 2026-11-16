@@ -356,6 +356,14 @@ export type SharedListEntry = {
   };
 };
 
+/** Sous-groupe d'une liste (arbre à plat : `parent_id`). */
+export type ListGroup = {
+  id: string;
+  parent_id: string | null;
+  nom: string;
+  position: number;
+};
+
 export type ListCreateInput = {
   nom: string;
   type: "watchlist" | "favoris" | "custom";
@@ -386,12 +394,22 @@ export type ListDetail = {
   role: ListRole;
   owner: PublicUser | null;
   capabilities: ListCapabilities;
+  /** Nombre de membres (0 = liste non partagée). */
+  member_count: number;
+  groups: ListGroup[];
   items: Array<
     Title & {
       addedAt: string;
       position: number | null;
       /** Statut de progression dans la watchlist : "en_cours" (défaut), "a_jour", "abandonnee". */
       statut?: "en_cours" | "a_jour" | "abandonnee";
+      /** "Vu" dans le cadre de la liste, un seul état pour tous les membres. */
+      vu: boolean;
+      vuAt?: string;
+      /** Pseudo de qui a marqué le titre comme vu. */
+      vuBy?: string;
+      /** Sous-groupes dans lesquels le titre est rangé. */
+      groupIds: string[];
     }
   >;
 };

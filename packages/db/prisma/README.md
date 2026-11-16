@@ -79,6 +79,13 @@ Le mode de partage est porté par la liste (`user_lists.share_mode`) et s'appliq
 - **`trg_user_lists_guard_owner_columns`** : la RLS filtre des lignes, pas des colonnes. Ce trigger empêche un membre autorisé à renommer la liste de modifier aussi `share_mode`, `type` ou `user_id`. Il ne s'applique qu'aux requêtes faites au nom d'un utilisateur (`app.user_id` défini) : le worker et les scripts d'administration, qui contournent la RLS sans définir ce contexte, ne sont pas bloqués.
 - La même matrice existe côté API dans `apps/api/src/lists/list-permissions.ts`. Les deux doivent rester synchronisées.
 
+### « Vu » dans la liste et sous-groupes (migration `list_items_vu_and_groups`)
+
+- **`list_items.vu_at` / `vu_by`** : un titre est « vu » dans le cadre de la liste, un seul état partagé par tous les membres (indépendant de l'historique perso `user_watches`). Droit : `item:update` (créateur, ou membre en `collaboratif` / `ouvert`).
+- **`list_groups`** : sous-groupes en arbre. `parent_id` pointe vers un groupe de la **même** liste grâce à la FK composite `(parent_id, list_id) → (id, list_id)` ; supprimer un groupe supprime ses sous-groupes.
+- **`list_item_groups`** : un titre peut être rangé dans plusieurs sous-groupes. Les FK composites vers `list_items (list_id, title_id)` et `list_groups (id, list_id)` garantissent que le titre et le groupe sont dans la même liste.
+- **RLS**, via `fn_list_can` : créer / supprimer un sous-groupe = `item:add` / `item:remove` (mode `ouvert`) ; renommer, ranger ou déranger un titre = `item:update` (`collaboratif`). `EXECUTE`/droits accordés à `emdb_app`, rien pour `anon`/`authenticated`.
+
 **Mécanisme** : `PrismaService.forUser(userId, fn)` déclare `set_config('app.user_id', userId, true)` (SET LOCAL, portée à la transaction) avant d'exécuter la requête ; `PrismaService.asSystem(fn)` déclare `app.bypass_rls = 'true'` pour les opérations légitimement transverses à tous les utilisateurs (stats admin, vérification avant suppression d'un titre, notification à l'admin). Sans contexte défini, la policy est fermée par défaut. Ces deux méthodes sont **indispensables** dès qu'un appel touche une des 6 tables ci-dessus — sinon la requête échoue silencieusement (rôle restreint) ou n'a aucun effet (superuser).
 
 **Deux rôles Postgres distincts** (`packages/db/sql/setup_roles.sql`) :
