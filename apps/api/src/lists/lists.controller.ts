@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -20,6 +21,12 @@ import { UpdateItemStatusDto } from './dto/update-item-status.dto';
 import { AddItemDto } from './dto/add-item.dto';
 import { ReorderDto } from './dto/reorder.dto';
 import { ShareListDto } from './dto/share-list.dto';
+import { UpdateShareModeDto } from './dto/update-share-mode.dto';
+import { SetItemVuDto } from './dto/set-item-vu.dto';
+import { CreateGroupDto } from './dto/create-group.dto';
+import { UpdateGroupDto } from './dto/update-group.dto';
+import { SetItemGroupsDto } from './dto/set-item-groups.dto';
+import { CommentDto } from './dto/comment.dto';
 
 /**
  * Contrôleur du module lists (Phase 4.3).
@@ -38,11 +45,29 @@ import { ShareListDto } from './dto/share-list.dto';
  * - DELETE /lists/:listId/items/:titleId — Retirer un titre
  * - PATCH  /lists/:listId/items/reorder — Réordonnancement batch
  *
- * Endpoints list_shares (4) :
- * - POST   /lists/:listId/shares                    — Partager une liste
- * - GET    /lists/:listId/shares                    — Liste des partages
- * - DELETE /lists/:listId/shares/:sharedWithUserId  — Retirer un partage
+ * Endpoints "vu" et sous-groupes (5) — mêmes droits que le contenu :
+ * - PATCH  /lists/:listId/items/:titleId/vu      — Vu / pas vu (partagé par tous les membres)
+ * - PUT    /lists/:listId/items/:titleId/groups  — Ranger un titre dans des sous-groupes
+ * - POST   /lists/:listId/groups                 — Créer un sous-groupe
+ * - PATCH  /lists/:listId/groups/:groupId        — Renommer un sous-groupe
+ * - DELETE /lists/:listId/groups/:groupId        — Supprimer un sous-groupe (et ses enfants)
+ *
+ * Endpoints commentaires partagés (4) — lecture : tout membre ; écriture :
+ * créateur ou membre en collaboratif/ouvert ; le créateur peut supprimer
+ * tout commentaire :
+ * - GET    /lists/:listId/items/:titleId/comments
+ * - POST   /lists/:listId/items/:titleId/comments
+ * - PATCH  /lists/:listId/comments/:commentId
+ * - DELETE /lists/:listId/comments/:commentId
+ *
+ * Endpoints partage (6) — droits des membres selon user_lists.share_mode,
+ * cf. list-permissions.ts :
+ * - PATCH  /lists/:listId/share-mode                — Changer le mode de partage (créateur)
+ * - POST   /lists/:listId/shares                    — Ajouter un membre (créateur)
+ * - GET    /lists/:listId/shares                    — Liste des membres (créateur)
+ * - DELETE /lists/:listId/shares/:sharedWithUserId  — Retirer un membre (créateur)
  * - GET    /shared-lists                            — Listes partagées avec moi
+ * - DELETE /shared-lists/:listId                    — Quitter une liste partagée
  */
 @UseGuards(JwtAuthGuard)
 @Controller()
@@ -164,12 +189,121 @@ export class ListsController {
   }
 
   // ======================================================================
-  // LIST_SHARES
+  // VU DANS LA LISTE & SOUS-GROUPES
+  // ======================================================================
+
+  @Patch('lists/:listId/items/:titleId/vu')
+  async setItemVu(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('titleId') titleId: string,
+    @Body() dto: SetItemVuDto,
+  ) {
+    return this.listsService.setItemVu(listId, user.id, titleId, dto);
+  }
+
+  @Put('lists/:listId/items/:titleId/groups')
+  async setItemGroups(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('titleId') titleId: string,
+    @Body() dto: SetItemGroupsDto,
+  ) {
+    return this.listsService.setItemGroups(listId, user.id, titleId, dto);
+  }
+
+  @Post('lists/:listId/groups')
+  async createGroup(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Body() dto: CreateGroupDto,
+  ) {
+    return this.listsService.createGroup(listId, user.id, dto);
+  }
+
+  @Patch('lists/:listId/groups/:groupId')
+  async renameGroup(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('groupId') groupId: string,
+    @Body() dto: UpdateGroupDto,
+  ) {
+    return this.listsService.renameGroup(listId, user.id, groupId, dto);
+  }
+
+  @Delete('lists/:listId/groups/:groupId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteGroup(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('groupId') groupId: string,
+  ): Promise<void> {
+    await this.listsService.deleteGroup(listId, user.id, groupId);
+  }
+
+  // ======================================================================
+  // COMMENTAIRES PARTAGÉS
+  // ======================================================================
+
+  @Get('lists/:listId/items/:titleId/comments')
+  async getItemComments(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('titleId') titleId: string,
+  ) {
+    return this.listsService.getItemComments(listId, user.id, titleId);
+  }
+
+  @Post('lists/:listId/items/:titleId/comments')
+  async addItemComment(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('titleId') titleId: string,
+    @Body() dto: CommentDto,
+  ) {
+    return this.listsService.addItemComment(listId, user.id, titleId, dto);
+  }
+
+  @Patch('lists/:listId/comments/:commentId')
+  async updateItemComment(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('commentId') commentId: string,
+    @Body() dto: CommentDto,
+  ) {
+    return this.listsService.updateItemComment(listId, user.id, commentId, dto);
+  }
+
+  @Delete('lists/:listId/comments/:commentId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteItemComment(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('commentId') commentId: string,
+  ): Promise<void> {
+    await this.listsService.deleteItemComment(listId, user.id, commentId);
+  }
+
+  // ======================================================================
+  // PARTAGE
   // ======================================================================
 
   /**
+   * PATCH /lists/:listId/share-mode
+   * Change le mode de partage (lecture / collaboratif / ouvert).
+   */
+  @Patch('lists/:listId/share-mode')
+  async updateShareMode(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Body() dto: UpdateShareModeDto,
+  ) {
+    return this.listsService.updateShareMode(listId, user.id, dto);
+  }
+
+  /**
    * POST /lists/:listId/shares
-   * Partage une liste avec un autre utilisateur.
+   * Ajoute un membre à une liste.
    */
   @Post('lists/:listId/shares')
   async shareList(
@@ -182,7 +316,7 @@ export class ListsController {
 
   /**
    * GET /lists/:listId/shares
-   * Liste des partages d'une liste.
+   * Membres d'une liste.
    */
   @Get('lists/:listId/shares')
   async getShares(@CurrentUser() user: any, @Param('listId') listId: string) {
@@ -191,7 +325,7 @@ export class ListsController {
 
   /**
    * DELETE /lists/:listId/shares/:sharedWithUserId
-   * Retire un partage.
+   * Retire un membre.
    */
   @Delete('lists/:listId/shares/:sharedWithUserId')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -210,5 +344,15 @@ export class ListsController {
   @Get('shared-lists')
   async getSharedLists(@CurrentUser() user: any) {
     return this.listsService.getSharedLists(user.id);
+  }
+
+  /**
+   * DELETE /shared-lists/:listId
+   * Quitter une liste partagée avec moi.
+   */
+  @Delete('shared-lists/:listId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async leaveSharedList(@CurrentUser() user: any, @Param('listId') listId: string): Promise<void> {
+    await this.listsService.leaveSharedList(listId, user.id);
   }
 }

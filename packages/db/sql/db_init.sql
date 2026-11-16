@@ -31,6 +31,9 @@ CREATE TABLE users (
     -- encore committé au moment de cette note, et cette colonne n'a pas
     -- encore été appliquée en production.
     status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('pending','active','rejected')),
+    -- Commentaires perso visibles des membres de ses listes partagées
+    -- (réglage, migration title_comments).
+    commentaires_visibles BOOLEAN NOT NULL DEFAULT false,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -278,7 +281,12 @@ CREATE TABLE user_lists (
     nom         TEXT NOT NULL,
     type        TEXT NOT NULL CHECK (type IN ('watchlist','favoris','custom','collection')),
     description TEXT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Mode de partage appliqué à tous les membres de list_shares. Matrice des
+    -- droits : fn_list_can() (migration list_share_modes) et
+    -- apps/api/src/lists/list-permissions.ts.
+    share_mode  TEXT NOT NULL DEFAULT 'lecture'
+                CHECK (share_mode IN ('lecture','collaboratif','ouvert'))
 );
 
 CREATE TABLE list_items (
@@ -289,13 +297,58 @@ CREATE TABLE list_items (
     -- Statut de progression pour la watchlist : "en_cours" (défaut), "a_jour", "abandonnee".
     -- Validé côté API (DTO @IsEnum), pas de CHECK ici (cf. packages/db/prisma/schema.prisma).
     statut      TEXT NOT NULL DEFAULT 'en_cours',
-    PRIMARY KEY (list_id, title_id)
+    -- "Vu" dans le cadre de la liste, un seul état partagé par tous les
+    -- membres (migration list_items_vu_and_groups).
+    vu_at       TIMESTAMPTZ,
+    vu_by       UUID REFERENCES users(id) ON DELETE SET NULL,
+    PRIMARY KEY (list_id, title_id),
+    CHECK (vu_at IS NOT NULL OR vu_by IS NULL)
 );
 
+-- Fil de commentaires partagés sur un titre d'une liste (RLS et droits :
+-- migration title_comments).
+CREATE TABLE list_item_comments (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    list_id     UUID NOT NULL,
+    title_id    UUID NOT NULL,
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    contenu     TEXT NOT NULL CHECK (char_length(btrim(contenu)) BETWEEN 1 AND 2000),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    FOREIGN KEY (list_id, title_id) REFERENCES list_items(list_id, title_id) ON DELETE CASCADE
+);
+CREATE INDEX list_item_comments_list_id_title_id_created_at_idx
+    ON list_item_comments (list_id, title_id, created_at);
+
+-- Sous-groupes d'une liste, en arbre (parent dans la même liste). RLS et
+-- droits : migration list_items_vu_and_groups.
+CREATE TABLE list_groups (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    list_id     UUID NOT NULL REFERENCES user_lists(id) ON DELETE CASCADE,
+    parent_id   UUID,
+    nom         TEXT NOT NULL CHECK (char_length(btrim(nom)) BETWEEN 1 AND 100),
+    position    INT NOT NULL DEFAULT 0,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (id, list_id),
+    CHECK (parent_id IS NULL OR parent_id <> id),
+    FOREIGN KEY (parent_id, list_id) REFERENCES list_groups(id, list_id) ON DELETE CASCADE
+);
+
+-- Un titre peut être rangé dans plusieurs sous-groupes de sa liste.
+CREATE TABLE list_item_groups (
+    list_id     UUID NOT NULL,
+    title_id    UUID NOT NULL,
+    group_id    UUID NOT NULL,
+    PRIMARY KEY (group_id, title_id),
+    FOREIGN KEY (list_id, title_id) REFERENCES list_items(list_id, title_id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id, list_id) REFERENCES list_groups(id, list_id) ON DELETE CASCADE
+);
+
+-- Appartenance d'un utilisateur à une liste partagée. Les droits ne sont plus
+-- portés ici mais par user_lists.share_mode (migration list_share_modes).
 CREATE TABLE list_shares (
-    list_id             UUID NOT NULL REFERENCES user_lists(id) ON DELETE CASCADE,
+    list_id            UUID NOT NULL REFERENCES user_lists(id) ON DELETE CASCADE,
     shared_with_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    permission          TEXT NOT NULL CHECK (permission IN ('lecture','edition')) DEFAULT 'lecture',
     shared_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (list_id, shared_with_user_id)
 );

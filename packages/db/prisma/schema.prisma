@@ -65,23 +65,80 @@ model genres {
 }
 
 model list_items {
-  list_id    String     @db.Uuid
-  title_id   String     @db.Uuid
-  position   Int?
-  added_at   DateTime   @default(now()) @db.Timestamptz(6)
+  list_id            String               @db.Uuid
+  title_id           String               @db.Uuid
+  position           Int?
+  added_at           DateTime             @default(now()) @db.Timestamptz(6)
   /// Statut de progression pour la watchlist : "en_cours" (défaut), "a_jour", "abandonnee".
-  statut     String     @default("en_cours")
-  user_lists user_lists @relation(fields: [list_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  titles     titles     @relation(fields: [title_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  statut             String               @default("en_cours")
+  /// "Vu" dans le cadre de la liste : un seul état partagé par tous les
+  /// membres (pas l'historique perso user_watches). null = pas vu.
+  vu_at              DateTime?            @db.Timestamptz(6)
+  /// Qui a marqué le titre comme vu (null si pas vu, ou compte supprimé).
+  vu_by              String?              @db.Uuid
+  user_lists         user_lists           @relation(fields: [list_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  titles             titles               @relation(fields: [title_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vu_by_user         users?               @relation("list_items_vu_by", fields: [vu_by], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  list_item_groups   list_item_groups[]
+  list_item_comments list_item_comments[]
 
   @@id([list_id, title_id])
+}
+
+/// Fil de commentaires partagés sur un titre d'une liste (visible par tous
+/// les membres ; écriture selon le mode de partage, cf. migration
+/// title_comments).
+model list_item_comments {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  list_id    String     @db.Uuid
+  title_id   String     @db.Uuid
+  user_id    String     @db.Uuid
+  contenu    String
+  created_at DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at DateTime   @default(now()) @updatedAt @db.Timestamptz(6)
+  list_items list_items @relation(fields: [list_id, title_id], references: [list_id, title_id], onDelete: Cascade, onUpdate: NoAction)
+  users      users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([list_id, title_id, created_at])
+}
+
+/// Sous-groupe d'une liste (ex. Sport > Tennis). Arbre : parent_id pointe vers
+/// un groupe de la même liste (FK composite (parent_id, list_id)), supprimer
+/// un groupe supprime ses sous-groupes.
+model list_groups {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  list_id          String             @db.Uuid
+  parent_id        String?            @db.Uuid
+  nom              String
+  position         Int                @default(0)
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  user_lists       user_lists         @relation(fields: [list_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  parent           list_groups?       @relation("list_groups_tree", fields: [parent_id, list_id], references: [id, list_id], onDelete: Cascade, onUpdate: NoAction)
+  children         list_groups[]      @relation("list_groups_tree")
+  list_item_groups list_item_groups[]
+
+  @@unique([id, list_id])
+  @@index([list_id])
+}
+
+/// Appartenance d'un titre de la liste à un sous-groupe (un titre peut être
+/// dans plusieurs sous-groupes). Les FK composites garantissent que le titre
+/// et le groupe appartiennent à la même liste.
+model list_item_groups {
+  list_id     String      @db.Uuid
+  title_id    String      @db.Uuid
+  group_id    String      @db.Uuid
+  list_items  list_items  @relation(fields: [list_id, title_id], references: [list_id, title_id], onDelete: Cascade, onUpdate: NoAction)
+  list_groups list_groups @relation(fields: [group_id, list_id], references: [id, list_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([group_id, title_id])
+  @@index([list_id, title_id])
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model list_shares {
   list_id             String     @db.Uuid
   shared_with_user_id String     @db.Uuid
-  permission          String     @default("lecture")
   shared_at           DateTime   @default(now()) @db.Timestamptz(6)
   user_lists          user_lists @relation(fields: [list_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users               users      @relation(fields: [shared_with_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -94,19 +151,19 @@ model list_shares {
 // "notifications push" (pas du chantier studios), inclus par erreur dans le
 // commit 2ede937 en même temps que user_follows_studio — voir db_init.sql.
 model notifications {
-  id                                            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id                                       String    @db.Uuid
-  episode_id                                    String?   @db.Uuid
-  title_id                                      String?   @db.Uuid
-  related_user_id                               String?   @db.Uuid
-  message                                       String?
-  type                                          String
-  lu                                            Boolean   @default(false)
-  created_at                                    DateTime  @default(now()) @db.Timestamptz(6)
-  episodes                                      episodes? @relation(fields: [episode_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  titles                                        titles?   @relation(fields: [title_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users_notifications_user_idTousers            users     @relation("notifications_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users_notifications_related_user_idTousers    users?    @relation("notifications_related_user_idTousers", fields: [related_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                                         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                                    String    @db.Uuid
+  episode_id                                 String?   @db.Uuid
+  title_id                                   String?   @db.Uuid
+  related_user_id                            String?   @db.Uuid
+  message                                    String?
+  type                                       String
+  lu                                         Boolean   @default(false)
+  created_at                                 DateTime  @default(now()) @db.Timestamptz(6)
+  episodes                                   episodes? @relation(fields: [episode_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  titles                                     titles?   @relation(fields: [title_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_notifications_user_idTousers         users     @relation("notifications_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_notifications_related_user_idTousers users?    @relation("notifications_related_user_idTousers", fields: [related_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([title_id], map: "idx_notifications_title")
 }
@@ -269,6 +326,11 @@ model user_lists {
   type        String
   description String?
   created_at  DateTime      @default(now()) @db.Timestamptz(6)
+  /// Mode de partage appliqué à tous les membres (list_shares) :
+  /// "lecture" | "collaboratif" | "ouvert" — CHECK en SQL, matrice dans
+  /// apps/api/src/lists/list-permissions.ts et fn_list_can().
+  share_mode  String        @default("lecture")
+  list_groups list_groups[]
   list_items  list_items[]
   list_shares list_shares[]
   users       users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -315,24 +377,29 @@ model user_watches {
 }
 
 model users {
-  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email              String               @unique
-  password_hash      String
-  pseudo             String               @unique
-  avatar_url         String?
+  id                                                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                                              String                @unique
+  password_hash                                      String
+  pseudo                                             String                @unique
+  avatar_url                                         String?
   // Chantier "notifications push" (pas studios) — voir note db_init.sql.
-  status             String               @default("active")
-  created_at         DateTime             @default(now()) @db.Timestamptz(6)
-  list_shares        list_shares[]
-  notifications_notifications_user_idTousers         notifications[] @relation("notifications_user_idTousers")
-  notifications_notifications_related_user_idTousers notifications[] @relation("notifications_related_user_idTousers")
-  push_tokens         push_tokens[]
-  user_follows_serie  user_follows_serie[]
-  user_follows_person user_follows_person[]
-  user_follows_studio user_follows_studio[]
-  user_lists          user_lists[]
-  user_ratings        user_ratings[]
-  user_watches        user_watches[]
+  status                                             String                @default("active")
+  /// Commentaires perso (user_ratings.commentaire) visibles des membres de
+  /// ses listes partagées. Désactivé par défaut (réglage utilisateur).
+  commentaires_visibles                              Boolean               @default(false)
+  created_at                                         DateTime              @default(now()) @db.Timestamptz(6)
+  list_shares                                        list_shares[]
+  list_items_vu                                      list_items[]          @relation("list_items_vu_by")
+  list_item_comments                                 list_item_comments[]
+  notifications_notifications_user_idTousers         notifications[]       @relation("notifications_user_idTousers")
+  notifications_notifications_related_user_idTousers notifications[]       @relation("notifications_related_user_idTousers")
+  push_tokens                                        push_tokens[]
+  user_follows_serie                                 user_follows_serie[]
+  user_follows_person                                user_follows_person[]
+  user_follows_studio                                user_follows_studio[]
+  user_lists                                         user_lists[]
+  user_ratings                                       user_ratings[]
+  user_watches                                       user_watches[]
 }
 
 // Chantier "notifications push" (pas studios) — voir note db_init.sql.

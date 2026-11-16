@@ -102,13 +102,13 @@ export class UsersController {
   }
 
   /**
-   * GET /users/search?q=
-   * Recherche un utilisateur par pseudo ou email.
-   * Nécessaire pour le partage de listes (list_shares).
+   * GET /users/search?query=
+   * Recherche un utilisateur par fragment de pseudo ou email exact, pour le
+   * partage de listes. Ne renvoie jamais d'email (cf. UsersService).
    */
   @Get('search')
-  async search(@Query() query: SearchUsersDto) {
-    return this.usersService.findByPseudoOrEmail(query.query);
+  async search(@CurrentUser() user: any, @Query() query: SearchUsersDto) {
+    return this.usersService.findByPseudoOrEmail(query.query, user.id);
   }
 
   /**

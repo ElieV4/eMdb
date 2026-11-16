@@ -27,3 +27,11 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO emdb_app;
 GRANT USAGE ON SCHEMA public TO emdb_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO emdb_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO emdb_app;
+
+-- Les policies RLS des listes appellent fn_list_can() (migration
+-- list_share_modes), dont l'EXECUTE est retiré à PUBLIC : sans ce GRANT,
+-- toute requête de emdb_app sur user_lists/list_items/list_shares échoue
+-- ("permission denied for function fn_list_can"). La migration accorde déjà
+-- ce droit si emdb_app existe au moment où elle s'exécute ; cette ligne
+-- couvre le cas inverse (rôle créé après la migration, ex. Supabase).
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO emdb_app;

@@ -104,6 +104,9 @@ export { useShares } from "./useShares";
 export { useShareList } from "./useShareList";
 export { useRemoveShare } from "./useRemoveShare";
 export { useSharedLists } from "./useSharedLists";
+export { useUpdateShareMode } from "./useUpdateShareMode";
+export { useLeaveSharedList } from "./useLeaveSharedList";
+export { useSearchUsers } from "./useSearchUsers";
 
 // Hooks utilitaires pour les icones d'affiche
 export { useWatchedTitles } from "./useWatchedTitles";

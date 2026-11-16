@@ -46,7 +46,7 @@ import { useUpdateListItemStatus } from "@/hooks/api/useUpdateListItemStatus";
 import { useUpsertRating } from "@/hooks/api/useUpsertRating";
 import { useDeleteWatch } from "@/hooks/api/useDeleteWatch";
 import { useUpdateWatchContext } from "@/hooks/api/useUpdateWatchContext";
-import { useTitleRatingsSummary } from "@/hooks/api/useTitleRatingsSummary";
+import { useMyTitleRating } from "@/hooks/api/useComments";
 import { useWatches } from "@/hooks/api/useWatches";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
@@ -63,7 +63,9 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
   const { data: follows } = useFollows();
   const { data: userLists } = useUserLists(titleId);
   const { watchlistStatuses } = useListMembership();
-  const { data: ratingsSummary } = useTitleRatingsSummary(titleId);
+  // Ma note (et non la moyenne publique) : les étoiles sont un champ de
+  // saisie, elles doivent refléter ce que l'utilisateur a lui-même noté.
+  const { data: myRating } = useMyTitleRating(titleId, isAuthenticated);
   const { data: watchesData } = useWatches({ title_id: titleId, limit: 50 });
   const queryClient = useQueryClient();
   const addListItem = useAddListItem();
@@ -252,7 +254,12 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
                     isInList(list.id) && "text-primary",
                   )}
                 />
-                {list.nom}
+                <span className="truncate">{list.nom}</span>
+                {list.shared && list.owner && (
+                  <span className="ml-auto pl-2 text-xs text-muted-foreground shrink-0">
+                    {list.owner.pseudo}
+                  </span>
+                )}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
@@ -274,7 +281,7 @@ export function TitleActions({ titleId, type, releaseDate, className }: TitleAct
       <div className="flex flex-wrap items-center justify-center gap-1.5">
         <RatingInput
           size="sm"
-          value={ratingsSummary?.moyenne ?? null}
+          value={myRating?.note_perso ?? null}
           onChange={(value) =>
             upsertRating.mutate({ title_id: titleId, note_perso: value })
           }

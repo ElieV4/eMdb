@@ -18,6 +18,9 @@ export function useAddListItem() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-lists"] });
       queryClient.invalidateQueries({ queryKey: ["lists"] });
+      // Liste partagée : détail et compteur de "Partagées avec moi".
+      queryClient.invalidateQueries({ queryKey: ["list"] });
+      queryClient.invalidateQueries({ queryKey: ["shared-lists"] });
     },
   });
 }

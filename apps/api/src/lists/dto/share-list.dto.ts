@@ -1,17 +1,13 @@
-import { IsEnum, IsNotEmpty, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsUUID } from 'class-validator';
 
 /**
- * DTO pour le partage d'une liste (POST /lists/:listId/shares).
+ * DTO pour l'ajout d'un membre à une liste (POST /lists/:listId/shares).
  *
- * Validation :
- * - shared_with_user_id : UUID obligatoire
- * - permission : enum ['lecture', 'edition']
+ * Les droits du membre ne se choisissent pas ici : ils découlent du mode de
+ * partage de la liste (user_lists.share_mode, cf. PATCH /lists/:listId/share-mode).
  */
 export class ShareListDto {
   @IsUUID()
   @IsNotEmpty()
   shared_with_user_id!: string;
-
-  @IsEnum(['lecture', 'edition'])
-  permission!: 'lecture' | 'edition';
 }

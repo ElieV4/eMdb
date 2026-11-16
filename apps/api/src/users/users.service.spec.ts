@@ -50,7 +50,14 @@ describe('UsersService', () => {
       expect(result).toEqual(mockUser);
       expect(prismaServiceMock.users.findUnique).toHaveBeenCalledWith({
         where: { id: 'user-id' },
-        select: { id: true, email: true, pseudo: true, avatar_url: true, created_at: true },
+        select: {
+          id: true,
+          email: true,
+          pseudo: true,
+          avatar_url: true,
+          created_at: true,
+          commentaires_visibles: true,
+        },
       });
     });
 
@@ -100,49 +107,83 @@ describe('UsersService', () => {
       expect(prismaServiceMock.users.update).toHaveBeenCalledWith({
         where: { id: 'user-id' },
         data: { avatar_url: '/uploads/avatars/avatar.png' },
-        select: { id: true, email: true, pseudo: true, avatar_url: true, created_at: true },
+        select: {
+          id: true,
+          email: true,
+          pseudo: true,
+          avatar_url: true,
+          created_at: true,
+          commentaires_visibles: true,
+        },
       });
     });
   });
 
   describe('findByPseudoOrEmail', () => {
-    it('recherche par pseudo ou email insensible à la casse', async () => {
+    const select = { id: true, pseudo: true, avatar_url: true };
+
+    it("cherche un fragment de pseudo, comptes actifs uniquement, sans l'utilisateur connecté", async () => {
       const users = [
-        { id: '1', email: 'user1@example.com', pseudo: 'user1', avatar_url: null },
-        { id: '2', email: 'user2@example.com', pseudo: 'user2', avatar_url: null },
+        { id: '1', pseudo: 'user1', avatar_url: null },
+        { id: '2', pseudo: 'user2', avatar_url: null },
       ];
       prismaServiceMock.users.findMany.mockResolvedValue(users);
 
-      const result = await service.findByPseudoOrEmail('user');
+      const result = await service.findByPseudoOrEmail('user', 'me');
 
       expect(result).toHaveLength(2);
       expect(prismaServiceMock.users.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [
-            { email: { contains: 'user', mode: 'insensitive' } },
-            { pseudo: { contains: 'user', mode: 'insensitive' } },
-          ],
+          status: 'active',
+          id: { not: 'me' },
+          pseudo: { contains: 'user', mode: 'insensitive' },
         },
-        select: { id: true, email: true, pseudo: true, avatar_url: true },
-        take: 20,
+        select,
+        orderBy: { pseudo: 'asc' },
+        take: 10,
       });
     });
 
-    it('retourne un tableau vide si aucun résultat', async () => {
+    it("ne cherche un email qu'en correspondance exacte (pas d'énumération par sous-chaîne)", async () => {
       prismaServiceMock.users.findMany.mockResolvedValue([]);
 
-      const result = await service.findByPseudoOrEmail('nonexistent');
+      await service.findByPseudoOrEmail('  Ami@Example.com ', 'me');
+
+      expect(prismaServiceMock.users.findMany).toHaveBeenCalledWith({
+        where: {
+          status: 'active',
+          id: { not: 'me' },
+          email: { equals: 'Ami@Example.com', mode: 'insensitive' },
+        },
+        select,
+        orderBy: { pseudo: 'asc' },
+        take: 10,
+      });
+    });
+
+    it("ne renvoie jamais l'email", async () => {
+      prismaServiceMock.users.findMany.mockResolvedValue([]);
+
+      await service.findByPseudoOrEmail('user', 'me');
+
+      const [args] = prismaServiceMock.users.findMany.mock.calls[0];
+      expect(args.select).not.toHaveProperty('email');
+    });
+
+    it("ne lance pas de requête pour moins de 2 caractères", async () => {
+      const result = await service.findByPseudoOrEmail('u', 'me');
 
       expect(result).toEqual([]);
+      expect(prismaServiceMock.users.findMany).not.toHaveBeenCalled();
     });
   });
 
   describe('search', () => {
     it('est un alias de findByPseudoOrEmail', async () => {
-      const users = [{ id: '1', email: 'user1@example.com', pseudo: 'user1', avatar_url: null }];
+      const users = [{ id: '1', pseudo: 'user1', avatar_url: null }];
       prismaServiceMock.users.findMany.mockResolvedValue(users);
 
-      const result = await service.search('user1');
+      const result = await service.search('user1', 'me');
 
       expect(result).toEqual(users);
     });

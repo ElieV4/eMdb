@@ -13,7 +13,6 @@ const mockList: UserList = {
   type: "watchlist",
   description: "Films à voir",
   items: [],
-  shares: [],
 };
 
 describe("ListCard", () => {
@@ -39,6 +38,16 @@ describe("ListCard", () => {
     };
     render(<ListCard list={listWithItems} />);
     expect(screen.getByText("1 titre")).toBeInTheDocument();
+  });
+
+  it("indique avec combien de personnes la liste est partagée", () => {
+    render(<ListCard list={{ ...mockList, _count: { list_items: 0, list_shares: 2 } }} />);
+    expect(screen.getByText("Partagée avec 2")).toBeInTheDocument();
+  });
+
+  it("n'affiche pas d'indicateur de partage sans membre", () => {
+    render(<ListCard list={mockList} />);
+    expect(screen.queryByText(/Partagée avec/)).not.toBeInTheDocument();
   });
 
   it("redirige vers /lists/:id", () => {
