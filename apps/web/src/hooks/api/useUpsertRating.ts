@@ -19,6 +19,7 @@ export function useUpsertRating() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-ratings"] });
       queryClient.invalidateQueries({ queryKey: ["title-ratings-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["my-title-rating"] });
     },
   });
 }

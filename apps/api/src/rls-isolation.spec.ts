@@ -294,6 +294,138 @@ describe('RLS — isolation entre utilisateurs (bout en bout, base réelle)', ()
       expect(afterLeave).toBeNull();
     });
 
+    // Vu partagé et sous-groupes (migration list_items_vu_and_groups).
+    const markVuAsB = () =>
+      forUser(userB, (tx) =>
+        tx.list_items.updateMany({
+          where: { list_id: listId, title_id: titleId },
+          data: { vu_at: new Date(), vu_by: userB },
+        }),
+      );
+    const createGroupAsB = () =>
+      forUser(userB, (tx) => tx.list_groups.create({ data: { list_id: listId, nom: 'Sport' } }));
+
+    it('vu et sous-groupes en lecture : B lit, ne marque rien, ne crée ni ne range rien', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('lecture');
+      const groupId = randomUUID();
+      await asSystem((tx) => tx.list_groups.create({ data: { id: groupId, list_id: listId, nom: 'Sport' } }));
+
+      const groups = await forUser<any[]>(userB, (tx) => tx.list_groups.findMany({ where: { list_id: listId } }));
+      expect(groups).toHaveLength(1);
+      expect(((await markVuAsB()) as any).count).toBe(0);
+      await expect(createGroupAsB()).rejects.toThrow();
+      await expect(
+        forUser(userB, (tx) =>
+          tx.list_item_groups.create({ data: { list_id: listId, title_id: titleId, group_id: groupId } }),
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('collaboratif : B marque vu (visible par A) et range un titre, mais ne crée pas de sous-groupe', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('collaboratif');
+      const groupId = randomUUID();
+      await asSystem((tx) => tx.list_groups.create({ data: { id: groupId, list_id: listId, nom: 'Sport' } }));
+
+      expect(((await markVuAsB()) as any).count).toBe(1);
+      const seenByA = await forUser<any>(userA, (tx) =>
+        tx.list_items.findUnique({ where: { list_id_title_id: { list_id: listId, title_id: titleId } } }),
+      );
+      expect(seenByA.vu_by).toBe(userB);
+
+      await expect(
+        forUser(userB, (tx) =>
+          tx.list_item_groups.create({ data: { list_id: listId, title_id: titleId, group_id: groupId } }),
+        ),
+      ).resolves.toBeDefined();
+      await expect(createGroupAsB()).rejects.toThrow();
+    });
+
+    it('ouvert : B crée et supprime des sous-groupes ; la suppression emporte les enfants', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('ouvert');
+
+      const sport = await forUser<any>(userB, (tx) =>
+        tx.list_groups.create({ data: { list_id: listId, nom: 'Sport' } }),
+      );
+      await forUser(userB, (tx) =>
+        tx.list_groups.create({ data: { list_id: listId, parent_id: sport.id, nom: 'Tennis' } }),
+      );
+
+      const deleted = await forUser<any>(userB, (tx) => tx.list_groups.deleteMany({ where: { id: sport.id } }));
+      expect(deleted.count).toBe(1);
+      const left = await asSystem<any[]>((tx) => tx.list_groups.findMany({ where: { list_id: listId } }));
+      expect(left).toHaveLength(0);
+    });
+
+    it("un sous-groupe ne peut pas avoir pour parent un groupe d'une autre liste (FK composite)", async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('ouvert');
+      const otherList = randomUUID();
+      const foreignGroup = randomUUID();
+      await asSystem(async (tx) => {
+        await tx.user_lists.create({ data: { id: otherList, user_id: userA, nom: 'Autre', type: 'custom' } });
+        await tx.list_groups.create({ data: { id: foreignGroup, list_id: otherList, nom: 'Ailleurs' } });
+      });
+
+      await expect(
+        forUser(userA, (tx) =>
+          tx.list_groups.create({ data: { list_id: listId, parent_id: foreignGroup, nom: 'Intrus' } }),
+        ),
+      ).rejects.toThrow();
+
+      await asSystem((tx) => tx.user_lists.deleteMany({ where: { id: otherList } }));
+    });
+
+    // Fil de commentaires partagés (migration title_comments).
+    const commentAsB = (authorId: string = userB) =>
+      forUser(userB, (tx) =>
+        tx.list_item_comments.create({
+          data: { list_id: listId, title_id: titleId, user_id: authorId, contenu: 'Avis de B' },
+        }),
+      );
+
+    it('commentaires en lecture : B lit le fil mais ne peut pas commenter', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('lecture');
+      await asSystem((tx) =>
+        tx.list_item_comments.create({
+          data: { list_id: listId, title_id: titleId, user_id: userA, contenu: 'Avis de A' },
+        }),
+      );
+
+      const visible = await forUser<any[]>(userB, (tx) =>
+        tx.list_item_comments.findMany({ where: { list_id: listId } }),
+      );
+      expect(visible.map((c) => c.contenu)).toEqual(['Avis de A']);
+      await expect(commentAsB()).rejects.toThrow();
+    });
+
+    it("commentaires en collaboratif : B commente en son nom, pas au nom de A, ni ne modifie ceux de A ; A modère", async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('collaboratif');
+      const fromA = await asSystem<any>((tx) =>
+        tx.list_item_comments.create({
+          data: { list_id: listId, title_id: titleId, user_id: userA, contenu: 'Avis de A' },
+        }),
+      );
+
+      const mine = await commentAsB();
+      expect((mine as any).user_id).toBe(userB);
+      await expect(commentAsB(userA)).rejects.toThrow();
+
+      const edited = await forUser<any>(userB, (tx) =>
+        tx.list_item_comments.updateMany({ where: { id: fromA.id }, data: { contenu: 'Piraté' } }),
+      );
+      expect(edited.count).toBe(0);
+
+      const moderated = await forUser<any>(userA, (tx) =>
+        tx.list_item_comments.deleteMany({ where: { id: (mine as any).id } }),
+      );
+      expect(moderated.count).toBe(1);
+    });
+
     it('A (créateur) garde tous les droits, y compris changer le mode', async () => {
       if (skipIfNotRestricted()) return;
       await createSharedList('lecture');

@@ -20,6 +20,7 @@ import { ImportCreditsButton } from "@/components/profile/ImportCreditsButton";
 import { FreeWatchSitesSection } from "@/components/settings/FreeWatchSitesSection";
 import { AccountRequestsSection } from "@/components/settings/AccountRequestsSection";
 import { WorkerSection } from "@/components/settings/WorkerSection";
+import { CommentsVisibilitySection } from "@/components/settings/CommentsVisibilitySection";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -190,6 +191,8 @@ export default function SettingsPage() {
             <ImportCreditsButton />
           </div>
         </section>
+
+        <CommentsVisibilitySection />
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold flex items-center gap-2">
