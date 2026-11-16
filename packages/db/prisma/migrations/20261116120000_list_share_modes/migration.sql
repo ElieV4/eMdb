@@ -208,7 +208,11 @@ AS $$
 DECLARE
   v_user UUID := NULLIF(current_setting('app.user_id', true), '')::uuid;
 BEGIN
-  IF current_setting('app.bypass_rls', true) = 'true' THEN
+  -- Ne s'applique qu'aux requêtes faites au nom d'un utilisateur de l'app
+  -- (app.user_id). Sans ce contexte, la RLS empêche déjà emdb_app de voir
+  -- la moindre ligne ; seuls des rôles qui la contournent (worker, scripts
+  -- d'administration, migrations) arrivent ici, et on ne les bloque pas.
+  IF current_setting('app.bypass_rls', true) = 'true' OR v_user IS NULL THEN
     RETURN NEW;
   END IF;
 
