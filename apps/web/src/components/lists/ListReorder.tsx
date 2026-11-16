@@ -30,6 +30,9 @@ import { TitleSearchResult } from "@/lib/types/api";
 type ListReorderProps = {
   listId: string;
   items: TitleSearchResult[];
+  /** Bouton de retrait sur chaque titre. Faux pour un membre en mode
+   * "collaboratif" : il peut réordonner, pas retirer (cf. capabilities). */
+  canRemove?: boolean;
 };
 
 function SortableItem({
@@ -40,7 +43,7 @@ function SortableItem({
   inFavorites,
 }: {
   title: TitleSearchResult;
-  onRemove: (id: string) => void;
+  onRemove?: (id: string) => void;
   watched?: boolean;
   inWatchlist?: boolean;
   inFavorites?: boolean;
@@ -67,22 +70,24 @@ function SortableItem({
       </div>
       {/* Bouton retrait — en frère du <Link> de TitleCard, comme le menu
           actions rapides (un bouton ne peut pas être imbriqué dans un <a>). */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          onRemove(title.id);
-        }}
-        className="absolute top-2 left-2 z-30 rounded-full bg-destructive/90 hover:bg-destructive p-1.5 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-        aria-label="Retirer de la liste"
-      >
-        <X className="h-3.5 w-3.5" />
-      </button>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            onRemove(title.id);
+          }}
+          className="absolute top-2 left-2 z-30 rounded-full bg-destructive/90 hover:bg-destructive p-1.5 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label="Retirer de la liste"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
 
-export function ListReorder({ listId, items }: ListReorderProps) {
+export function ListReorder({ listId, items, canRemove = true }: ListReorderProps) {
   const [orderedIds, setOrderedIds] = useState<string[]>(() => items.map((i) => i.id));
   const reorder = useReorderItems();
   const removeItem = useRemoveListItem();
@@ -142,7 +147,7 @@ export function ListReorder({ listId, items }: ListReorderProps) {
             <SortableItem
               key={item.id}
               title={item}
-              onRemove={handleRemove}
+              onRemove={canRemove ? handleRemove : undefined}
               watched={watchedTitles?.has(item.id)}
               inWatchlist={watchlistIds.has(item.id)}
               inFavorites={favoriteIds.has(item.id)}

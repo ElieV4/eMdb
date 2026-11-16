@@ -61,6 +61,16 @@ export class RatingsController {
   }
 
   /**
+   * GET /titles/:id/my-rating
+   * Note et commentaire perso de l'utilisateur connecté pour ce titre.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('titles/:id/my-rating')
+  async getMyTitleRating(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.ratingsService.getMyTitleRating(user.id, id);
+  }
+
+  /**
    * GET /titles/:id/ratings
    * Résumé public des notes d'un titre (moyenne, count, répartition).
    * Accessible sans authentification.

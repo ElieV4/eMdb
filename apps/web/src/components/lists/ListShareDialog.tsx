@@ -1,139 +1,208 @@
 /**
- * Dialog de partage d'une liste avec un utilisateur.
- *
- * Phase 4.3 — Lists
+ * Dialogue de partage d'une liste, réservé à son créateur :
+ * - choix du mode de partage, appliqué à tous les membres ;
+ * - liste des membres, avec retrait ;
+ * - ajout d'un membre par pseudo (ou email exact).
  */
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { X, UserPlus } from "lucide-react";
 import { useShareList } from "@/hooks/api/useShareList";
+import { useShares } from "@/hooks/api/useShares";
+import { useRemoveShare } from "@/hooks/api/useRemoveShare";
+import { useUpdateShareMode } from "@/hooks/api/useUpdateShareMode";
+import { useSearchUsers } from "@/hooks/api/useSearchUsers";
+import { useDebounce } from "@/hooks/ui";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SHARE_MODE_OPTIONS } from "@/lib/shareModes";
+import { ShareMode } from "@/lib/types/api";
+import { cn } from "@/lib/utils";
 
 type ListShareDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  listId: string;
-  listName: string;
+  list: { id: string; nom: string; share_mode: ShareMode };
 };
 
-type UserOption = {
-  id: string;
-  pseudo: string;
-};
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
 
-export function ListShareDialog({
-  open,
-  onOpenChange,
-  listId,
-  listName,
-}: ListShareDialogProps) {
+export function ListShareDialog({ open, onOpenChange, list }: ListShareDialogProps) {
   const [query, setQuery] = useState("");
-  const [selectedUserId, setSelectedUserId] = useState("");
-  const [permission, setPermission] = useState<"lecture" | "edition">(
-    "lecture",
-  );
-  const [users, setUsers] = useState<UserOption[]>([]);
   const [error, setError] = useState("");
+  const debouncedQuery = useDebounce(query, 300);
 
+  const { data: members = [], isLoading: membersLoading } = useShares(list.id, open);
+  const { data: results = [], isFetching: searching } = useSearchUsers(
+    open ? debouncedQuery : "",
+  );
   const shareList = useShareList();
+  const removeShare = useRemoveShare();
+  const updateShareMode = useUpdateShareMode();
 
-  useEffect(() => {
-    if (query.trim().length >= 2) {
-      // TODO: intégrer un vrai endpoint de recherche utilisateurs
-      setUsers([]);
-    }
-  }, [query]);
+  const memberIds = new Set(members.map((m) => m.shared_with_user_id));
+  const candidates = results.filter((user) => !memberIds.has(user.id));
+  const hasQuery = debouncedQuery.trim().length >= 2 || debouncedQuery.includes("@");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleModeChange = (shareMode: ShareMode) => {
+    if (shareMode === list.share_mode) return;
     setError("");
-
-    if (!selectedUserId) {
-      setError("Veuillez sélectionner un utilisateur.");
-      return;
-    }
-
-    try {
-      await shareList.mutateAsync({
-        listId,
-        data: { shared_with_user_id: selectedUserId, permission },
-      });
-      onOpenChange(false);
-      setQuery("");
-      setSelectedUserId("");
-      setPermission("lecture");
-    } catch {
-      setError("Erreur lors du partage.");
-    }
+    updateShareMode.mutate(
+      { listId: list.id, shareMode },
+      { onError: (err) => setError(errorMessage(err, "Impossible de changer le mode.")) },
+    );
   };
+
+  const handleAdd = (userId: string) => {
+    setError("");
+    shareList.mutate(
+      { listId: list.id, data: { shared_with_user_id: userId } },
+      {
+        onSuccess: () => setQuery(""),
+        onError: (err) => setError(errorMessage(err, "Erreur lors du partage.")),
+      },
+    );
+  };
+
+  const handleRemove = (userId: string) => {
+    setError("");
+    removeShare.mutate(
+      { listId: list.id, userId },
+      { onError: (err) => setError(errorMessage(err, "Impossible de retirer ce membre.")) },
+    );
+  };
+
+  // Mode affiché : celui en cours d'envoi, sinon celui de la liste.
+  const currentMode = updateShareMode.isPending
+    ? (updateShareMode.variables?.shareMode ?? list.share_mode)
+    : list.share_mode;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Partager "{listName}"</DialogTitle>
+          <DialogTitle>Partager « {list.nom} »</DialogTitle>
+          <DialogDescription>
+            Le mode choisi s&apos;applique à tous les membres. Vous seul pouvez supprimer la
+            liste, gérer les membres et changer le mode.
+          </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="user-query">Rechercher un utilisateur</Label>
-            <Input
-              id="user-query"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Pseudo ou email..."
-            />
-            {users.length > 0 && (
-              <ul className="border rounded-md max-h-40 overflow-auto">
-                {users.map((user) => (
-                  <li
-                    key={user.id}
-                    className="px-3 py-2 hover:bg-accent cursor-pointer"
-                    onClick={() => setSelectedUserId(user.id)}
+
+        <div className="space-y-5">
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium mb-2">Droits des membres</legend>
+            <div role="radiogroup" aria-label="Mode de partage" className="grid gap-2">
+              {SHARE_MODE_OPTIONS.map((option) => {
+                const selected = currentMode === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    disabled={updateShareMode.isPending}
+                    onClick={() => handleModeChange(option.value)}
+                    className={cn(
+                      "rounded-md border px-3 py-2 text-left transition-colors",
+                      selected ? "border-primary bg-primary/10" : "hover:bg-muted",
+                    )}
                   >
-                    {user.pseudo}
+                    <span className="block text-sm font-medium">{option.label}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {option.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium">
+              Membres{members.length > 0 ? ` (${members.length})` : ""}
+            </p>
+            {membersLoading ? (
+              <p className="text-sm text-muted-foreground">Chargement…</p>
+            ) : members.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Cette liste n&apos;est encore partagée avec personne.
+              </p>
+            ) : (
+              <ul className="divide-y rounded-md border">
+                {members.map((member) => (
+                  <li
+                    key={member.shared_with_user_id}
+                    className="flex items-center justify-between px-3 py-2 text-sm"
+                  >
+                    <span>{member.users.pseudo}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Retirer ${member.users.pseudo}`}
+                      disabled={removeShare.isPending}
+                      onClick={() => handleRemove(member.shared_with_user_id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </li>
                 ))}
               </ul>
             )}
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="permission">Permission</Label>
-            <select
-              id="permission"
-              value={permission}
-              onChange={(e) =>
-                setPermission(e.target.value as "lecture" | "edition")
-              }
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="lecture">Lecture</option>
-              <option value="edition">Édition</option>
-            </select>
+            <Label htmlFor="share-user-query">Ajouter un membre</Label>
+            <Input
+              id="share-user-query"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Pseudo, ou adresse email complète"
+              autoComplete="off"
+            />
+            {hasQuery && (
+              <ul className="max-h-40 overflow-auto rounded-md border">
+                {candidates.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-muted-foreground">
+                    {searching ? "Recherche…" : "Aucun utilisateur trouvé."}
+                  </li>
+                ) : (
+                  candidates.map((user) => (
+                    <li key={user.id}>
+                      <button
+                        type="button"
+                        disabled={shareList.isPending}
+                        onClick={() => handleAdd(user.id)}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted"
+                      >
+                        <span>{user.pseudo}</span>
+                        <UserPlus className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Annuler
-            </Button>
-            <Button type="submit" disabled={shareList.isPending}>
-              Partager
-            </Button>
-          </DialogFooter>
-        </form>
+
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

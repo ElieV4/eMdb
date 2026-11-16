@@ -5,6 +5,10 @@
  *
  * Applique les filtres du header (type/genre/pays/année/note, bug filtres
  * header sur accueil/watchlist/listes/historique) aux titres affichés.
+ *
+ * Sous-groupes (?groupe=<id>) : filtre sur un sous-groupe, descendants
+ * inclus. Liste partagée : suivi "vu" commun à tous les membres, avec filtre
+ * ?vu=vus|non_vus et compteur.
  */
 
 "use client";
@@ -20,6 +24,12 @@ import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { ListActionsMenu } from "@/components/lists/ListActionsMenu";
 import { ListReorder } from "@/components/lists/ListReorder";
+import { ListGroupsBar } from "@/components/lists/ListGroupsBar";
+import { ListItemOverlay } from "@/components/lists/ListItemOverlay";
+import { ItemGroupsDialog } from "@/components/lists/ItemGroupsDialog";
+import { ItemCommentsDialog } from "@/components/lists/ItemCommentsDialog";
+import { useSetItemVu } from "@/hooks/api/useListGroups";
+import { itemInGroup } from "@/lib/listGroups";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { BackButton } from "@/components/common/BackButton";
@@ -33,6 +43,7 @@ import {
   buildListIdsByTitle,
 } from "@/lib/titleFilters";
 import { Title, TitleSearchResult } from "@/lib/types/api";
+import { SHARE_MODE_LABELS } from "@/lib/shareModes";
 import { cn } from "@/lib/utils";
 
 function titleToSearchResult(title: Title): TitleSearchResult {
@@ -68,6 +79,9 @@ function ListDetailPageContent() {
   const { watchlistIds, favoriteIds } = useListMembership();
   const { data: allLists } = useLists(isAuthenticated);
   const [editMode, setEditMode] = useState(false);
+  const [rangerItemId, setRangerItemId] = useState<string | null>(null);
+  const [commentsItemId, setCommentsItemId] = useState<string | null>(null);
+  const setItemVu = useSetItemVu();
 
   const filters = parseTitleFilters(searchParams);
   const listIdsByTitle = buildListIdsByTitle(allLists);
@@ -77,6 +91,16 @@ function ListDetailPageContent() {
   // "en_cours", "abandonnee". Sans objet pour les listes personnalisées/
   // favoris, qui n'ont pas de notion de statut de progression.
   const progressionFilter = searchParams.get("progression") ?? "tous";
+  const selectedGroupId = searchParams.get("groupe");
+  const vuFilter = searchParams.get("vu") ?? "tous";
+
+  const setParam = (key: string, value: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === null) params.delete(key);
+    else params.set(key, value);
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+  };
 
   if (isAuthLoading) {
     return (
@@ -98,6 +122,12 @@ function ListDetailPageContent() {
   }
 
   const isWatchlist = list?.type === "watchlist";
+  const isMember = list?.role === "member";
+  // Le suivi "vu" n'a de sens que pour une liste réellement partagée.
+  const isShared = isMember || (list?.member_count ?? 0) > 0;
+  const groups = list?.groups ?? [];
+  const activeGroupId =
+    selectedGroupId && groups.some((g) => g.id === selectedGroupId) ? selectedGroupId : null;
   const items = list?.items ?? [];
   const filteredItems = items.filter((item) => {
     if (
@@ -107,12 +137,23 @@ function ListDetailPageContent() {
       )
     )
       return false;
+    if (activeGroupId && !itemInGroup(item.groupIds ?? [], groups, activeGroupId)) return false;
+    if (isShared && vuFilter === "vus" && !item.vu) return false;
+    if (isShared && vuFilter === "non_vus" && item.vu) return false;
     if (!isWatchlist || progressionFilter === "tous") return true;
     // Les films n'ont pas de statut de progression — retirés quand un
     // filtre de progression est actif (cohérent avec /watchlist).
     if (item.type === "film") return false;
     return (item.statut ?? "en_cours") === progressionFilter;
   });
+
+  const groupCounts = new Map(
+    groups.map((g) => [g.id, items.filter((i) => itemInGroup(i.groupIds ?? [], groups, g.id)).length]),
+  );
+  const vuCount = items.filter((i) => i.vu).length;
+  const rangerItem = items.find((i) => i.id === rangerItemId) ?? null;
+  const commentsItem = items.find((i) => i.id === commentsItemId) ?? null;
+  const canEditItems = list?.capabilities.canEditItems ?? false;
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
@@ -125,7 +166,7 @@ function ListDetailPageContent() {
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
           >
             <ArrowLeft className="h-4 w-4" />
-            Mes listes
+            {isMember ? "Listes partagées" : "Mes listes"}
           </Link>
 
           {isLoading ? (
@@ -140,7 +181,17 @@ function ListDetailPageContent() {
                   <span className="text-xs rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">
                     {typeLabels[list.type] ?? list.type}
                   </span>
+                  {isMember && (
+                    <span className="text-xs rounded-full border px-2 py-0.5 text-muted-foreground">
+                      Partagée · {SHARE_MODE_LABELS[list.share_mode]}
+                    </span>
+                  )}
                 </div>
+                {isMember && list.owner && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Créée par {list.owner.pseudo}
+                  </p>
+                )}
                 {list.description && (
                   <p className="text-sm text-muted-foreground mt-1">
                     {list.description}
@@ -161,6 +212,8 @@ function ListDetailPageContent() {
               ) : (
                 <ListActionsMenu
                   list={list}
+                  capabilities={list.capabilities}
+                  role={list.role}
                   variant="buttons"
                   onEditContent={() => setEditMode(true)}
                   onDeleted={() => router.push("/lists")}
@@ -204,6 +257,48 @@ function ListDetailPageContent() {
           </div>
         )}
 
+        {list && !editMode && !isLoading && !error && (
+          <ListGroupsBar
+            listId={list.id}
+            groups={groups}
+            capabilities={list.capabilities}
+            counts={groupCounts}
+            totalCount={items.length}
+            selectedGroupId={activeGroupId}
+            onSelect={(groupId) => setParam("groupe", groupId)}
+          />
+        )}
+
+        {isShared && !editMode && !isLoading && !error && items.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
+              {[
+                { value: "tous", label: "Tous" },
+                { value: "vus", label: "Vus" },
+                { value: "non_vus", label: "Pas vus" },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={vuFilter === option.value}
+                  onClick={() => setParam("vu", option.value === "tous" ? null : option.value)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    vuFilter === option.value
+                      ? "bg-primary text-white"
+                      : "text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {vuCount}/{items.length} vu{vuCount > 1 ? "s" : ""} dans la liste
+            </span>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -219,31 +314,91 @@ function ListDetailPageContent() {
           </Alert>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Cette liste est vide. Ajoutez des titres depuis leur fiche.
+            {list?.capabilities.canAddItems
+              ? "Cette liste est vide. Ajoutez des titres depuis leur fiche."
+              : "Cette liste est vide."}
           </p>
         ) : editMode ? (
           // Mode édition : glisser-déposer + retrait en un clic, sur la
           // liste complète non filtrée (réordonner un sous-ensemble filtré
           // réattribuerait des positions incohérentes aux items masqués).
-          <ListReorder listId={list?.id ?? ""} items={items.map(titleToSearchResult)} />
+          <ListReorder
+            listId={list?.id ?? ""}
+            items={items.map(titleToSearchResult)}
+            canRemove={list?.capabilities.canRemoveItems ?? false}
+          />
         ) : filteredItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Aucun titre de cette liste ne correspond aux filtres actifs.
+            {activeGroupId
+              ? "Aucun titre rangé dans ce sous-groupe ne correspond aux filtres actifs."
+              : "Aucun titre de cette liste ne correspond aux filtres actifs."}
           </p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {filteredItems.map((title) => (
-              <TitleCard
-                key={title.id}
-                title={titleToSearchResult(title)}
-                compact
-                watched={watchedTitles?.has(title.id)}
-                inWatchlist={watchlistIds.has(title.id)}
-                inFavorites={favoriteIds.has(title.id)}
-                watchlistStatus={title.statut}
-              />
+              <div key={title.id} className="relative">
+                <TitleCard
+                  title={titleToSearchResult(title)}
+                  compact
+                  watched={watchedTitles?.has(title.id)}
+                  inWatchlist={watchlistIds.has(title.id)}
+                  inFavorites={favoriteIds.has(title.id)}
+                  watchlistStatus={title.statut}
+                />
+                <ListItemOverlay
+                  titre={title.titre}
+                  showVu={isShared}
+                  vu={title.vu}
+                  vuBy={title.vuBy}
+                  canEdit={canEditItems}
+                  onToggleVu={() =>
+                    list && setItemVu.mutate({ listId: list.id, titleId: title.id, vu: !title.vu })
+                  }
+                  showRanger={canEditItems && groups.length > 0}
+                  onRanger={() => setRangerItemId(title.id)}
+                  onComments={() => setCommentsItemId(title.id)}
+                  commentCount={
+                    (title.commentCount ?? 0) +
+                    (title.memberComments?.length ?? 0) +
+                    (title.myComment ? 1 : 0)
+                  }
+                />
+              </div>
             ))}
           </div>
+        )}
+
+        {list && (
+          <ItemCommentsDialog
+            open={commentsItem !== null}
+            onOpenChange={(open) => !open && setCommentsItemId(null)}
+            listId={list.id}
+            isShared={isShared}
+            item={
+              commentsItem
+                ? {
+                    id: commentsItem.id,
+                    titre: commentsItem.titre,
+                    myComment: commentsItem.myComment,
+                    memberComments: commentsItem.memberComments ?? [],
+                  }
+                : null
+            }
+          />
+        )}
+
+        {list && (
+          <ItemGroupsDialog
+            open={rangerItem !== null}
+            onOpenChange={(open) => !open && setRangerItemId(null)}
+            listId={list.id}
+            groups={groups}
+            item={
+              rangerItem
+                ? { id: rangerItem.id, titre: rangerItem.titre, groupIds: rangerItem.groupIds ?? [] }
+                : null
+            }
+          />
         )}
       </div>
     </div>

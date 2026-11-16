@@ -66,7 +66,15 @@ jest.mock("@/components/watches/FollowButton", () => ({
 }));
 
 jest.mock("@/components/ratings/RatingInput", () => ({
-  RatingInput: () => <div data-testid="rating-input" />,
+  RatingInput: ({ value }: { value?: number | null }) => (
+    <div data-testid="rating-input" data-value={String(value ?? "")} />
+  ),
+}));
+
+// Les étoiles reflètent la note de l'utilisateur (GET /titles/:id/my-rating),
+// pas la moyenne publique.
+jest.mock("@/hooks/api/useComments", () => ({
+  useMyTitleRating: () => ({ data: { note_perso: 7, commentaire: null, updated_at: "" } }),
 }));
 
 jest.mock("@/hooks/api/useWatches", () => ({
@@ -109,6 +117,11 @@ describe("TitleActions", () => {
     renderWithClient(<TitleActions titleId="title-1" type="film" />);
     expect(screen.getByTestId("watch-button")).toBeInTheDocument();
     expect(screen.getByTestId("rating-input")).toBeInTheDocument();
+  });
+
+  it("affiche ma note (et non la moyenne) dans les étoiles", () => {
+    renderWithClient(<TitleActions titleId="title-1" type="film" />);
+    expect(screen.getByTestId("rating-input")).toHaveAttribute("data-value", "7");
   });
 
   it("affiche les actions principales pour une série", () => {

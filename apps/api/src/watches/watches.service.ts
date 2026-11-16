@@ -206,12 +206,22 @@ export class WatchesService {
         throw new ForbiddenException('Ce visionnage ne vous appartient pas.');
       }
 
+      let dateVue: Date | undefined;
+      if (dto.date_vue !== undefined) {
+        dateVue = new Date(dto.date_vue);
+        // Une minute de marge pour les horloges légèrement décalées.
+        if (dateVue.getTime() > Date.now() + 60_000) {
+          throw new BadRequestException('La date de visionnage ne peut pas être dans le futur.');
+        }
+      }
+
       return tx.user_watches.update({
         where: { id },
         data: {
           ...(dto.support !== undefined && { support: dto.support }),
           ...(dto.compagnie !== undefined && { compagnie: dto.compagnie }),
           ...(dto.emotion !== undefined && { emotion: dto.emotion }),
+          ...(dateVue && { date_vue: dateVue }),
         },
       });
     });
@@ -515,15 +525,27 @@ export class WatchesService {
                   ...(episodeIds.length > 0 ? [{ episode_id: { in: episodeIds } }] : []),
                 ],
               },
-              select: { title_id: true, episode_id: true, note_perso: true },
+              select: { title_id: true, episode_id: true, note_perso: true, commentaire: true },
             })
           : [];
 
       return { data, total, ratings };
     });
-    const ratingByTitleId = new Map(ratings.filter((r) => r.title_id).map((r) => [r.title_id, Number(r.note_perso)]));
+    // Une ligne user_ratings peut ne porter qu'un commentaire (note_perso
+    // null) : ne pas la convertir en 0, qui s'afficherait comme "★ 0".
+    const noteOf = (r: { note_perso: unknown }) => (r.note_perso === null ? null : Number(r.note_perso));
+    const ratingByTitleId = new Map(ratings.filter((r) => r.title_id).map((r) => [r.title_id, noteOf(r)]));
     const ratingByEpisodeId = new Map(
-      ratings.filter((r) => r.episode_id).map((r) => [r.episode_id, Number(r.note_perso)]),
+      ratings.filter((r) => r.episode_id).map((r) => [r.episode_id, noteOf(r)]),
+    );
+
+    // Commentaire perso du titre (ou de l'épisode), affiché sous chaque
+    // visionnage dans l'Historique.
+    const commentByTitleId = new Map(
+      ratings.filter((r) => r.title_id && r.commentaire).map((r) => [r.title_id, r.commentaire]),
+    );
+    const commentByEpisodeId = new Map(
+      ratings.filter((r) => r.episode_id && r.commentaire).map((r) => [r.episode_id, r.commentaire]),
     );
 
     const items = data.map((watch) => ({
@@ -531,10 +553,204 @@ export class WatchesService {
       note_perso: watch.episode_id
         ? (ratingByEpisodeId.get(watch.episode_id) ?? null)
         : (ratingByTitleId.get(watch.title_id) ?? null),
+      commentaire: watch.episode_id
+        ? (commentByEpisodeId.get(watch.episode_id) ?? null)
+        : (commentByTitleId.get(watch.title_id) ?? null),
     }));
 
     const totalPages = Math.ceil(total / limit);
     return { items, total, page, limit, totalPages };
+  }
+
+  // ======================================================================
+  // HISTORIQUE TABULAIRE
+  // ======================================================================
+
+  /**
+   * GET /watches/table
+   * Tout l'historique de l'utilisateur, une ligne par visionnage, avec ce
+   * qu'affiche la vue tableau : dates, genres, studios, réalisateurs, note
+   * IMDb, moyenne des utilisateurs, note et commentaire perso, contexte
+   * (support / compagnie / émotions) et listes contenant le titre.
+   *
+   * Renvoyé d'un bloc (tri, filtres et regroupement se font côté client) :
+   * les données annexes sont chargées en quelques requêtes groupées, pas une
+   * par ligne. Plafonné à HISTORY_TABLE_LIMIT visionnages (les plus récents).
+   */
+  async getHistoryTable(userId: string) {
+    const HISTORY_TABLE_LIMIT = 5000;
+    const titleSelect = {
+      id: true,
+      titre_vo: true,
+      titre_vf: true,
+      type: true,
+      date_sortie: true,
+      note_imdb: true,
+      affiche_url: true,
+    } as const;
+
+    const watches = await this.prisma.forUser(userId, (tx) =>
+      tx.user_watches.findMany({
+        where: { user_id: userId },
+        orderBy: { date_vue: 'desc' },
+        take: HISTORY_TABLE_LIMIT + 1,
+        select: {
+          id: true,
+          date_vue: true,
+          support: true,
+          compagnie: true,
+          emotion: true,
+          title_id: true,
+          episode_id: true,
+          titles: { select: titleSelect },
+          episodes: {
+            select: {
+              id: true,
+              numero: true,
+              titre: true,
+              date_sortie: true,
+              seasons: { select: { numero: true, titles: { select: titleSelect } } },
+            },
+          },
+        },
+      }),
+    );
+    const truncated = watches.length > HISTORY_TABLE_LIMIT;
+    const rows = truncated ? watches.slice(0, HISTORY_TABLE_LIMIT) : watches;
+
+    // Titre "porteur" de la ligne : le film, ou la série de l'épisode.
+    const titleOf = (w: (typeof rows)[number]) => w.titles ?? w.episodes?.seasons.titles ?? null;
+    const titleIds = [...new Set(rows.map((w) => titleOf(w)?.id).filter((id): id is string => !!id))];
+    const episodeIds = [...new Set(rows.map((w) => w.episode_id).filter((id): id is string => !!id))];
+
+    const [genres, studios, directors, myRatings, lists] =
+      titleIds.length === 0
+        ? [[], [], [], [], []]
+        : await Promise.all([
+            this.prisma.title_genres.findMany({
+              where: { title_id: { in: titleIds } },
+              select: { title_id: true, genres: { select: { nom: true } } },
+            }),
+            this.prisma.title_studios.findMany({
+              where: { title_id: { in: titleIds } },
+              select: { title_id: true, studios: { select: { id: true, nom: true } } },
+            }),
+            this.prisma.credits.findMany({
+              where: { title_id: { in: titleIds }, episode_id: null, roles: { code: 'realisateur' } },
+              select: { title_id: true, people: { select: { id: true, nom: true } } },
+            }),
+            this.prisma.forUser(userId, (tx) =>
+              tx.user_ratings.findMany({
+                where: {
+                  user_id: userId,
+                  OR: [
+                    { title_id: { in: titleIds } },
+                    ...(episodeIds.length > 0 ? [{ episode_id: { in: episodeIds } }] : []),
+                  ],
+                },
+                select: { title_id: true, episode_id: true, note_perso: true, commentaire: true },
+              }),
+            ),
+            // Listes visibles par l'utilisateur (les siennes et celles
+            // partagées avec lui, RLS) qui contiennent ces titres.
+            this.prisma.forUser(userId, (tx) =>
+              tx.list_items.findMany({
+                where: { title_id: { in: titleIds } },
+                select: { title_id: true, user_lists: { select: { id: true, nom: true, type: true } } },
+              }),
+            ),
+          ]);
+
+    // Moyenne des notes des utilisateurs de l'app (lignes avec une note
+    // seulement), tous utilisateurs confondus : agrégat public, cf.
+    // RatingsService.getTitleRatingsSummary.
+    const averages =
+      titleIds.length === 0
+        ? []
+        : await this.prisma.asSystem((tx) =>
+            tx.user_ratings.groupBy({
+              by: ['title_id'],
+              where: { title_id: { in: titleIds }, note_perso: { not: null } },
+              _avg: { note_perso: true },
+              _count: { note_perso: true },
+            }),
+          );
+
+    const group = <T, V>(items: T[], key: (i: T) => string | null, value: (i: T) => V) => {
+      const map = new Map<string, V[]>();
+      for (const item of items) {
+        const k = key(item);
+        if (!k) continue;
+        map.set(k, [...(map.get(k) ?? []), value(item)]);
+      }
+      return map;
+    };
+    const genresBy = group(genres, (g) => g.title_id, (g) => g.genres.nom);
+    const studiosBy = group(studios, (s) => s.title_id, (s) => s.studios);
+    const directorsBy = group(directors, (d) => d.title_id, (d) => d.people);
+    const listsBy = group(lists, (l) => l.title_id, (l) => l.user_lists);
+    const avgBy = new Map(
+      averages.map((a) => [
+        a.title_id as string,
+        {
+          moyenne: a._avg.note_perso !== null ? parseFloat(Number(a._avg.note_perso).toFixed(1)) : null,
+          count: a._count.note_perso,
+        },
+      ]),
+    );
+    const myByTitle = new Map(myRatings.filter((r) => r.title_id).map((r) => [r.title_id as string, r]));
+    const myByEpisode = new Map(myRatings.filter((r) => r.episode_id).map((r) => [r.episode_id as string, r]));
+    const noteOf = (n: unknown) => (n === null || n === undefined ? null : Number(n));
+
+    return {
+      truncated,
+      rows: rows.map((w) => {
+        const title = titleOf(w);
+        const tid = title?.id ?? null;
+        const mine = w.episode_id ? myByEpisode.get(w.episode_id) : tid ? myByTitle.get(tid) : undefined;
+        const avg = tid ? avgBy.get(tid) : undefined;
+        return {
+          watchId: w.id,
+          dateVue: w.date_vue,
+          title: title
+            ? {
+                id: title.id,
+                titre: title.titre_vf || title.titre_vo,
+                titreVo: title.titre_vo,
+                type: title.type,
+                afficheUrl: title.affiche_url,
+              }
+            : null,
+          episode: w.episodes
+            ? {
+                id: w.episodes.id,
+                saison: w.episodes.seasons.numero,
+                numero: w.episodes.numero,
+                titre: w.episodes.titre,
+              }
+            : null,
+          // Date de publication : celle de l'épisode pour un épisode.
+          dateSortie: w.episodes?.date_sortie ?? title?.date_sortie ?? null,
+          genres: (tid && genresBy.get(tid)) || [],
+          studios: (tid && studiosBy.get(tid)) || [],
+          realisateurs: (tid && directorsBy.get(tid)) || [],
+          noteImdb: noteOf(title?.note_imdb),
+          moyenneApp: avg?.moyenne ?? null,
+          nombreNotesApp: avg?.count ?? 0,
+          // Note et commentaire perso : ceux de l'épisode pour un épisode.
+          notePerso: noteOf(mine?.note_perso),
+          commentaire: mine?.commentaire ?? null,
+          // Note et commentaire perso du titre lui-même (la série pour un
+          // épisode) : utilisés quand le tableau regroupe par série.
+          titreNotePerso: noteOf(tid ? myByTitle.get(tid)?.note_perso : null),
+          titreCommentaire: (tid && myByTitle.get(tid)?.commentaire) || null,
+          support: w.support,
+          compagnie: w.compagnie,
+          emotion: w.emotion ?? [],
+          listes: (tid && listsBy.get(tid)) || [],
+        };
+      }),
+    };
   }
 
   // ======================================================================

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Length, IsUrl } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Length, IsUrl } from 'class-validator';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -10,4 +10,9 @@ export class UpdateUserDto {
   @IsString()
   @IsUrl()
   avatar_url?: string;
+
+  /** Rendre ses commentaires perso visibles des membres de ses listes partagées. */
+  @IsOptional()
+  @IsBoolean()
+  commentaires_visibles?: boolean;
 }

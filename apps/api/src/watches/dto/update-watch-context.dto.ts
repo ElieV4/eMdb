@@ -1,4 +1,4 @@
-import { ArrayMinSize, IsArray, IsEnum, IsOptional } from 'class-validator';
+import { ArrayMinSize, IsArray, IsDateString, IsEnum, IsOptional } from 'class-validator';
 
 /**
  * Contexte de visionnage — saisi uniquement a posteriori (jamais à la
@@ -36,4 +36,9 @@ export class UpdateWatchContextDto {
   @ArrayMinSize(1)
   @IsEnum(WATCH_EMOTION_VALUES, { each: true })
   emotion?: string[] | null;
+
+  /** Corriger la date/heure du visionnage (ISO 8601, pas dans le futur). */
+  @IsOptional()
+  @IsDateString()
+  date_vue?: string;
 }

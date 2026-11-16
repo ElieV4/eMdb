@@ -32,9 +32,32 @@ const prismaServiceMock = {
     findUnique: jest.fn(),
     findMany: jest.fn(),
     delete: jest.fn(),
+    count: jest.fn().mockResolvedValue(0),
+  },
+  list_groups: {
+    findMany: jest.fn().mockResolvedValue([]),
+    findFirst: jest.fn(),
+    count: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  list_item_groups: {
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
   },
   titles: {
     findUnique: jest.fn(),
+  },
+  user_ratings: {
+    findMany: jest.fn().mockResolvedValue([]),
+  },
+  list_item_comments: {
+    findMany: jest.fn(),
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
   },
   users: {
     findUnique: jest.fn(),
@@ -52,6 +75,8 @@ describe('ListsService', () => {
 
     service = module.get<ListsService>(ListsService);
     jest.clearAllMocks();
+    prismaServiceMock.list_shares.findMany.mockResolvedValue([]);
+    prismaServiceMock.user_ratings.findMany.mockResolvedValue([]);
   });
 
   const userId = 'user-uuid';
@@ -77,6 +102,10 @@ describe('ListsService', () => {
     title_id: overrides.title_id ?? titleId,
     position: overrides.position ?? 0,
     added_at: overrides.added_at ?? new Date('2026-07-23'),
+    vu_at: overrides.vu_at ?? null,
+    vu_by_user: overrides.vu_by_user ?? null,
+    list_item_groups: overrides.list_item_groups ?? [],
+    _count: overrides._count ?? { list_item_comments: 0 },
     titles: overrides.titles ?? {
       id: titleId,
       tmdb_id: 123,
@@ -615,6 +644,347 @@ describe('ListsService', () => {
           ],
         }),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ======================================================================
+  // getListDetail — vu et sous-groupes
+  // ======================================================================
+  describe('getListDetail (vu et sous-groupes)', () => {
+    it('renvoie les sous-groupes, le vu partagé et les groupes de chaque titre', async () => {
+      mockOwnList();
+      prismaServiceMock.list_items.findMany.mockResolvedValue([
+        buildListItem({
+          vu_at: new Date('2026-11-16'),
+          vu_by_user: { pseudo: 'marie' },
+          list_item_groups: [{ group_id: 'g-tennis' }],
+        }),
+      ]);
+      prismaServiceMock.list_groups.findMany.mockResolvedValue([
+        { id: 'g-sport', parent_id: null, nom: 'Sport', position: 0 },
+        { id: 'g-tennis', parent_id: 'g-sport', nom: 'Tennis', position: 0 },
+      ]);
+      prismaServiceMock.list_shares.count.mockResolvedValue(2);
+
+      const result = await service.getListDetail(listId, userId);
+
+      expect(result.groups).toHaveLength(2);
+      expect(result.member_count).toBe(2);
+      expect(result.items[0]).toMatchObject({ vu: true, vuBy: 'marie', groupIds: ['g-tennis'] });
+    });
+  });
+
+  // ======================================================================
+  // setItemVu
+  // ======================================================================
+  describe('setItemVu', () => {
+    it("marque un titre comme vu pour toute la liste, avec l'auteur", async () => {
+      mockSharedList('collaboratif');
+      prismaServiceMock.list_items.findUnique.mockResolvedValue({ list_id: listId });
+      prismaServiceMock.list_items.update.mockResolvedValue({
+        title_id: titleId,
+        vu_at: new Date('2026-11-16'),
+        vu_by_user: { pseudo: 'user2' },
+      });
+
+      const result = await service.setItemVu(listId, sharedWithUserId, titleId, { vu: true });
+
+      expect(prismaServiceMock.list_items.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { vu_at: expect.any(Date), vu_by: sharedWithUserId },
+        }),
+      );
+      expect(result).toMatchObject({ vu: true, vuBy: 'user2' });
+    });
+
+    it("retire le vu (vu_at et vu_by remis à null)", async () => {
+      mockOwnList();
+      prismaServiceMock.list_items.findUnique.mockResolvedValue({ list_id: listId });
+      prismaServiceMock.list_items.update.mockResolvedValue({
+        title_id: titleId,
+        vu_at: null,
+        vu_by_user: null,
+      });
+
+      const result = await service.setItemVu(listId, userId, titleId, { vu: false });
+
+      expect(prismaServiceMock.list_items.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { vu_at: null, vu_by: null } }),
+      );
+      expect(result.vu).toBe(false);
+    });
+
+    it('lève Forbidden pour un membre en mode lecture', async () => {
+      mockSharedList('lecture');
+
+      await expect(
+        service.setItemVu(listId, sharedWithUserId, titleId, { vu: true }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaServiceMock.list_items.update).not.toHaveBeenCalled();
+    });
+
+    it("lève NotFound si le titre n'est pas dans la liste", async () => {
+      mockOwnList();
+      prismaServiceMock.list_items.findUnique.mockResolvedValue(null);
+
+      await expect(service.setItemVu(listId, userId, titleId, { vu: true })).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  // ======================================================================
+  // Sous-groupes
+  // ======================================================================
+  describe('createGroup', () => {
+    it('crée un sous-groupe sous un parent de la même liste, en dernière position', async () => {
+      mockOwnList();
+      prismaServiceMock.list_groups.findFirst
+        .mockResolvedValueOnce({ id: 'g-sport' }) // parent
+        .mockResolvedValueOnce({ position: 1 }); // dernier frère
+      prismaServiceMock.list_groups.create.mockResolvedValue({ id: 'g-tennis' });
+
+      await service.createGroup(listId, userId, { nom: '  Tennis ', parent_id: 'g-sport' });
+
+      expect(prismaServiceMock.list_groups.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { list_id: listId, parent_id: 'g-sport', nom: 'Tennis', position: 2 },
+        }),
+      );
+    });
+
+    it("lève NotFound si le parent n'est pas dans la liste", async () => {
+      mockOwnList();
+      prismaServiceMock.list_groups.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.createGroup(listId, userId, { nom: 'Tennis', parent_id: 'g-autre-liste' }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prismaServiceMock.list_groups.create).not.toHaveBeenCalled();
+    });
+
+    it('lève Forbidden pour un membre en mode collaboratif (création = mode ouvert)', async () => {
+      mockSharedList('collaboratif');
+
+      await expect(service.createGroup(listId, sharedWithUserId, { nom: 'Foot' })).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+
+  describe('renameGroup / deleteGroup', () => {
+    it('autorise un membre en collaboratif à renommer', async () => {
+      mockSharedList('collaboratif');
+      prismaServiceMock.list_groups.findFirst.mockResolvedValue({ id: 'g-sport' });
+      prismaServiceMock.list_groups.update.mockResolvedValue({ id: 'g-sport', nom: 'Sports' });
+
+      await service.renameGroup(listId, sharedWithUserId, 'g-sport', { nom: 'Sports' });
+
+      expect(prismaServiceMock.list_groups.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'g-sport' }, data: { nom: 'Sports' } }),
+      );
+    });
+
+    it('refuse la suppression à un membre en collaboratif', async () => {
+      mockSharedList('collaboratif');
+
+      await expect(service.deleteGroup(listId, sharedWithUserId, 'g-sport')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(prismaServiceMock.list_groups.delete).not.toHaveBeenCalled();
+    });
+
+    it("lève NotFound pour un groupe d'une autre liste", async () => {
+      mockOwnList();
+      prismaServiceMock.list_groups.findFirst.mockResolvedValue(null);
+
+      await expect(service.deleteGroup(listId, userId, 'g-ailleurs')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('setItemGroups', () => {
+    it('remplace les sous-groupes du titre (doublons ignorés)', async () => {
+      mockSharedList('collaboratif');
+      prismaServiceMock.list_items.findUnique.mockResolvedValue({ list_id: listId });
+      prismaServiceMock.list_groups.count.mockResolvedValue(2);
+
+      const result = await service.setItemGroups(listId, sharedWithUserId, titleId, {
+        group_ids: ['g-sport', 'g-tennis', 'g-tennis'],
+      });
+
+      expect(prismaServiceMock.list_item_groups.deleteMany).toHaveBeenCalledWith({
+        where: { list_id: listId, title_id: titleId },
+      });
+      expect(prismaServiceMock.list_item_groups.createMany).toHaveBeenCalledWith({
+        data: [
+          { list_id: listId, title_id: titleId, group_id: 'g-sport' },
+          { list_id: listId, title_id: titleId, group_id: 'g-tennis' },
+        ],
+      });
+      expect(result.groupIds).toEqual(['g-sport', 'g-tennis']);
+    });
+
+    it("lève NotFound si un groupe n'appartient pas à la liste", async () => {
+      mockOwnList();
+      prismaServiceMock.list_items.findUnique.mockResolvedValue({ list_id: listId });
+      prismaServiceMock.list_groups.count.mockResolvedValue(1);
+
+      await expect(
+        service.setItemGroups(listId, userId, titleId, { group_ids: ['g-1', 'g-autre'] }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prismaServiceMock.list_item_groups.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('lève Forbidden pour un membre en lecture', async () => {
+      mockSharedList('lecture');
+
+      await expect(
+        service.setItemGroups(listId, sharedWithUserId, titleId, { group_ids: [] }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  // ======================================================================
+  // Commentaires perso dans le détail d'une liste
+  // ======================================================================
+  describe('getListDetail (commentaires)', () => {
+    it("renvoie mon commentaire, ceux des membres qui les partagent, et le nombre de commentaires du fil", async () => {
+      mockOwnList();
+      prismaServiceMock.list_items.findMany.mockResolvedValue([
+        buildListItem({ _count: { list_item_comments: 3 } }),
+      ]);
+      prismaServiceMock.list_shares.findMany.mockResolvedValue([{ shared_with_user_id: 'u2' }]);
+      prismaServiceMock.user_ratings.findMany
+        .mockResolvedValueOnce([{ title_id: titleId, commentaire: 'Mon avis' }])
+        .mockResolvedValueOnce([
+          { title_id: titleId, commentaire: 'Génial', users: { pseudo: 'marie' } },
+        ]);
+
+      const result = await service.getListDetail(listId, userId);
+
+      expect(result.items[0]).toMatchObject({
+        myComment: 'Mon avis',
+        memberComments: [{ pseudo: 'marie', commentaire: 'Génial' }],
+        commentCount: 3,
+      });
+      // Les commentaires des autres ne sont lus que pour les membres de la
+      // liste, hors moi, ayant activé le partage.
+      expect(prismaServiceMock.user_ratings.findMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            user_id: { in: ['u2'] },
+            title_id: { in: [titleId] },
+            users: { commentaires_visibles: true },
+          }),
+        }),
+      );
+    });
+
+    it("ne lit pas les commentaires des autres pour une liste non partagée", async () => {
+      mockOwnList();
+      prismaServiceMock.list_items.findMany.mockResolvedValue([buildListItem({})]);
+
+      const result = await service.getListDetail(listId, userId);
+
+      expect(result.items[0].memberComments).toEqual([]);
+      expect(prismaServiceMock.user_ratings.findMany).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ======================================================================
+  // Fil de commentaires partagés
+  // ======================================================================
+  describe('commentaires partagés', () => {
+    const comment = (overrides: any = {}) => ({
+      id: overrides.id ?? 'c1',
+      contenu: overrides.contenu ?? 'Super film',
+      created_at: new Date('2026-11-16'),
+      updated_at: new Date('2026-11-16'),
+      user_id: overrides.user_id ?? sharedWithUserId,
+      users: { pseudo: overrides.pseudo ?? 'user2', avatar_url: null },
+    });
+
+    it('un membre en lecture lit le fil mais ne peut ni écrire ni supprimer', async () => {
+      mockSharedList('lecture');
+      prismaServiceMock.list_item_comments.findMany.mockResolvedValue([comment()]);
+
+      const result = await service.getItemComments(listId, sharedWithUserId, titleId);
+
+      expect(result.canWrite).toBe(false);
+      expect(result.comments[0]).toMatchObject({
+        contenu: 'Super film',
+        author: { pseudo: 'user2' },
+        canEdit: false,
+        canDelete: false,
+      });
+    });
+
+    it('le créateur peut supprimer le commentaire de quelqu’un d’autre (modération)', async () => {
+      mockOwnList();
+      prismaServiceMock.list_item_comments.findMany.mockResolvedValue([comment()]);
+
+      const result = await service.getItemComments(listId, userId, titleId);
+
+      expect(result.comments[0]).toMatchObject({ canEdit: false, canDelete: true });
+    });
+
+    it('un membre en collaboratif ajoute un commentaire (texte nettoyé)', async () => {
+      mockSharedList('collaboratif');
+      prismaServiceMock.list_items.findUnique.mockResolvedValue({ list_id: listId });
+      prismaServiceMock.list_item_comments.create.mockResolvedValue(comment({ contenu: 'À revoir' }));
+
+      const result = await service.addItemComment(listId, sharedWithUserId, titleId, {
+        contenu: '  À revoir  ',
+      });
+
+      expect(prismaServiceMock.list_item_comments.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { list_id: listId, title_id: titleId, user_id: sharedWithUserId, contenu: 'À revoir' },
+        }),
+      );
+      expect(result).toMatchObject({ canEdit: true, canDelete: true });
+    });
+
+    it('un membre en lecture ne peut pas commenter', async () => {
+      mockSharedList('lecture');
+
+      await expect(
+        service.addItemComment(listId, sharedWithUserId, titleId, { contenu: 'Hop' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaServiceMock.list_item_comments.create).not.toHaveBeenCalled();
+    });
+
+    it("on ne modifie pas le commentaire de quelqu'un d'autre, même en mode ouvert", async () => {
+      mockSharedList('ouvert');
+      prismaServiceMock.list_item_comments.findFirst.mockResolvedValue({ id: 'c1', user_id: 'autre' });
+
+      await expect(
+        service.updateItemComment(listId, sharedWithUserId, 'c1', { contenu: 'Modifié' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaServiceMock.list_item_comments.update).not.toHaveBeenCalled();
+    });
+
+    it("un membre ne supprime pas le commentaire d'un autre ; le créateur si", async () => {
+      mockSharedList('ouvert');
+      prismaServiceMock.list_item_comments.findFirst.mockResolvedValue({ id: 'c1', user_id: 'autre' });
+      await expect(service.deleteItemComment(listId, sharedWithUserId, 'c1')).rejects.toThrow(
+        ForbiddenException,
+      );
+
+      mockOwnList();
+      await service.deleteItemComment(listId, userId, 'c1');
+      expect(prismaServiceMock.list_item_comments.delete).toHaveBeenCalledWith({ where: { id: 'c1' } });
+    });
+
+    it("lève NotFound pour un commentaire d'une autre liste", async () => {
+      mockOwnList();
+      prismaServiceMock.list_item_comments.findFirst.mockResolvedValue(null);
+
+      await expect(service.deleteItemComment(listId, userId, 'c-ailleurs')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

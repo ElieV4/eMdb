@@ -1,6 +1,6 @@
 /**
- * Hook API pour partager une liste (POST /lists/:listId/shares).
- * Phase 4.3 — Lists
+ * Hook API pour ajouter un membre à une liste (POST /lists/:listId/shares).
+ * Les droits du membre découlent du mode de partage de la liste.
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,7 +18,8 @@ export function useShareList() {
       }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["shares", variables.listId] });
-      queryClient.invalidateQueries({ queryKey: ["shared-lists"] });
+      // Compteur "partagée avec N" des cartes de /lists.
+      queryClient.invalidateQueries({ queryKey: ["lists"] });
     },
   });
 }

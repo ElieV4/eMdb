@@ -12,6 +12,8 @@ const USER_PUBLIC_SELECT = {
   pseudo: true,
   avatar_url: true,
   created_at: true,
+  // Réglage : commentaires perso visibles des membres de ses listes partagées.
+  commentaires_visibles: true,
 } as const;
 
 @Injectable()
@@ -45,6 +47,7 @@ export class UsersService {
       data: {
         pseudo: payload.pseudo,
         avatar_url: payload.avatar_url,
+        commentaires_visibles: payload.commentaires_visibles,
       },
       select: USER_PUBLIC_SELECT,
     });
@@ -64,28 +67,43 @@ export class UsersService {
   }
 
   /**
-   * Recherche un utilisateur par pseudo ou email (insensible à la casse).
-   * Nécessaire pour la fonctionnalité de partage de listes :
-   * il faut pouvoir trouver l'autre utilisateur.
+   * Recherche d'utilisateurs pour le partage de listes (GET /users/search).
    *
-   * @param query - Fragment de pseudo ou email à rechercher.
-   * @returns Liste des utilisateurs correspondants (max 20).
+   * Ne doit pas permettre d'énumérer les comptes :
+   * - un fragment de pseudo (2 caractères min.) cherche par "contient" ;
+   * - une saisie contenant "@" ne trouve que l'email EXACT (insensible à la
+   *   casse) : on retrouve un ami dont on connaît l'adresse, sans pouvoir
+   *   lister les emails par sous-chaîne ;
+   * - l'email n'est jamais renvoyé ;
+   * - seuls les comptes actifs sont proposés, hors utilisateur connecté.
+   *
+   * @param query - Fragment de pseudo, ou email complet.
+   * @param currentUserId - Utilisateur connecté, exclu des résultats.
+   * @returns Utilisateurs correspondants (max 10) : id, pseudo, avatar_url.
    */
-  async findByPseudoOrEmail(query: string) {
+  async findByPseudoOrEmail(query: string, currentUserId: string) {
+    const trimmed = query.trim();
+    const isEmail = trimmed.includes('@');
+
+    if (!isEmail && trimmed.length < 2) {
+      return [];
+    }
+
     return this.prisma.users.findMany({
       where: {
-        OR: [
-          { email: { contains: query, mode: 'insensitive' } },
-          { pseudo: { contains: query, mode: 'insensitive' } },
-        ],
+        status: 'active',
+        id: { not: currentUserId },
+        ...(isEmail
+          ? { email: { equals: trimmed, mode: 'insensitive' as const } }
+          : { pseudo: { contains: trimmed, mode: 'insensitive' as const } }),
       },
       select: {
         id: true,
-        email: true,
         pseudo: true,
         avatar_url: true,
       },
-      take: 20,
+      orderBy: { pseudo: 'asc' },
+      take: 10,
     });
   }
 
@@ -93,8 +111,8 @@ export class UsersService {
    * Alias de findByPseudoOrEmail pour la route GET /users/search.
    * Conservé pour la compatibilité avec le contrôleur existant.
    */
-  async search(query: string) {
-    return this.findByPseudoOrEmail(query);
+  async search(query: string, currentUserId: string) {
+    return this.findByPseudoOrEmail(query, currentUserId);
   }
 
   /**
