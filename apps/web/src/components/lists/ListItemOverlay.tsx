@@ -10,7 +10,7 @@
 
 "use client";
 
-import { Eye, EyeOff, FolderTree } from "lucide-react";
+import { Eye, EyeOff, FolderTree, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ListItemOverlayProps = {
@@ -22,6 +22,10 @@ type ListItemOverlayProps = {
   onToggleVu: () => void;
   showRanger: boolean;
   onRanger: () => void;
+  /** Bouton commentaires (perso + fil de la liste) ; absent si non fourni. */
+  onComments?: () => void;
+  /** Nombre de commentaires à signaler sur le bouton (fil + avis + le mien). */
+  commentCount?: number;
 };
 
 export function ListItemOverlay({
@@ -33,8 +37,10 @@ export function ListItemOverlay({
   onToggleVu,
   showRanger,
   onRanger,
+  onComments,
+  commentCount = 0,
 }: ListItemOverlayProps) {
-  if (!showVu && !showRanger) return null;
+  if (!showVu && !showRanger && !onComments) return null;
 
   const vuLabel = vu
     ? `Vu dans la liste${vuBy ? ` (marqué par ${vuBy})` : ""}`
@@ -85,6 +91,30 @@ export function ListItemOverlay({
           className="rounded-full border bg-background/90 p-1.5 text-muted-foreground hover:text-foreground"
         >
           <FolderTree className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {onComments && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            onComments();
+          }}
+          aria-label={`Commentaires : ${titre}${commentCount > 0 ? ` (${commentCount})` : ""}`}
+          title="Commentaires"
+          className={cn(
+            "relative rounded-full border p-1.5 transition-colors",
+            commentCount > 0
+              ? "bg-primary text-white border-primary"
+              : "bg-background/90 text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          {commentCount > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-background px-1 text-[10px] font-medium text-foreground border">
+              {commentCount}
+            </span>
+          )}
         </button>
       )}
     </div>

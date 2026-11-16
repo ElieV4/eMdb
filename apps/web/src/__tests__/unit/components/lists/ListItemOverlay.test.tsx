@@ -43,6 +43,15 @@ describe("ListItemOverlay", () => {
     expect(screen.queryByLabelText(/Vu dans la liste/)).not.toBeInTheDocument();
   });
 
+  it("bouton commentaires avec compteur", () => {
+    const onComments = jest.fn();
+    render(<ListItemOverlay {...base} showVu={false} onComments={onComments} commentCount={3} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Commentaires : Match Point (3)" }));
+    expect(onComments).toHaveBeenCalled();
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
   it("ouvre le rangement en sous-groupes", () => {
     render(<ListItemOverlay {...base} showVu={false} showRanger />);
 

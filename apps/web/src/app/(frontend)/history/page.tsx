@@ -26,12 +26,22 @@ import { TitleQuickActionsMenu } from "@/components/titles/TitleQuickActionsMenu
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ListChecks, Star } from "lucide-react";
+import {
+  AlertCircle,
+  CalendarDays,
+  ListChecks,
+  Star,
+  Table2,
+} from "lucide-react";
+import { HistoryTable } from "@/components/history/HistoryTable";
 import { parseTitleFilters, buildListIdsByTitle } from "@/lib/titleFilters";
 import { groupByPeriod, Period } from "@/lib/periodGrouping";
 import { UserWatch } from "@/lib/types/api";
 import { buildEntityUrl } from "@/lib/utils";
-import { formatRatingStars, formatSeasonEpisodeCompact } from "@/lib/cardFormatting";
+import {
+  formatRatingStars,
+  formatSeasonEpisodeCompact,
+} from "@/lib/cardFormatting";
 
 function HistoryPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
@@ -42,6 +52,8 @@ function HistoryPageContent() {
   // pas ces données du titre. Listes et statut "vu" s'appliquent côté client.
   const filters = parseTitleFilters(searchParams);
   const period = (searchParams.get("period") as Period | null) || "semaine";
+  // Vue : "par date" (défaut, cartes groupées par période) ou "tableau".
+  const isTable = searchParams.get("vue") === "tableau";
   const {
     data,
     isLoading,
@@ -51,14 +63,21 @@ function HistoryPageContent() {
     isFetchingNextPage,
   } = useInfiniteWatches(
     { type: filters.type !== "tout" ? filters.type : undefined },
-    { enabled: isAuthenticated },
+    // La vue tableau charge ses propres données (GET /watches/table).
+    { enabled: isAuthenticated && !isTable },
   );
   const { data: lists } = useLists(isAuthenticated);
   const listIdsByTitle = buildListIdsByTitle(lists);
   const { data: watchedTitles } = useWatchedTitles();
-  const { watchlistIds, favoriteIds, watchlistId, favorisId } = useListMembership();
-  const { selectionMode, selectedIds, toggleSelectionMode, toggleSelected, clearSelection } =
-    useSelectionMode();
+  const { watchlistIds, favoriteIds, watchlistId, favorisId } =
+    useListMembership();
+  const {
+    selectionMode,
+    selectedIds,
+    toggleSelectionMode,
+    toggleSelected,
+    clearSelection,
+  } = useSelectionMode();
 
   // Charge la page suivante dès que la sentinelle en bas de liste entre
   // dans le viewport — l'historique complet se charge ainsi au fur et à
@@ -79,6 +98,14 @@ function HistoryPageContent() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const setView = (table: boolean) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (table) params.set("vue", "tableau");
+    else params.delete("vue");
+    const qs = params.toString();
+    router.replace(qs ? `/history?${qs}` : "/history");
+  };
 
   const setPeriod = (next: Period) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -125,8 +152,10 @@ function HistoryPageContent() {
 
     if (filters.watchedYearMin !== null || filters.watchedYearMax !== null) {
       const year = new Date(watch.date_vue).getFullYear();
-      if (filters.watchedYearMin !== null && year < filters.watchedYearMin) return false;
-      if (filters.watchedYearMax !== null && year > filters.watchedYearMax) return false;
+      if (filters.watchedYearMin !== null && year < filters.watchedYearMin)
+        return false;
+      if (filters.watchedYearMax !== null && year > filters.watchedYearMax)
+        return false;
     }
 
     return true;
@@ -148,7 +177,8 @@ function HistoryPageContent() {
 
   // Le titre résolu (série via l'épisode ou film direct) — nécessaire pour
   // les actions groupées, qui portent sur le titre, pas sur le visionnage.
-  const resolveWatchTitle = (watch: UserWatch) => watch.titles ?? watch.episodes?.seasons.titles;
+  const resolveWatchTitle = (watch: UserWatch) =>
+    watch.titles ?? watch.episodes?.seasons.titles;
 
   const selectedBulkItems = filteredWatches
     .filter((watch) => selectedIds.has(watch.id))
@@ -169,145 +199,219 @@ function HistoryPageContent() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Historique ({totalWatches})</h1>
+            <h1 className="text-2xl font-bold">
+              Historique{isTable ? "" : ` (${totalWatches})`}
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Vos derniers visionnages
             </p>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={toggleSelectionMode}>
-            <ListChecks className="mr-2 h-4 w-4" />
-            {selectionMode ? "Terminer" : "Modifier le contenu"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              className="flex gap-1 rounded-lg border p-1"
+              role="group"
+              aria-label="Vue de l'historique"
+            >
+              {[
+                { table: false, label: "Par date", Icon: CalendarDays },
+                { table: true, label: "Tableau", Icon: Table2 },
+              ].map(({ table, label, Icon }) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={isTable === table}
+                  onClick={() => setView(table)}
+                  className={
+                    isTable === table
+                      ? "inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-white"
+                      : "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+                  }
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+            {!isTable && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={toggleSelectionMode}
+              >
+                <ListChecks className="mr-2 h-4 w-4" />
+                {selectionMode ? "Terminer" : "Modifier le contenu"}
+              </Button>
+            )}
+          </div>
         </div>
 
-        {selectionMode && selectedBulkItems.length > 0 && (
-          <BulkActionsBar
-            items={selectedBulkItems}
-            watchlistId={watchlistId}
-            favorisId={favorisId}
-            allowDeleteHistory
-            onDone={clearSelection}
-          />
-        )}
-
-        <PeriodFilter value={period} onChange={setPeriod} />
-
-        {isLoading ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[2/3] w-full" />
-            ))}
-          </div>
-        ) : error ? (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Erreur lors du chargement de l&apos;historique.
-            </AlertDescription>
-          </Alert>
-        ) : groups.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {hasActiveFilter
-              ? "Aucun visionnage ne correspond au filtre actif."
-              : "Vous n'avez encore rien marqué comme vu."}
-          </p>
+        {isTable ? (
+          <HistoryTable />
         ) : (
-          <div className="space-y-8">
-            {groups.map((group) => (
-              <div key={group.key} className="space-y-3">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  {group.label} ({group.items.length})
-                </h2>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-                  {group.items.map((watch) => {
-                    // Un visionnage d'épisode n'a pas de `titles` direct
-                    // (title_id reste null, cf. createWatch) — l'affiche/nom
-                    // de la série se lit via episodes.seasons.titles.
-                    const serie = watch.episodes?.seasons.titles;
-                    const resolvedTitle = watch.titles ?? serie;
-                    const dateSortie = resolvedTitle?.date_sortie
-                      ? new Date(resolvedTitle.date_sortie).getFullYear()
-                      : null;
-                    // Titre nu (pas de "(Année)"/"- titre épisode" en suffixe,
-                    // contrairement à Calendrier/Continuer) : l'année ou le
-                    // SxxExx vit sur la ligne du dessous, avec la note perso.
-                    const label = resolvedTitle?.titre_vf || resolvedTitle?.titre_vo || "Titre inconnu";
-                    const seasonEp = watch.episodes
-                      ? formatSeasonEpisodeCompact(watch.episodes.seasons.numero, watch.episodes.numero)
-                      : null;
-                    const ratingLabel = formatRatingStars(watch.note_perso);
-                    const metaPrimary = watch.episodes ? seasonEp : dateSortie ? String(dateSortie) : null;
-                    const subtitle =
-                      metaPrimary || ratingLabel ? (
-                        <span className="inline-flex items-center gap-1">
-                          {metaPrimary}
-                          {ratingLabel && (
-                            <span className="inline-flex items-center gap-0.5">
-                              <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />
-                              {ratingLabel}
-                            </span>
-                          )}
-                        </span>
-                      ) : null;
-                    const href = watch.episodes
-                      ? `/episodes/${watch.episodes.id}`
-                      : buildEntityUrl(
-                          "/titles",
-                          watch.title_id ?? "",
-                          resolvedTitle?.titre_vf || resolvedTitle?.titre_vo,
-                        );
+          <>
+            {selectionMode && selectedBulkItems.length > 0 && (
+              <BulkActionsBar
+                items={selectedBulkItems}
+                watchlistId={watchlistId}
+                favorisId={favorisId}
+                allowDeleteHistory
+                onDone={clearSelection}
+              />
+            )}
 
-                    return (
-                      <div key={watch.id} className="relative">
-                        {selectionMode && resolvedTitle && (
-                          <SelectionCheckbox
-                            selected={selectedIds.has(watch.id)}
-                            onToggle={() => toggleSelected(watch.id)}
-                          />
-                        )}
-                        <DateCard
-                          href={href}
-                          imageUrl={resolvedTitle?.affiche_url}
-                          title={label}
-                          subtitle={subtitle ?? undefined}
-                          date={watch.date_vue}
-                          showTime
-                          watched={resolvedTitle ? watchedTitles?.has(resolvedTitle.id) : false}
-                          inWatchlist={resolvedTitle ? watchlistIds.has(resolvedTitle.id) : false}
-                          inFavorites={resolvedTitle ? favoriteIds.has(resolvedTitle.id) : false}
-                          quickActions={
-                            resolvedTitle && (
-                              <TitleQuickActionsMenu
-                                titleId={resolvedTitle.id}
-                                episodeId={watch.episode_id ?? undefined}
-                                tmdbId={resolvedTitle.tmdb_id ?? undefined}
-                                type={resolvedTitle.type as "film" | "serie"}
-                                inWatchlist={watchlistIds.has(resolvedTitle.id)}
-                                inFavorites={favoriteIds.has(resolvedTitle.id)}
-                                watched={watchedTitles?.has(resolvedTitle.id)}
-                              />
-                            )
-                          }
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+            <PeriodFilter value={period} onChange={setPeriod} />
 
-            {/* Sentinelle invisible : déclenche le chargement de la page
-                suivante dès qu'elle entre dans le viewport. */}
-            <div ref={sentinelRef} />
-
-            {isFetchingNextPage && (
+            {isLoading ? (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-                {Array.from({ length: 6 }).map((_, i) => (
+                {Array.from({ length: 12 }).map((_, i) => (
                   <Skeleton key={i} className="aspect-[2/3] w-full" />
                 ))}
               </div>
+            ) : error ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Erreur lors du chargement de l&apos;historique.
+                </AlertDescription>
+              </Alert>
+            ) : groups.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {hasActiveFilter
+                  ? "Aucun visionnage ne correspond au filtre actif."
+                  : "Vous n'avez encore rien marqué comme vu."}
+              </p>
+            ) : (
+              <div className="space-y-8">
+                {groups.map((group) => (
+                  <div key={group.key} className="space-y-3">
+                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      {group.label} ({group.items.length})
+                    </h2>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                      {group.items.map((watch) => {
+                        // Un visionnage d'épisode n'a pas de `titles` direct
+                        // (title_id reste null, cf. createWatch) — l'affiche/nom
+                        // de la série se lit via episodes.seasons.titles.
+                        const serie = watch.episodes?.seasons.titles;
+                        const resolvedTitle = watch.titles ?? serie;
+                        const dateSortie = resolvedTitle?.date_sortie
+                          ? new Date(resolvedTitle.date_sortie).getFullYear()
+                          : null;
+                        // Titre nu (pas de "(Année)"/"- titre épisode" en suffixe,
+                        // contrairement à Calendrier/Continuer) : l'année ou le
+                        // SxxExx vit sur la ligne du dessous, avec la note perso.
+                        const label =
+                          resolvedTitle?.titre_vf ||
+                          resolvedTitle?.titre_vo ||
+                          "Titre inconnu";
+                        const seasonEp = watch.episodes
+                          ? formatSeasonEpisodeCompact(
+                              watch.episodes.seasons.numero,
+                              watch.episodes.numero,
+                            )
+                          : null;
+                        const ratingLabel = formatRatingStars(watch.note_perso);
+                        const metaPrimary = watch.episodes
+                          ? seasonEp
+                          : dateSortie
+                            ? String(dateSortie)
+                            : null;
+                        const subtitle =
+                          metaPrimary || ratingLabel ? (
+                            <span className="inline-flex items-center gap-1">
+                              {metaPrimary}
+                              {ratingLabel && (
+                                <span className="inline-flex items-center gap-0.5">
+                                  <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />
+                                  {ratingLabel}
+                                </span>
+                              )}
+                            </span>
+                          ) : null;
+                        const href = watch.episodes
+                          ? `/episodes/${watch.episodes.id}`
+                          : buildEntityUrl(
+                              "/titles",
+                              watch.title_id ?? "",
+                              resolvedTitle?.titre_vf ||
+                                resolvedTitle?.titre_vo,
+                            );
+
+                        return (
+                          <div key={watch.id} className="relative">
+                            {selectionMode && resolvedTitle && (
+                              <SelectionCheckbox
+                                selected={selectedIds.has(watch.id)}
+                                onToggle={() => toggleSelected(watch.id)}
+                              />
+                            )}
+                            <DateCard
+                              href={href}
+                              imageUrl={resolvedTitle?.affiche_url}
+                              title={label}
+                              subtitle={subtitle ?? undefined}
+                              date={watch.date_vue}
+                              showTime
+                              watched={
+                                resolvedTitle
+                                  ? watchedTitles?.has(resolvedTitle.id)
+                                  : false
+                              }
+                              comment={watch.commentaire ?? undefined}
+                              inWatchlist={
+                                resolvedTitle
+                                  ? watchlistIds.has(resolvedTitle.id)
+                                  : false
+                              }
+                              inFavorites={
+                                resolvedTitle
+                                  ? favoriteIds.has(resolvedTitle.id)
+                                  : false
+                              }
+                              quickActions={
+                                resolvedTitle && (
+                                  <TitleQuickActionsMenu
+                                    titleId={resolvedTitle.id}
+                                    episodeId={watch.episode_id ?? undefined}
+                                    tmdbId={resolvedTitle.tmdb_id ?? undefined}
+                                    type={
+                                      resolvedTitle.type as "film" | "serie"
+                                    }
+                                    inWatchlist={watchlistIds.has(
+                                      resolvedTitle.id,
+                                    )}
+                                    inFavorites={favoriteIds.has(
+                                      resolvedTitle.id,
+                                    )}
+                                    watched={watchedTitles?.has(
+                                      resolvedTitle.id,
+                                    )}
+                                  />
+                                )
+                              }
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Sentinelle invisible : déclenche le chargement de la page
+                suivante dès qu'elle entre dans le viewport. */}
+                <div ref={sentinelRef} />
+
+                {isFetchingNextPage && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <Skeleton key={i} className="aspect-[2/3] w-full" />
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>

@@ -26,6 +26,7 @@ import { SetItemVuDto } from './dto/set-item-vu.dto';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { SetItemGroupsDto } from './dto/set-item-groups.dto';
+import { CommentDto } from './dto/comment.dto';
 
 /**
  * Contrôleur du module lists (Phase 4.3).
@@ -50,6 +51,14 @@ import { SetItemGroupsDto } from './dto/set-item-groups.dto';
  * - POST   /lists/:listId/groups                 — Créer un sous-groupe
  * - PATCH  /lists/:listId/groups/:groupId        — Renommer un sous-groupe
  * - DELETE /lists/:listId/groups/:groupId        — Supprimer un sous-groupe (et ses enfants)
+ *
+ * Endpoints commentaires partagés (4) — lecture : tout membre ; écriture :
+ * créateur ou membre en collaboratif/ouvert ; le créateur peut supprimer
+ * tout commentaire :
+ * - GET    /lists/:listId/items/:titleId/comments
+ * - POST   /lists/:listId/items/:titleId/comments
+ * - PATCH  /lists/:listId/comments/:commentId
+ * - DELETE /lists/:listId/comments/:commentId
  *
  * Endpoints partage (6) — droits des membres selon user_lists.share_mode,
  * cf. list-permissions.ts :
@@ -230,6 +239,49 @@ export class ListsController {
     @Param('groupId') groupId: string,
   ): Promise<void> {
     await this.listsService.deleteGroup(listId, user.id, groupId);
+  }
+
+  // ======================================================================
+  // COMMENTAIRES PARTAGÉS
+  // ======================================================================
+
+  @Get('lists/:listId/items/:titleId/comments')
+  async getItemComments(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('titleId') titleId: string,
+  ) {
+    return this.listsService.getItemComments(listId, user.id, titleId);
+  }
+
+  @Post('lists/:listId/items/:titleId/comments')
+  async addItemComment(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('titleId') titleId: string,
+    @Body() dto: CommentDto,
+  ) {
+    return this.listsService.addItemComment(listId, user.id, titleId, dto);
+  }
+
+  @Patch('lists/:listId/comments/:commentId')
+  async updateItemComment(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('commentId') commentId: string,
+    @Body() dto: CommentDto,
+  ) {
+    return this.listsService.updateItemComment(listId, user.id, commentId, dto);
+  }
+
+  @Delete('lists/:listId/comments/:commentId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteItemComment(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Param('commentId') commentId: string,
+  ): Promise<void> {
+    await this.listsService.deleteItemComment(listId, user.id, commentId);
   }
 
   // ======================================================================

@@ -31,6 +31,9 @@ CREATE TABLE users (
     -- encore committé au moment de cette note, et cette colonne n'a pas
     -- encore été appliquée en production.
     status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('pending','active','rejected')),
+    -- Commentaires perso visibles des membres de ses listes partagées
+    -- (réglage, migration title_comments).
+    commentaires_visibles BOOLEAN NOT NULL DEFAULT false,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -301,6 +304,21 @@ CREATE TABLE list_items (
     PRIMARY KEY (list_id, title_id),
     CHECK (vu_at IS NOT NULL OR vu_by IS NULL)
 );
+
+-- Fil de commentaires partagés sur un titre d'une liste (RLS et droits :
+-- migration title_comments).
+CREATE TABLE list_item_comments (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    list_id     UUID NOT NULL,
+    title_id    UUID NOT NULL,
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    contenu     TEXT NOT NULL CHECK (char_length(btrim(contenu)) BETWEEN 1 AND 2000),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    FOREIGN KEY (list_id, title_id) REFERENCES list_items(list_id, title_id) ON DELETE CASCADE
+);
+CREATE INDEX list_item_comments_list_id_title_id_created_at_idx
+    ON list_item_comments (list_id, title_id, created_at);
 
 -- Sous-groupes d'une liste, en arbre (parent dans la même liste). RLS et
 -- droits : migration list_items_vu_and_groups.

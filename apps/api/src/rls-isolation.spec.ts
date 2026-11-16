@@ -378,6 +378,54 @@ describe('RLS — isolation entre utilisateurs (bout en bout, base réelle)', ()
       await asSystem((tx) => tx.user_lists.deleteMany({ where: { id: otherList } }));
     });
 
+    // Fil de commentaires partagés (migration title_comments).
+    const commentAsB = (authorId: string = userB) =>
+      forUser(userB, (tx) =>
+        tx.list_item_comments.create({
+          data: { list_id: listId, title_id: titleId, user_id: authorId, contenu: 'Avis de B' },
+        }),
+      );
+
+    it('commentaires en lecture : B lit le fil mais ne peut pas commenter', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('lecture');
+      await asSystem((tx) =>
+        tx.list_item_comments.create({
+          data: { list_id: listId, title_id: titleId, user_id: userA, contenu: 'Avis de A' },
+        }),
+      );
+
+      const visible = await forUser<any[]>(userB, (tx) =>
+        tx.list_item_comments.findMany({ where: { list_id: listId } }),
+      );
+      expect(visible.map((c) => c.contenu)).toEqual(['Avis de A']);
+      await expect(commentAsB()).rejects.toThrow();
+    });
+
+    it("commentaires en collaboratif : B commente en son nom, pas au nom de A, ni ne modifie ceux de A ; A modère", async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('collaboratif');
+      const fromA = await asSystem<any>((tx) =>
+        tx.list_item_comments.create({
+          data: { list_id: listId, title_id: titleId, user_id: userA, contenu: 'Avis de A' },
+        }),
+      );
+
+      const mine = await commentAsB();
+      expect((mine as any).user_id).toBe(userB);
+      await expect(commentAsB(userA)).rejects.toThrow();
+
+      const edited = await forUser<any>(userB, (tx) =>
+        tx.list_item_comments.updateMany({ where: { id: fromA.id }, data: { contenu: 'Piraté' } }),
+      );
+      expect(edited.count).toBe(0);
+
+      const moderated = await forUser<any>(userA, (tx) =>
+        tx.list_item_comments.deleteMany({ where: { id: (mine as any).id } }),
+      );
+      expect(moderated.count).toBe(1);
+    });
+
     it('A (créateur) garde tous les droits, y compris changer le mode', async () => {
       if (skipIfNotRestricted()) return;
       await createSharedList('lecture');

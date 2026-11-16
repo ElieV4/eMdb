@@ -49,6 +49,16 @@ const prismaServiceMock = {
   titles: {
     findUnique: jest.fn(),
   },
+  user_ratings: {
+    findMany: jest.fn().mockResolvedValue([]),
+  },
+  list_item_comments: {
+    findMany: jest.fn(),
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
   users: {
     findUnique: jest.fn(),
   },
@@ -65,6 +75,8 @@ describe('ListsService', () => {
 
     service = module.get<ListsService>(ListsService);
     jest.clearAllMocks();
+    prismaServiceMock.list_shares.findMany.mockResolvedValue([]);
+    prismaServiceMock.user_ratings.findMany.mockResolvedValue([]);
   });
 
   const userId = 'user-uuid';
@@ -93,6 +105,7 @@ describe('ListsService', () => {
     vu_at: overrides.vu_at ?? null,
     vu_by_user: overrides.vu_by_user ?? null,
     list_item_groups: overrides.list_item_groups ?? [],
+    _count: overrides._count ?? { list_item_comments: 0 },
     titles: overrides.titles ?? {
       id: titleId,
       tmdb_id: 123,
@@ -830,6 +843,148 @@ describe('ListsService', () => {
       await expect(
         service.setItemGroups(listId, sharedWithUserId, titleId, { group_ids: [] }),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  // ======================================================================
+  // Commentaires perso dans le détail d'une liste
+  // ======================================================================
+  describe('getListDetail (commentaires)', () => {
+    it("renvoie mon commentaire, ceux des membres qui les partagent, et le nombre de commentaires du fil", async () => {
+      mockOwnList();
+      prismaServiceMock.list_items.findMany.mockResolvedValue([
+        buildListItem({ _count: { list_item_comments: 3 } }),
+      ]);
+      prismaServiceMock.list_shares.findMany.mockResolvedValue([{ shared_with_user_id: 'u2' }]);
+      prismaServiceMock.user_ratings.findMany
+        .mockResolvedValueOnce([{ title_id: titleId, commentaire: 'Mon avis' }])
+        .mockResolvedValueOnce([
+          { title_id: titleId, commentaire: 'Génial', users: { pseudo: 'marie' } },
+        ]);
+
+      const result = await service.getListDetail(listId, userId);
+
+      expect(result.items[0]).toMatchObject({
+        myComment: 'Mon avis',
+        memberComments: [{ pseudo: 'marie', commentaire: 'Génial' }],
+        commentCount: 3,
+      });
+      // Les commentaires des autres ne sont lus que pour les membres de la
+      // liste, hors moi, ayant activé le partage.
+      expect(prismaServiceMock.user_ratings.findMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            user_id: { in: ['u2'] },
+            title_id: { in: [titleId] },
+            users: { commentaires_visibles: true },
+          }),
+        }),
+      );
+    });
+
+    it("ne lit pas les commentaires des autres pour une liste non partagée", async () => {
+      mockOwnList();
+      prismaServiceMock.list_items.findMany.mockResolvedValue([buildListItem({})]);
+
+      const result = await service.getListDetail(listId, userId);
+
+      expect(result.items[0].memberComments).toEqual([]);
+      expect(prismaServiceMock.user_ratings.findMany).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ======================================================================
+  // Fil de commentaires partagés
+  // ======================================================================
+  describe('commentaires partagés', () => {
+    const comment = (overrides: any = {}) => ({
+      id: overrides.id ?? 'c1',
+      contenu: overrides.contenu ?? 'Super film',
+      created_at: new Date('2026-11-16'),
+      updated_at: new Date('2026-11-16'),
+      user_id: overrides.user_id ?? sharedWithUserId,
+      users: { pseudo: overrides.pseudo ?? 'user2', avatar_url: null },
+    });
+
+    it('un membre en lecture lit le fil mais ne peut ni écrire ni supprimer', async () => {
+      mockSharedList('lecture');
+      prismaServiceMock.list_item_comments.findMany.mockResolvedValue([comment()]);
+
+      const result = await service.getItemComments(listId, sharedWithUserId, titleId);
+
+      expect(result.canWrite).toBe(false);
+      expect(result.comments[0]).toMatchObject({
+        contenu: 'Super film',
+        author: { pseudo: 'user2' },
+        canEdit: false,
+        canDelete: false,
+      });
+    });
+
+    it('le créateur peut supprimer le commentaire de quelqu’un d’autre (modération)', async () => {
+      mockOwnList();
+      prismaServiceMock.list_item_comments.findMany.mockResolvedValue([comment()]);
+
+      const result = await service.getItemComments(listId, userId, titleId);
+
+      expect(result.comments[0]).toMatchObject({ canEdit: false, canDelete: true });
+    });
+
+    it('un membre en collaboratif ajoute un commentaire (texte nettoyé)', async () => {
+      mockSharedList('collaboratif');
+      prismaServiceMock.list_items.findUnique.mockResolvedValue({ list_id: listId });
+      prismaServiceMock.list_item_comments.create.mockResolvedValue(comment({ contenu: 'À revoir' }));
+
+      const result = await service.addItemComment(listId, sharedWithUserId, titleId, {
+        contenu: '  À revoir  ',
+      });
+
+      expect(prismaServiceMock.list_item_comments.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { list_id: listId, title_id: titleId, user_id: sharedWithUserId, contenu: 'À revoir' },
+        }),
+      );
+      expect(result).toMatchObject({ canEdit: true, canDelete: true });
+    });
+
+    it('un membre en lecture ne peut pas commenter', async () => {
+      mockSharedList('lecture');
+
+      await expect(
+        service.addItemComment(listId, sharedWithUserId, titleId, { contenu: 'Hop' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaServiceMock.list_item_comments.create).not.toHaveBeenCalled();
+    });
+
+    it("on ne modifie pas le commentaire de quelqu'un d'autre, même en mode ouvert", async () => {
+      mockSharedList('ouvert');
+      prismaServiceMock.list_item_comments.findFirst.mockResolvedValue({ id: 'c1', user_id: 'autre' });
+
+      await expect(
+        service.updateItemComment(listId, sharedWithUserId, 'c1', { contenu: 'Modifié' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaServiceMock.list_item_comments.update).not.toHaveBeenCalled();
+    });
+
+    it("un membre ne supprime pas le commentaire d'un autre ; le créateur si", async () => {
+      mockSharedList('ouvert');
+      prismaServiceMock.list_item_comments.findFirst.mockResolvedValue({ id: 'c1', user_id: 'autre' });
+      await expect(service.deleteItemComment(listId, sharedWithUserId, 'c1')).rejects.toThrow(
+        ForbiddenException,
+      );
+
+      mockOwnList();
+      await service.deleteItemComment(listId, userId, 'c1');
+      expect(prismaServiceMock.list_item_comments.delete).toHaveBeenCalledWith({ where: { id: 'c1' } });
+    });
+
+    it("lève NotFound pour un commentaire d'une autre liste", async () => {
+      mockOwnList();
+      prismaServiceMock.list_item_comments.findFirst.mockResolvedValue(null);
+
+      await expect(service.deleteItemComment(listId, userId, 'c-ailleurs')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

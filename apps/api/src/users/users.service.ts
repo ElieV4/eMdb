@@ -12,6 +12,8 @@ const USER_PUBLIC_SELECT = {
   pseudo: true,
   avatar_url: true,
   created_at: true,
+  // Réglage : commentaires perso visibles des membres de ses listes partagées.
+  commentaires_visibles: true,
 } as const;
 
 @Injectable()
@@ -45,6 +47,7 @@ export class UsersService {
       data: {
         pseudo: payload.pseudo,
         avatar_url: payload.avatar_url,
+        commentaires_visibles: payload.commentaires_visibles,
       },
       select: USER_PUBLIC_SELECT,
     });

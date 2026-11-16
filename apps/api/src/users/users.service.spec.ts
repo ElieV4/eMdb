@@ -50,7 +50,14 @@ describe('UsersService', () => {
       expect(result).toEqual(mockUser);
       expect(prismaServiceMock.users.findUnique).toHaveBeenCalledWith({
         where: { id: 'user-id' },
-        select: { id: true, email: true, pseudo: true, avatar_url: true, created_at: true },
+        select: {
+          id: true,
+          email: true,
+          pseudo: true,
+          avatar_url: true,
+          created_at: true,
+          commentaires_visibles: true,
+        },
       });
     });
 
@@ -100,7 +107,14 @@ describe('UsersService', () => {
       expect(prismaServiceMock.users.update).toHaveBeenCalledWith({
         where: { id: 'user-id' },
         data: { avatar_url: '/uploads/avatars/avatar.png' },
-        select: { id: true, email: true, pseudo: true, avatar_url: true, created_at: true },
+        select: {
+          id: true,
+          email: true,
+          pseudo: true,
+          avatar_url: true,
+          created_at: true,
+          commentaires_visibles: true,
+        },
       });
     });
   });
