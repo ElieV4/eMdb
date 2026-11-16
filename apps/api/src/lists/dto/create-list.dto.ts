@@ -1,4 +1,5 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { SHARE_MODES, ShareMode } from '../list-permissions';
 
 /**
  * DTO pour la création d'une liste (POST /lists).
@@ -21,4 +22,9 @@ export class CreateListDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  /** Mode de partage initial (défaut 'lecture'), cf. list-permissions.ts. */
+  @IsOptional()
+  @IsIn(SHARE_MODES)
+  share_mode?: ShareMode;
 }

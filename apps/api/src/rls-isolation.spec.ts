@@ -162,7 +162,7 @@ describe('RLS — isolation entre utilisateurs (bout en bout, base réelle)', ()
 
     await asSystem((tx) =>
       tx.list_shares.create({
-        data: { list_id: listId, shared_with_user_id: userB, permission: 'lecture' },
+        data: { list_id: listId, shared_with_user_id: userB },
       }),
     );
 
@@ -172,6 +172,141 @@ describe('RLS — isolation entre utilisateurs (bout en bout, base réelle)', ()
     await asSystem(async (tx) => {
       await tx.list_shares.deleteMany({ where: { list_id: listId } });
       await tx.user_lists.deleteMany({ where: { id: listId } });
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // Modes de partage (migration list_share_modes, fn_list_can) : A crée
+  // une liste contenant `titleId`, B en est membre dans le mode testé.
+  // Ces tests passent volontairement à côté du service pour prouver que la
+  // base refuse d'elle-même ce que le mode interdit.
+  // ------------------------------------------------------------------
+  describe('modes de partage', () => {
+    const otherTitleId = randomUUID();
+    let listId: string;
+
+    async function createSharedList(shareMode: 'lecture' | 'collaboratif' | 'ouvert') {
+      listId = randomUUID();
+      await asSystem(async (tx) => {
+        await tx.user_lists.create({
+          data: { id: listId, user_id: userA, nom: `RLS ${shareMode}`, type: 'custom', share_mode: shareMode },
+        });
+        await tx.list_items.create({ data: { list_id: listId, title_id: titleId, position: 0 } });
+        await tx.list_shares.create({ data: { list_id: listId, shared_with_user_id: userB } });
+      });
+    }
+
+    beforeAll(async () => {
+      if (!usingRestrictedRole) return;
+      await asSystem((tx) =>
+        tx.titles.create({ data: { id: otherTitleId, type: 'film', titre_vo: `RLS other ${otherTitleId}` } }),
+      );
+    });
+
+    afterEach(async () => {
+      if (!usingRestrictedRole || !listId) return;
+      await asSystem((tx) => tx.user_lists.deleteMany({ where: { id: listId } }));
+    });
+
+    afterAll(async () => {
+      if (!usingRestrictedRole) return;
+      await asSystem((tx) => tx.titles.deleteMany({ where: { id: otherTitleId } }));
+    });
+
+    const addItemAsB = () =>
+      forUser(userB, (tx) =>
+        tx.list_items.create({ data: { list_id: listId, title_id: otherTitleId, position: 1 } }),
+      );
+    const removeItemAsB = () =>
+      forUser(userB, (tx) => tx.list_items.deleteMany({ where: { list_id: listId, title_id: titleId } }));
+    const renameAsB = () =>
+      forUser(userB, (tx) => tx.user_lists.updateMany({ where: { id: listId }, data: { nom: 'Renommée par B' } }));
+    const updateStatutAsB = () =>
+      forUser(userB, (tx) =>
+        tx.list_items.updateMany({ where: { list_id: listId, title_id: titleId }, data: { statut: 'a_jour' } }),
+      );
+
+    it('lecture : B lit les titres, ne peut ni ajouter, ni retirer, ni modifier', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('lecture');
+
+      const items = await forUser<any[]>(userB, (tx) => tx.list_items.findMany({ where: { list_id: listId } }));
+      expect(items).toHaveLength(1);
+
+      await expect(addItemAsB()).rejects.toThrow();
+      expect(((await removeItemAsB()) as any).count).toBe(0);
+      expect(((await renameAsB()) as any).count).toBe(0);
+      expect(((await updateStatutAsB()) as any).count).toBe(0);
+    });
+
+    it('collaboratif : B renomme et change un statut, mais ne peut ni ajouter ni retirer', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('collaboratif');
+
+      expect(((await renameAsB()) as any).count).toBe(1);
+      expect(((await updateStatutAsB()) as any).count).toBe(1);
+      await expect(addItemAsB()).rejects.toThrow();
+      expect(((await removeItemAsB()) as any).count).toBe(0);
+    });
+
+    it('collaboratif : B ne peut pas changer le mode de partage (trigger)', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('collaboratif');
+
+      await expect(
+        forUser(userB, (tx) => tx.user_lists.updateMany({ where: { id: listId }, data: { share_mode: 'ouvert' } })),
+      ).rejects.toThrow();
+    });
+
+    it('ouvert : B ajoute et retire des titres, mais ne peut pas supprimer la liste', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('ouvert');
+
+      await expect(addItemAsB()).resolves.toBeDefined();
+      expect(((await removeItemAsB()) as any).count).toBe(1);
+
+      const deleted = await forUser<any>(userB, (tx) => tx.user_lists.deleteMany({ where: { id: listId } }));
+      expect(deleted.count).toBe(0);
+    });
+
+    it('ouvert : B ne peut pas ajouter un autre membre', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('ouvert');
+
+      await expect(
+        forUser(userB, (tx) => tx.list_shares.create({ data: { list_id: listId, shared_with_user_id: userA } })),
+      ).rejects.toThrow();
+    });
+
+    it('list_shares : B ne voit que sa propre appartenance et peut quitter la liste', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('lecture');
+
+      const visible = await forUser<any[]>(userB, (tx) => tx.list_shares.findMany({ where: { list_id: listId } }));
+      expect(visible.map((s) => s.shared_with_user_id)).toEqual([userB]);
+
+      const left = await forUser<any>(userB, (tx) =>
+        tx.list_shares.deleteMany({ where: { list_id: listId, shared_with_user_id: userB } }),
+      );
+      expect(left.count).toBe(1);
+
+      const afterLeave = await forUser(userB, (tx) => tx.user_lists.findUnique({ where: { id: listId } }));
+      expect(afterLeave).toBeNull();
+    });
+
+    it('A (créateur) garde tous les droits, y compris changer le mode', async () => {
+      if (skipIfNotRestricted()) return;
+      await createSharedList('lecture');
+
+      const updated = await forUser<any>(userA, (tx) =>
+        tx.user_lists.update({ where: { id: listId }, data: { share_mode: 'ouvert' } }),
+      );
+      expect(updated.share_mode).toBe('ouvert');
+
+      const created = await forUser<any>(userA, (tx) =>
+        tx.list_items.create({ data: { list_id: listId, title_id: otherTitleId, position: 1 } }),
+      );
+      expect(created.title_id).toBe(otherTitleId);
     });
   });
 });

@@ -60,7 +60,24 @@ La CI applique l'historique de migrations sur une base fraîche, puis compare le
 
 ## 🔒 Row-Level Security (defense-in-depth)
 
-Migration `enable_rls_user_scoped_tables` : policies RLS sur `user_watches`, `user_ratings`, `push_tokens`, `notifications`, `user_lists`, `list_items` — défense en profondeur en complément des contrôles d'autorisation déjà vérifiés au niveau service (ex. `ForbiddenException` dans `lists.service.ts`).
+Migration `enable_rls_user_scoped_tables` : policies RLS sur `user_watches`, `user_ratings`, `push_tokens`, `notifications`, `user_lists`, `list_items` (plus `list_shares` depuis `list_share_modes`) — défense en profondeur en complément des contrôles d'autorisation déjà vérifiés au niveau service (ex. `ForbiddenException` dans `lists.service.ts`).
+
+### Listes partagées (migration `list_share_modes`)
+
+Le mode de partage est porté par la liste (`user_lists.share_mode`) et s'applique à tous ses membres (`list_shares`, qui ne contient plus que l'appartenance) :
+
+| Action | `lecture` | `collaboratif` | `ouvert` |
+| --- | --- | --- | --- |
+| Voir la liste et ses titres | ✅ | ✅ | ✅ |
+| Réordonner, changer le statut d'un item, renommer, modifier la description | ❌ | ✅ | ✅ |
+| Ajouter un titre | ❌ | ❌ | ✅ |
+| Retirer un titre | ❌ | ❌ | ✅ |
+| Supprimer la liste, gérer les membres, changer le mode | créateur | créateur | créateur |
+
+- **`fn_list_can(list_id, action)`** (`SECURITY DEFINER`) évalue cette matrice pour `app.user_id`. Toutes les policies de `user_lists`, `list_items` et `list_shares` passent par elle. Elle lit les tables sans repasser par leurs policies : c'est ce qui évite la récursion `user_lists` ↔ `list_shares`. Son `EXECUTE` est retiré à `PUBLIC` (Data API Supabase) et accordé à `emdb_app` seulement.
+- **Policies par commande** (`SELECT` / `INSERT` / `UPDATE` / `DELETE`) au lieu d'une policy unique par table. `list_shares` a désormais sa propre RLS : un membre voit et peut supprimer sa propre entrée (quitter la liste), le créateur gère toutes les entrées.
+- **`trg_user_lists_guard_owner_columns`** : la RLS filtre des lignes, pas des colonnes. Ce trigger empêche un membre autorisé à renommer la liste de modifier aussi `share_mode`, `type` ou `user_id`.
+- La même matrice existe côté API dans `apps/api/src/lists/list-permissions.ts`. Les deux doivent rester synchronisées.
 
 **Mécanisme** : `PrismaService.forUser(userId, fn)` déclare `set_config('app.user_id', userId, true)` (SET LOCAL, portée à la transaction) avant d'exécuter la requête ; `PrismaService.asSystem(fn)` déclare `app.bypass_rls = 'true'` pour les opérations légitimement transverses à tous les utilisateurs (stats admin, vérification avant suppression d'un titre, notification à l'admin). Sans contexte défini, la policy est fermée par défaut. Ces deux méthodes sont **indispensables** dès qu'un appel touche une des 6 tables ci-dessus — sinon la requête échoue silencieusement (rôle restreint) ou n'a aucun effet (superuser).
 

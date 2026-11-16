@@ -278,7 +278,12 @@ CREATE TABLE user_lists (
     nom         TEXT NOT NULL,
     type        TEXT NOT NULL CHECK (type IN ('watchlist','favoris','custom','collection')),
     description TEXT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Mode de partage appliqué à tous les membres de list_shares. Matrice des
+    -- droits : fn_list_can() (migration list_share_modes) et
+    -- apps/api/src/lists/list-permissions.ts.
+    share_mode  TEXT NOT NULL DEFAULT 'lecture'
+                CHECK (share_mode IN ('lecture','collaboratif','ouvert'))
 );
 
 CREATE TABLE list_items (
@@ -292,10 +297,11 @@ CREATE TABLE list_items (
     PRIMARY KEY (list_id, title_id)
 );
 
+-- Appartenance d'un utilisateur à une liste partagée. Les droits ne sont plus
+-- portés ici mais par user_lists.share_mode (migration list_share_modes).
 CREATE TABLE list_shares (
-    list_id             UUID NOT NULL REFERENCES user_lists(id) ON DELETE CASCADE,
+    list_id            UUID NOT NULL REFERENCES user_lists(id) ON DELETE CASCADE,
     shared_with_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    permission          TEXT NOT NULL CHECK (permission IN ('lecture','edition')) DEFAULT 'lecture',
     shared_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (list_id, shared_with_user_id)
 );

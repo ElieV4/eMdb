@@ -20,6 +20,7 @@ import { UpdateItemStatusDto } from './dto/update-item-status.dto';
 import { AddItemDto } from './dto/add-item.dto';
 import { ReorderDto } from './dto/reorder.dto';
 import { ShareListDto } from './dto/share-list.dto';
+import { UpdateShareModeDto } from './dto/update-share-mode.dto';
 
 /**
  * Contrôleur du module lists (Phase 4.3).
@@ -38,11 +39,14 @@ import { ShareListDto } from './dto/share-list.dto';
  * - DELETE /lists/:listId/items/:titleId — Retirer un titre
  * - PATCH  /lists/:listId/items/reorder — Réordonnancement batch
  *
- * Endpoints list_shares (4) :
- * - POST   /lists/:listId/shares                    — Partager une liste
- * - GET    /lists/:listId/shares                    — Liste des partages
- * - DELETE /lists/:listId/shares/:sharedWithUserId  — Retirer un partage
+ * Endpoints partage (6) — droits des membres selon user_lists.share_mode,
+ * cf. list-permissions.ts :
+ * - PATCH  /lists/:listId/share-mode                — Changer le mode de partage (créateur)
+ * - POST   /lists/:listId/shares                    — Ajouter un membre (créateur)
+ * - GET    /lists/:listId/shares                    — Liste des membres (créateur)
+ * - DELETE /lists/:listId/shares/:sharedWithUserId  — Retirer un membre (créateur)
  * - GET    /shared-lists                            — Listes partagées avec moi
+ * - DELETE /shared-lists/:listId                    — Quitter une liste partagée
  */
 @UseGuards(JwtAuthGuard)
 @Controller()
@@ -164,12 +168,25 @@ export class ListsController {
   }
 
   // ======================================================================
-  // LIST_SHARES
+  // PARTAGE
   // ======================================================================
 
   /**
+   * PATCH /lists/:listId/share-mode
+   * Change le mode de partage (lecture / collaboratif / ouvert).
+   */
+  @Patch('lists/:listId/share-mode')
+  async updateShareMode(
+    @CurrentUser() user: any,
+    @Param('listId') listId: string,
+    @Body() dto: UpdateShareModeDto,
+  ) {
+    return this.listsService.updateShareMode(listId, user.id, dto);
+  }
+
+  /**
    * POST /lists/:listId/shares
-   * Partage une liste avec un autre utilisateur.
+   * Ajoute un membre à une liste.
    */
   @Post('lists/:listId/shares')
   async shareList(
@@ -182,7 +199,7 @@ export class ListsController {
 
   /**
    * GET /lists/:listId/shares
-   * Liste des partages d'une liste.
+   * Membres d'une liste.
    */
   @Get('lists/:listId/shares')
   async getShares(@CurrentUser() user: any, @Param('listId') listId: string) {
@@ -191,7 +208,7 @@ export class ListsController {
 
   /**
    * DELETE /lists/:listId/shares/:sharedWithUserId
-   * Retire un partage.
+   * Retire un membre.
    */
   @Delete('lists/:listId/shares/:sharedWithUserId')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -210,5 +227,15 @@ export class ListsController {
   @Get('shared-lists')
   async getSharedLists(@CurrentUser() user: any) {
     return this.listsService.getSharedLists(user.id);
+  }
+
+  /**
+   * DELETE /shared-lists/:listId
+   * Quitter une liste partagée avec moi.
+   */
+  @Delete('shared-lists/:listId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async leaveSharedList(@CurrentUser() user: any, @Param('listId') listId: string): Promise<void> {
+    await this.listsService.leaveSharedList(listId, user.id);
   }
 }
