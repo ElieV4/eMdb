@@ -119,6 +119,16 @@ export class WatchesController {
   }
 
   /**
+   * GET /watches/table
+   * Tout l'historique, une ligne par visionnage, pour la vue tableau.
+   * Déclaré avant les routes paramétrées /watches/:id.
+   */
+  @Get('watches/table')
+  async getHistoryTable(@CurrentUser() user: any) {
+    return this.watchesService.getHistoryTable(user.id);
+  }
+
+  /**
    * GET /watches
    * Liste paginée des visionnages avec filtres optionnels.
    */
