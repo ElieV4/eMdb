@@ -273,6 +273,7 @@ function HistoryPageContent() {
                           date={watch.date_vue}
                           showTime
                           watched={resolvedTitle ? watchedTitles?.has(resolvedTitle.id) : false}
+                          comment={watch.commentaire ?? undefined}
                           inWatchlist={resolvedTitle ? watchlistIds.has(resolvedTitle.id) : false}
                           inFavorites={resolvedTitle ? favoriteIds.has(resolvedTitle.id) : false}
                           quickActions={

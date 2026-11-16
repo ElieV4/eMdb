@@ -515,15 +515,27 @@ export class WatchesService {
                   ...(episodeIds.length > 0 ? [{ episode_id: { in: episodeIds } }] : []),
                 ],
               },
-              select: { title_id: true, episode_id: true, note_perso: true },
+              select: { title_id: true, episode_id: true, note_perso: true, commentaire: true },
             })
           : [];
 
       return { data, total, ratings };
     });
-    const ratingByTitleId = new Map(ratings.filter((r) => r.title_id).map((r) => [r.title_id, Number(r.note_perso)]));
+    // Une ligne user_ratings peut ne porter qu'un commentaire (note_perso
+    // null) : ne pas la convertir en 0, qui s'afficherait comme "★ 0".
+    const noteOf = (r: { note_perso: unknown }) => (r.note_perso === null ? null : Number(r.note_perso));
+    const ratingByTitleId = new Map(ratings.filter((r) => r.title_id).map((r) => [r.title_id, noteOf(r)]));
     const ratingByEpisodeId = new Map(
-      ratings.filter((r) => r.episode_id).map((r) => [r.episode_id, Number(r.note_perso)]),
+      ratings.filter((r) => r.episode_id).map((r) => [r.episode_id, noteOf(r)]),
+    );
+
+    // Commentaire perso du titre (ou de l'épisode), affiché sous chaque
+    // visionnage dans l'Historique.
+    const commentByTitleId = new Map(
+      ratings.filter((r) => r.title_id && r.commentaire).map((r) => [r.title_id, r.commentaire]),
+    );
+    const commentByEpisodeId = new Map(
+      ratings.filter((r) => r.episode_id && r.commentaire).map((r) => [r.episode_id, r.commentaire]),
     );
 
     const items = data.map((watch) => ({
@@ -531,6 +543,9 @@ export class WatchesService {
       note_perso: watch.episode_id
         ? (ratingByEpisodeId.get(watch.episode_id) ?? null)
         : (ratingByTitleId.get(watch.title_id) ?? null),
+      commentaire: watch.episode_id
+        ? (commentByEpisodeId.get(watch.episode_id) ?? null)
+        : (commentByTitleId.get(watch.title_id) ?? null),
     }));
 
     const totalPages = Math.ceil(total / limit);

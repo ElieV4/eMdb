@@ -27,6 +27,7 @@ import { ListReorder } from "@/components/lists/ListReorder";
 import { ListGroupsBar } from "@/components/lists/ListGroupsBar";
 import { ListItemOverlay } from "@/components/lists/ListItemOverlay";
 import { ItemGroupsDialog } from "@/components/lists/ItemGroupsDialog";
+import { ItemCommentsDialog } from "@/components/lists/ItemCommentsDialog";
 import { useSetItemVu } from "@/hooks/api/useListGroups";
 import { itemInGroup } from "@/lib/listGroups";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,7 @@ function ListDetailPageContent() {
   const { data: allLists } = useLists(isAuthenticated);
   const [editMode, setEditMode] = useState(false);
   const [rangerItemId, setRangerItemId] = useState<string | null>(null);
+  const [commentsItemId, setCommentsItemId] = useState<string | null>(null);
   const setItemVu = useSetItemVu();
 
   const filters = parseTitleFilters(searchParams);
@@ -150,6 +152,7 @@ function ListDetailPageContent() {
   );
   const vuCount = items.filter((i) => i.vu).length;
   const rangerItem = items.find((i) => i.id === rangerItemId) ?? null;
+  const commentsItem = items.find((i) => i.id === commentsItemId) ?? null;
   const canEditItems = list?.capabilities.canEditItems ?? false;
 
   return (
@@ -353,10 +356,35 @@ function ListDetailPageContent() {
                   }
                   showRanger={canEditItems && groups.length > 0}
                   onRanger={() => setRangerItemId(title.id)}
+                  onComments={() => setCommentsItemId(title.id)}
+                  commentCount={
+                    (title.commentCount ?? 0) +
+                    (title.memberComments?.length ?? 0) +
+                    (title.myComment ? 1 : 0)
+                  }
                 />
               </div>
             ))}
           </div>
+        )}
+
+        {list && (
+          <ItemCommentsDialog
+            open={commentsItem !== null}
+            onOpenChange={(open) => !open && setCommentsItemId(null)}
+            listId={list.id}
+            isShared={isShared}
+            item={
+              commentsItem
+                ? {
+                    id: commentsItem.id,
+                    titre: commentsItem.titre,
+                    myComment: commentsItem.myComment,
+                    memberComments: commentsItem.memberComments ?? [],
+                  }
+                : null
+            }
+          />
         )}
 
         {list && (

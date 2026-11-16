@@ -142,6 +142,20 @@ describe('RatingsService', () => {
       });
     });
 
+    it('efface le commentaire quand une chaîne vide est envoyée', async () => {
+      prismaServiceMock.titles.findUnique.mockResolvedValue({ id: titleId });
+      prismaServiceMock.user_ratings.findUnique.mockResolvedValue(buildRawRating({}));
+      prismaServiceMock.user_ratings.update.mockResolvedValue(buildRawRating({ commentaire: null }));
+
+      await service.upsertRating(userId, { title_id: titleId, commentaire: '   ' });
+
+      expect(prismaServiceMock.user_ratings.update).toHaveBeenCalledWith({
+        where: { id: ratingId },
+        data: { commentaire: null },
+        include: mockInclude,
+      });
+    });
+
     it('crée un rating pour un épisode', async () => {
       prismaServiceMock.episodes.findUnique.mockResolvedValue({
         id: episodeId,
@@ -341,6 +355,29 @@ describe('RatingsService', () => {
   // ======================================================================
   // getTitleRatingsSummary
   // ======================================================================
+  describe('getMyTitleRating', () => {
+    it("renvoie la note et le commentaire de l'utilisateur pour le titre", async () => {
+      prismaServiceMock.user_ratings.findUnique.mockResolvedValue({
+        note_perso: 7.5,
+        commentaire: 'Très bon',
+        updated_at: new Date('2026-11-16'),
+      });
+
+      const result = await service.getMyTitleRating(userId, titleId);
+
+      expect(result).toMatchObject({ note_perso: 7.5, commentaire: 'Très bon' });
+      expect(prismaServiceMock.user_ratings.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { user_id_title_id: { user_id: userId, title_id: titleId } } }),
+      );
+    });
+
+    it("renvoie null si l'utilisateur n'a ni noté ni commenté", async () => {
+      prismaServiceMock.user_ratings.findUnique.mockResolvedValue(null);
+
+      expect(await service.getMyTitleRating(userId, titleId)).toBeNull();
+    });
+  });
+
   describe('getTitleRatingsSummary', () => {
     it('retourne moyenne + count + répartition pour un titre existant', async () => {
       prismaServiceMock.titles.findUnique.mockResolvedValue({

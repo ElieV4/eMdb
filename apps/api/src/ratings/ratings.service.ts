@@ -184,7 +184,8 @@ export class RatingsService {
     }
 
     if (commentaire !== undefined) {
-      data.commentaire = commentaire;
+      // Une chaîne vide (ou blanche) efface le commentaire.
+      data.commentaire = commentaire?.trim() ? commentaire.trim() : null;
     }
 
     const include = {
@@ -367,6 +368,27 @@ export class RatingsService {
    * @param titleId - UUID du titre
    * @returns Résumé des notes
    */
+  /**
+   * GET /titles/:id/my-rating
+   * Note et commentaire perso de l'utilisateur connecté pour un titre (null
+   * s'il n'a ni noté ni commenté).
+   */
+  async getMyTitleRating(userId: string, titleId: string) {
+    const rating = await this.prisma.forUser(userId, (tx) =>
+      tx.user_ratings.findUnique({
+        where: { user_id_title_id: { user_id: userId, title_id: titleId } },
+        select: { note_perso: true, commentaire: true, updated_at: true },
+      }),
+    );
+
+    if (!rating) return null;
+    return {
+      note_perso: rating.note_perso !== null ? Number(rating.note_perso) : null,
+      commentaire: rating.commentaire,
+      updated_at: rating.updated_at,
+    };
+  }
+
   async getTitleRatingsSummary(titleId: string): Promise<TitleRatingsSummary> {
     // Vérifier que le titre existe
     const title = await this.prisma.titles.findUnique({

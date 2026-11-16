@@ -16,6 +16,7 @@ import { SetItemVuDto } from './dto/set-item-vu.dto';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { SetItemGroupsDto } from './dto/set-item-groups.dto';
+import { CommentDto } from './dto/comment.dto';
 import {
   ListAction,
   ListRole,
@@ -332,9 +333,13 @@ export class ListsService {
           },
           vu_by_user: { select: { pseudo: true } },
           list_item_groups: { select: { group_id: true } },
+          _count: { select: { list_item_comments: true } },
         },
       }),
     );
+
+    const titleIds = items.map((item) => item.title_id);
+    const { mine, others } = await this.getPersonalComments(list, userId, titleIds);
 
     const [groups, memberCount] = await this.prisma.forUser(userId, (tx) =>
       Promise.all([
@@ -396,8 +401,216 @@ export class ListsService {
         vuAt: item.vu_at ?? undefined,
         vuBy: item.vu_by_user?.pseudo ?? undefined,
         groupIds: item.list_item_groups.map((g) => g.group_id),
+        // Commentaire perso de l'utilisateur connecté (user_ratings).
+        myComment: mine.get(item.title_id) ?? undefined,
+        // Commentaires perso des autres membres qui ont choisi de les partager.
+        memberComments: others.get(item.title_id) ?? [],
+        // Nombre de commentaires du fil partagé de la liste.
+        commentCount: item._count.list_item_comments,
       })),
     };
+  }
+
+  /**
+   * Commentaires perso (user_ratings.commentaire) des titres d'une liste :
+   * - `mine` : ceux de l'utilisateur connecté ;
+   * - `others` : ceux des autres membres de la liste (créateur compris) qui
+   *   ont activé `commentaires_visibles`, seulement si la liste est partagée.
+   *
+   * La RLS de user_ratings limite chaque utilisateur à ses propres notes :
+   * la lecture des autres passe par `asSystem`, strictement bornée aux
+   * membres de cette liste (l'accès à la liste a déjà été vérifié par
+   * l'appelant) et aux titres qu'elle contient.
+   */
+  private async getPersonalComments(
+    list: { id: string; user_id: string },
+    userId: string,
+    titleIds: string[],
+  ) {
+    const mine = new Map<string, string>();
+    const others = new Map<string, Array<{ pseudo: string; commentaire: string }>>();
+    if (titleIds.length === 0) return { mine, others };
+
+    const own = await this.prisma.forUser(userId, (tx) =>
+      tx.user_ratings.findMany({
+        where: { user_id: userId, title_id: { in: titleIds }, commentaire: { not: null } },
+        select: { title_id: true, commentaire: true },
+      }),
+    );
+    for (const r of own) {
+      if (r.title_id && r.commentaire) mine.set(r.title_id, r.commentaire);
+    }
+
+    const shared = await this.prisma.asSystem(async (tx) => {
+      const shares = await tx.list_shares.findMany({
+        where: { list_id: list.id },
+        select: { shared_with_user_id: true },
+      });
+      if (shares.length === 0) return [];
+
+      const memberIds = [list.user_id, ...shares.map((s) => s.shared_with_user_id)].filter(
+        (id) => id !== userId,
+      );
+
+      return tx.user_ratings.findMany({
+        where: {
+          user_id: { in: memberIds },
+          title_id: { in: titleIds },
+          commentaire: { not: null },
+          users: { commentaires_visibles: true },
+        },
+        select: { title_id: true, commentaire: true, users: { select: { pseudo: true } } },
+        orderBy: { updated_at: 'desc' },
+      });
+    });
+    for (const r of shared) {
+      if (!r.title_id || !r.commentaire) continue;
+      others.set(r.title_id, [
+        ...(others.get(r.title_id) ?? []),
+        { pseudo: r.users.pseudo, commentaire: r.commentaire },
+      ]);
+    }
+
+    return { mine, others };
+  }
+
+  // ======================================================================
+  // COMMENTAIRES PARTAGÉS (fil par titre)
+  // ======================================================================
+
+  private static readonly COMMENT_SELECT = {
+    id: true,
+    contenu: true,
+    created_at: true,
+    updated_at: true,
+    user_id: true,
+    users: { select: { pseudo: true, avatar_url: true } },
+  } as const;
+
+  private formatComment(
+    c: {
+      id: string;
+      contenu: string;
+      created_at: Date;
+      updated_at: Date;
+      user_id: string;
+      users: { pseudo: string; avatar_url: string | null };
+    },
+    userId: string,
+    canModerate: boolean,
+    canWrite: boolean,
+  ) {
+    const isAuthor = c.user_id === userId;
+    return {
+      id: c.id,
+      contenu: c.contenu,
+      created_at: c.created_at,
+      updated_at: c.updated_at,
+      author: { id: c.user_id, pseudo: c.users.pseudo, avatar_url: c.users.avatar_url },
+      canEdit: isAuthor && canWrite,
+      canDelete: (isAuthor && canWrite) || canModerate,
+    };
+  }
+
+  /**
+   * GET /lists/:listId/items/:titleId/comments
+   * Fil des commentaires partagés d'un titre de la liste, du plus ancien au
+   * plus récent. Lisible par tout membre.
+   */
+  async getItemComments(listId: string, userId: string, titleId: string) {
+    const list = await this.assertCan(listId, userId, 'read');
+    const canWrite = canOnList(list.role, list.share_mode, 'item:update');
+    const canModerate = canOnList(list.role, list.share_mode, 'shares:manage');
+
+    const comments = await this.prisma.forUser(userId, (tx) =>
+      tx.list_item_comments.findMany({
+        where: { list_id: listId, title_id: titleId },
+        select: ListsService.COMMENT_SELECT,
+        orderBy: { created_at: 'asc' },
+      }),
+    );
+
+    return {
+      canWrite,
+      comments: comments.map((c) => this.formatComment(c, userId, canModerate, canWrite)),
+    };
+  }
+
+  /**
+   * POST /lists/:listId/items/:titleId/comments
+   * Ajoute un commentaire au fil. Créateur, ou membre en collaboratif / ouvert.
+   */
+  async addItemComment(listId: string, userId: string, titleId: string, dto: CommentDto) {
+    const list = await this.assertCan(listId, userId, 'item:update');
+
+    return this.prisma.forUser(userId, async (tx) => {
+      const item = await tx.list_items.findUnique({
+        where: { list_id_title_id: { list_id: listId, title_id: titleId } },
+        select: { list_id: true },
+      });
+      if (!item) {
+        throw new NotFoundException('Cet item ne fait pas partie de la liste.');
+      }
+
+      const comment = await tx.list_item_comments.create({
+        data: { list_id: listId, title_id: titleId, user_id: userId, contenu: dto.contenu.trim() },
+        select: ListsService.COMMENT_SELECT,
+      });
+      return this.formatComment(comment, userId, list.role === 'owner', true);
+    });
+  }
+
+  /**
+   * PATCH /lists/:listId/comments/:commentId
+   * Modifie un de ses commentaires (auteur, avec le droit d'écrire).
+   */
+  async updateItemComment(listId: string, userId: string, commentId: string, dto: CommentDto) {
+    const list = await this.assertCan(listId, userId, 'item:update');
+
+    return this.prisma.forUser(userId, async (tx) => {
+      const comment = await this.findCommentOrThrow(tx, listId, commentId);
+      if (comment.user_id !== userId) {
+        throw new ForbiddenException('Vous ne pouvez modifier que vos propres commentaires.');
+      }
+
+      const updated = await tx.list_item_comments.update({
+        where: { id: commentId },
+        data: { contenu: dto.contenu.trim() },
+        select: ListsService.COMMENT_SELECT,
+      });
+      return this.formatComment(updated, userId, list.role === 'owner', true);
+    });
+  }
+
+  /**
+   * DELETE /lists/:listId/comments/:commentId
+   * Supprime un commentaire : son auteur (avec le droit d'écrire), ou le
+   * créateur de la liste (modération).
+   */
+  async deleteItemComment(listId: string, userId: string, commentId: string): Promise<void> {
+    const list = await this.assertCan(listId, userId, 'read');
+    const canWrite = canOnList(list.role, list.share_mode, 'item:update');
+    const canModerate = canOnList(list.role, list.share_mode, 'shares:manage');
+
+    await this.prisma.forUser(userId, async (tx) => {
+      const comment = await this.findCommentOrThrow(tx, listId, commentId);
+      const isAuthor = comment.user_id === userId;
+      if (!canModerate && !(isAuthor && canWrite)) {
+        throw new ForbiddenException('Vous ne pouvez pas supprimer ce commentaire.');
+      }
+      await tx.list_item_comments.delete({ where: { id: commentId } });
+    });
+  }
+
+  private async findCommentOrThrow(tx: any, listId: string, commentId: string) {
+    const comment = await tx.list_item_comments.findFirst({
+      where: { id: commentId, list_id: listId },
+      select: { id: true, user_id: true },
+    });
+    if (!comment) {
+      throw new NotFoundException('Commentaire introuvable.');
+    }
+    return comment;
   }
 
   // ======================================================================

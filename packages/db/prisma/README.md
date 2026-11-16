@@ -79,6 +79,11 @@ Le mode de partage est porté par la liste (`user_lists.share_mode`) et s'appliq
 - **`trg_user_lists_guard_owner_columns`** : la RLS filtre des lignes, pas des colonnes. Ce trigger empêche un membre autorisé à renommer la liste de modifier aussi `share_mode`, `type` ou `user_id`. Il ne s'applique qu'aux requêtes faites au nom d'un utilisateur (`app.user_id` défini) : le worker et les scripts d'administration, qui contournent la RLS sans définir ce contexte, ne sont pas bloqués.
 - La même matrice existe côté API dans `apps/api/src/lists/list-permissions.ts`. Les deux doivent rester synchronisées.
 
+### Commentaires (migration `title_comments`)
+
+- **Commentaire perso** : champ existant `user_ratings.commentaire` (un par utilisateur et par titre). Réglage `users.commentaires_visibles` : s'il est activé, l'API montre ce commentaire aux membres des listes partagées de l'utilisateur, sur les titres de ces listes. La RLS de `user_ratings` reste limitée au propriétaire : la lecture des commentaires des autres membres passe par `asSystem`, bornée aux membres de la liste et à ses titres.
+- **`list_item_comments`** : fil de commentaires partagés par titre de liste. RLS : lecture `read` ; insertion et modification de ses propres commentaires (`user_id` = soi) avec `item:update` ; suppression par l'auteur (avec `item:update`) ou par le créateur de la liste (`shares:manage`).
+
 ### « Vu » dans la liste et sous-groupes (migration `list_items_vu_and_groups`)
 
 - **`list_items.vu_at` / `vu_by`** : un titre est « vu » dans le cadre de la liste, un seul état partagé par tous les membres (indépendant de l'historique perso `user_watches`). Droit : `item:update` (créateur, ou membre en `collaboratif` / `ouvert`).

@@ -377,10 +377,23 @@ describe('WatchesService', () => {
 
       const result = await service.listWatches(userId, {});
 
-      expect(result.items).toEqual([{ ...mockData[0], note_perso: null }]);
+      expect(result.items).toEqual([{ ...mockData[0], note_perso: null, commentaire: null }]);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
       expect(result.limit).toBe(20);
+    });
+
+    it("n'affiche pas une note de 0 pour un titre seulement commenté", async () => {
+      const watch = { id: 'w1', title_id: 't1', episode_id: null, date_vue: new Date() };
+      prismaServiceMock.user_watches.findMany.mockResolvedValue([watch]);
+      prismaServiceMock.user_watches.count.mockResolvedValue(1);
+      prismaServiceMock.user_ratings.findMany.mockResolvedValue([
+        { title_id: 't1', episode_id: null, note_perso: null, commentaire: 'Revu avec plaisir' },
+      ]);
+
+      const result = await service.listWatches(userId, {} as any);
+
+      expect(result.items[0]).toMatchObject({ note_perso: null, commentaire: 'Revu avec plaisir' });
     });
 
     it('filtre par type film', async () => {

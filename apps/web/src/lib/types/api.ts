@@ -104,6 +104,8 @@ export type UserWatch = {
   /** Note personnelle (/10) sur le titre/épisode de ce visionnage, si notée
    * — affichée en sous-titre des cards Historique à la place de la durée. */
   note_perso?: number | null;
+  /** Commentaire perso sur le titre/épisode (user_ratings), affiché sous la card. */
+  commentaire?: string | null;
   titles?: {
     id: string;
     tmdb_id: number | null;
@@ -356,6 +358,35 @@ export type SharedListEntry = {
   };
 };
 
+/** Note et commentaire perso de l'utilisateur sur un titre (GET /titles/:id/my-rating). */
+export type MyTitleRating = {
+  note_perso: number | null;
+  commentaire: string | null;
+  updated_at: string;
+} | null;
+
+/** Commentaire du fil partagé d'un titre dans une liste. */
+export type ListItemComment = {
+  id: string;
+  contenu: string;
+  created_at: string;
+  updated_at: string;
+  author: PublicUser;
+  canEdit: boolean;
+  canDelete: boolean;
+};
+
+/** Profil de l'utilisateur connecté (GET /users/me). */
+export type MyProfile = {
+  id: string;
+  email: string;
+  pseudo: string;
+  avatar_url: string | null;
+  created_at: string;
+  /** Commentaires perso visibles des membres de ses listes partagées. */
+  commentaires_visibles: boolean;
+};
+
 /** Sous-groupe d'une liste (arbre à plat : `parent_id`). */
 export type ListGroup = {
   id: string;
@@ -410,6 +441,12 @@ export type ListDetail = {
       vuBy?: string;
       /** Sous-groupes dans lesquels le titre est rangé. */
       groupIds: string[];
+      /** Mon commentaire perso sur le titre (user_ratings). */
+      myComment?: string;
+      /** Commentaires perso des autres membres qui ont choisi de les partager. */
+      memberComments: Array<{ pseudo: string; commentaire: string }>;
+      /** Nombre de commentaires dans le fil partagé de la liste. */
+      commentCount: number;
     }
   >;
 };

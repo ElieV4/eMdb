@@ -17,6 +17,7 @@ import { TitleInfo } from "./TitleInfo";
 import { WatchLinksSection } from "./WatchLinksSection";
 import { ProgressSerie } from "@/components/watches/ProgressSerie";
 import { TitleActions } from "./TitleActions";
+import { TitleCommentSection } from "@/components/comments/TitleCommentSection";
 
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
@@ -195,6 +196,8 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
           )}
 
           <TitleInfo title={title} />
+
+          <TitleCommentSection titleId={title.id} />
 
           {tmdb_id && (
             <a
