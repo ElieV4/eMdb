@@ -37,12 +37,17 @@ const prismaServiceMock = {
   },
   list_items: {
     deleteMany: jest.fn(),
+    findMany: jest.fn(),
   },
+  title_genres: { findMany: jest.fn() },
+  title_studios: { findMany: jest.fn() },
+  credits: { findMany: jest.fn() },
   user_lists: {
     findFirst: jest.fn(),
   },
   user_ratings: {
     findMany: jest.fn(),
+    groupBy: jest.fn(),
   },
 };
 
@@ -266,6 +271,151 @@ describe('WatchesService', () => {
   // ======================================================================
   // updateWatchContext
   // ======================================================================
+  describe('updateWatchContext (date)', () => {
+    it('corrige la date du visionnage', async () => {
+      prismaServiceMock.user_watches.findUnique.mockResolvedValue({ id: watchId, user_id: userId });
+      prismaServiceMock.user_watches.update.mockResolvedValue({ id: watchId });
+
+      await service.updateWatchContext(watchId, userId, { date_vue: '2026-11-01T20:30:00.000Z' });
+
+      expect(prismaServiceMock.user_watches.update).toHaveBeenCalledWith({
+        where: { id: watchId },
+        data: { date_vue: new Date('2026-11-01T20:30:00.000Z') },
+      });
+    });
+
+    it('refuse une date dans le futur', async () => {
+      prismaServiceMock.user_watches.findUnique.mockResolvedValue({ id: watchId, user_id: userId });
+      const future = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+
+      await expect(
+        service.updateWatchContext(watchId, userId, { date_vue: future }),
+      ).rejects.toThrow('futur');
+      expect(prismaServiceMock.user_watches.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getHistoryTable', () => {
+    const film = {
+      id: 'film-1',
+      titre_vo: 'Match Point',
+      titre_vf: null,
+      type: 'film',
+      date_sortie: new Date('2005-10-26'),
+      note_imdb: 7.6,
+      affiche_url: null,
+    };
+    const serie = { ...film, id: 'serie-1', titre_vo: 'The Office', type: 'serie', note_imdb: 9 };
+
+    beforeEach(() => {
+      prismaServiceMock.user_watches.findMany.mockResolvedValue([
+        {
+          id: 'w-film',
+          date_vue: new Date('2026-11-10'),
+          support: 'cinema',
+          compagnie: 'accompagne',
+          emotion: ['emu'],
+          title_id: 'film-1',
+          episode_id: null,
+          titles: film,
+          episodes: null,
+        },
+        {
+          id: 'w-ep',
+          date_vue: new Date('2026-11-12'),
+          support: null,
+          compagnie: null,
+          emotion: [],
+          title_id: null,
+          episode_id: 'ep-1',
+          titles: null,
+          episodes: {
+            id: 'ep-1',
+            numero: 3,
+            titre: 'Diversité',
+            date_sortie: new Date('2005-04-05'),
+            seasons: { numero: 1, titles: serie },
+          },
+        },
+      ]);
+      prismaServiceMock.title_genres.findMany.mockResolvedValue([
+        { title_id: 'film-1', genres: { nom: 'Drame' } },
+      ]);
+      prismaServiceMock.title_studios.findMany.mockResolvedValue([
+        { title_id: 'film-1', studios: { id: 's1', nom: 'BBC Films' } },
+      ]);
+      prismaServiceMock.credits.findMany.mockResolvedValue([
+        { title_id: 'film-1', people: { id: 'p1', nom: 'Woody Allen' } },
+      ]);
+      prismaServiceMock.user_ratings.findMany.mockResolvedValue([
+        { title_id: 'film-1', episode_id: null, note_perso: 8, commentaire: 'Glaçant' },
+        { title_id: null, episode_id: 'ep-1', note_perso: null, commentaire: 'Culte' },
+        { title_id: 'serie-1', episode_id: null, note_perso: 9, commentaire: null },
+      ]);
+      prismaServiceMock.list_items.findMany.mockResolvedValue([
+        { title_id: 'film-1', user_lists: { id: 'l1', nom: 'Ciné-club', type: 'custom' } },
+      ]);
+      prismaServiceMock.user_ratings.groupBy.mockResolvedValue([
+        { title_id: 'film-1', _avg: { note_perso: 7.25 }, _count: { note_perso: 4 } },
+      ]);
+    });
+
+    it('enrichit chaque visionnage (film) avec métadonnées, notes, contexte et listes', async () => {
+      const { rows, truncated } = await service.getHistoryTable(userId);
+
+      expect(truncated).toBe(false);
+      expect(rows[0]).toMatchObject({
+        watchId: 'w-film',
+        title: { id: 'film-1', titre: 'Match Point', type: 'film' },
+        episode: null,
+        genres: ['Drame'],
+        studios: [{ id: 's1', nom: 'BBC Films' }],
+        realisateurs: [{ id: 'p1', nom: 'Woody Allen' }],
+        noteImdb: 7.6,
+        moyenneApp: 7.3,
+        nombreNotesApp: 4,
+        notePerso: 8,
+        commentaire: 'Glaçant',
+        support: 'cinema',
+        emotion: ['emu'],
+        listes: [{ id: 'l1', nom: 'Ciné-club', type: 'custom' }],
+      });
+    });
+
+    it("pour un épisode : la série porte la ligne, note et commentaire sont ceux de l'épisode", async () => {
+      const { rows } = await service.getHistoryTable(userId);
+
+      expect(rows[1]).toMatchObject({
+        title: { id: 'serie-1', titre: 'The Office', type: 'serie' },
+        episode: { id: 'ep-1', saison: 1, numero: 3 },
+        dateSortie: new Date('2005-04-05'),
+        notePerso: null,
+        commentaire: 'Culte',
+        titreNotePerso: 9,
+        titreCommentaire: null,
+      });
+    });
+
+    it('la moyenne ne compte que les lignes avec une note', async () => {
+      await service.getHistoryTable(userId);
+
+      expect(prismaServiceMock.user_ratings.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { title_id: { in: ['film-1', 'serie-1'] }, note_perso: { not: null } },
+        }),
+      );
+    });
+
+    it('historique vide : aucune requête annexe', async () => {
+      prismaServiceMock.user_watches.findMany.mockResolvedValue([]);
+
+      const result = await service.getHistoryTable(userId);
+
+      expect(result).toEqual({ truncated: false, rows: [] });
+      expect(prismaServiceMock.title_genres.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe('updateWatchContext', () => {
     it('met à jour les champs de contexte fournis', async () => {
       prismaServiceMock.user_watches.findUnique.mockResolvedValue({
