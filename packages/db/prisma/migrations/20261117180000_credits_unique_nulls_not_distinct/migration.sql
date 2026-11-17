@@ -70,7 +70,10 @@ WHERE c.id = d.id
 DROP TABLE credits_dedup;
 DROP TABLE credits_personnages;
 
--- 3. Index unique effectif, même nom.
+-- 3. Index unique effectif, même nom. Selon la façon dont la base a été
+-- créée, l'unicité existe comme contrainte (db_init.sql : UNIQUE (...)) ou
+-- comme simple index (migrations Prisma) : on retire les deux formes.
+ALTER TABLE "credits" DROP CONSTRAINT IF EXISTS "credits_title_id_person_id_role_id_episode_id_key";
 DROP INDEX IF EXISTS "credits_title_id_person_id_role_id_episode_id_key";
 CREATE UNIQUE INDEX "credits_title_id_person_id_role_id_episode_id_key"
   ON "credits" ("title_id", "person_id", "role_id", "episode_id") NULLS NOT DISTINCT;
