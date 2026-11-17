@@ -43,6 +43,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ListDialog } from "./ListDialog";
 import { ListShareDialog } from "./ListShareDialog";
+import { ListConfigDialog } from "./ListConfigDialog";
+import { EditMenuButton } from "@/components/common/EditMenuButton";
 import { useDeleteList } from "@/hooks/api/useDeleteList";
 import { useLeaveSharedList } from "@/hooks/api/useLeaveSharedList";
 import { isShareableListType } from "@/lib/shareModes";
@@ -79,6 +81,8 @@ type ListActionsMenuProps = {
   onDeleted?: () => void;
   /** En-tête de la page liste : bouton « Ajout rapide » (affiche / masque le module). */
   quickAdd?: { open: boolean; onToggle: () => void };
+  /** Mode « Modifier le contenu » actif (bouton crayon mis en évidence). */
+  editing?: boolean;
   className?: string;
 };
 
@@ -130,8 +134,10 @@ export function ListActionsMenu({
   onEditContent,
   onDeleted,
   quickAdd,
+  editing = false,
   className,
 }: ListActionsMenuProps) {
+  const [configOpen, setConfigOpen] = useState(false);
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -144,7 +150,6 @@ export function ListActionsMenu({
   const isMember = role === "member";
 
   const canRename = isCustom && capabilities.canEditList;
-  const canEditContent = capabilities.canEditItems || capabilities.canRemoveItems;
   const canDelete = isCustom && capabilities.canDeleteList;
   const canShare = capabilities.canManageShares && isShareableListType(list.type);
   const canAddItems = capabilities.canAddItems;
@@ -243,27 +248,13 @@ export function ListActionsMenu({
               pressed={quickAdd.open}
             />
           )}
-          {canShare && (
-            <HeaderIconButton
-              label="Partager"
-              icon={<Share2 className="h-4 w-4" />}
-              onClick={() => setShareOpen(true)}
-            />
-          )}
-          {canRename && (
-            <HeaderIconButton
-              label="Modifier la liste"
-              icon={<Pencil className="h-4 w-4" />}
-              onClick={() => setEditOpen(true)}
-            />
-          )}
-          {canEditContent && (
-            <HeaderIconButton
-              label="Modifier le contenu"
-              icon={<ListVideo className="h-4 w-4" />}
-              onClick={handleEditContent}
-            />
-          )}
+          {/* Bouton crayon : « Configurer la liste » (listes personnalisées :
+              nom, description, partage, suppression) et « Modifier le contenu ». */}
+          <EditMenuButton
+            onConfigure={isCustom && (canRename || canShare || canDelete) ? () => setConfigOpen(true) : undefined}
+            onEditContent={handleEditContent}
+            editing={editing}
+          />
           {isMember && (
             <HeaderIconButton
               label="Quitter la liste"
@@ -273,8 +264,14 @@ export function ListActionsMenu({
             />
           )}
         </div>
-        {editDialog}
-        {shareDialog}
+        <ListConfigDialog
+          open={configOpen}
+          onOpenChange={setConfigOpen}
+          list={list}
+          canEdit={canRename}
+          canShare={canShare}
+          onDelete={canDelete ? () => setConfirmDeleteOpen(true) : undefined}
+        />
         {deleteDialog}
         {leaveDialog}
       </>

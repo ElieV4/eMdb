@@ -15,7 +15,6 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  Columns3,
   MessageSquare,
   Pencil,
   Trash2,
@@ -27,7 +26,6 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -68,6 +66,9 @@ import {
   ColumnFilter,
   ColumnId,
   DEFAULT_HIDDEN_COLUMNS,
+  COLUMN_ORDER,
+  normalize,
+  rowSearchText,
   DisplayRow,
   SortState,
   episodeCode,
@@ -85,6 +86,8 @@ import {
   supportLabel,
 } from "@/lib/watchContext";
 import { buildEntityUrl, cn } from "@/lib/utils";
+import { TitlePoster } from "@/components/titles/TitlePoster";
+import { formatDuration } from "@/lib/cardFormatting";
 
 // v2 : nouvelles colonnes par défaut (titre, réalisation, sortie, ma note) —
 // les choix enregistrés avec l'ancien jeu par défaut ne sont pas repris.
@@ -133,7 +136,16 @@ function toLocalInput(iso: string) {
 const selectClass =
   "h-7 rounded-md border border-input bg-transparent px-1.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
-export function HistoryTable() {
+type HistoryTableProps = {
+  /** Recherche globale (barre d'outils de la page), sur toutes les colonnes. */
+  search?: string;
+  /** « Trier / filtrer » : ligne de filtres par colonne et options. */
+  filtersOpen?: boolean;
+  /** « Colonnes » : choix des colonnes visibles. */
+  columnsOpen?: boolean;
+};
+
+export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = false }: HistoryTableProps = {}) {
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useHistoryTable();
   const { data: ownLists } = useLists();
@@ -167,7 +179,9 @@ export function HistoryTable() {
         : "La modification n'a pas pu être enregistrée.",
     );
 
-  const visibleColumns = COLUMNS.filter((c) => !hidden.includes(c.id));
+  const visibleColumns = COLUMN_ORDER.map((id) => COLUMNS.find((c) => c.id === id)!).filter(
+    (c) => !hidden.includes(c.id),
+  );
   const toggleColumn = (id: ColumnId) => {
     const next = hidden.includes(id)
       ? hidden.filter((h) => h !== id)
@@ -178,11 +192,14 @@ export function HistoryTable() {
 
   const rows = useMemo(() => {
     const display = toDisplayRows(data?.rows ?? [], groupBySeries);
+    const query = normalize(search.trim());
     return sortRows(
-      display.filter((r) => matchesFilters(r, filters)),
+      display.filter(
+        (r) => matchesFilters(r, filters) && (!query || normalize(rowSearchText(r)).includes(query)),
+      ),
       sort,
     );
-  }, [data, groupBySeries, filters, sort]);
+  }, [data, groupBySeries, filters, sort, search]);
 
   // Listes dans lesquelles l'utilisateur peut ranger un titre : les siennes,
   // et les listes partagées avec lui en mode "ouvert".
@@ -257,6 +274,20 @@ export function HistoryTable() {
 
   const renderCell = (column: ColumnDef, row: DisplayRow) => {
     switch (column.id) {
+      case "affiche":
+        return row.title ? (
+          <TitlePoster
+            src={row.title.afficheUrl}
+            alt={row.title.titre}
+            title={row.title.titre}
+            type={row.title.type}
+            width={32}
+            height={48}
+            className="[&>div]:hidden"
+          />
+        ) : null;
+      case "duree":
+        return row.duree != null ? formatDuration(row.duree) : "—";
       case "dateVue":
         if (row.grouped) {
           return (
@@ -595,41 +626,36 @@ export function HistoryTable() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="inline-flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={groupBySeries}
-            onChange={(e) => setGroupBySeries(e.target.checked)}
-          />
-          Regrouper les épisodes par série
-        </label>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="outline" size="sm">
-                <Columns3 className="h-4 w-4" />
-                Colonnes
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="start">
-            <DropdownMenuLabel>Colonnes affichées</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {COLUMNS.map((c) => (
-              <DropdownMenuCheckboxItem
-                key={c.id}
+      {columnsOpen && (
+        <fieldset className="flex flex-wrap gap-x-4 gap-y-2 rounded-lg border p-3">
+          <legend className="px-1 text-xs text-muted-foreground">Colonnes affichées</legend>
+          {COLUMNS.map((c) => (
+            <label key={c.id} className="inline-flex items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
                 checked={!hidden.includes(c.id)}
-                onCheckedChange={() => toggleColumn(c.id)}
                 disabled={c.id === "titre"}
-              >
-                {c.label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                onChange={() => toggleColumn(c.id)}
+              />
+              {c.label}
+            </label>
+          ))}
+        </fieldset>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        {filtersOpen && (
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-primary"
+              checked={groupBySeries}
+              onChange={(e) => setGroupBySeries(e.target.checked)}
+            />
+            Regrouper les épisodes par série
+          </label>
+        )}
 
         {activeFilters > 0 && (
           <Button variant="ghost" size="sm" onClick={() => setFilters({})}>
@@ -653,9 +679,9 @@ export function HistoryTable() {
 
       {/* `relative` : contient les éléments en position absolue du tableau
           (ex. texte sr-only) ; sans lui, ils élargissaient toute la page. */}
-      <div className="relative overflow-x-auto rounded-lg border">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left">
+          <thead className="border-b text-left text-xs text-muted-foreground">
             <tr>
               {visibleColumns.map((c) => {
                 const active = sort?.column === c.id;
@@ -694,14 +720,16 @@ export function HistoryTable() {
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
-            <tr>
-              {visibleColumns.map((c) => (
-                <th key={c.id} className="px-2 pb-2 font-normal">
-                  {renderFilter(c)}
-                </th>
-              ))}
-              <th />
-            </tr>
+            {filtersOpen && (
+              <tr>
+                {visibleColumns.map((c) => (
+                  <th key={c.id} className="px-2 pb-2 font-normal">
+                    {c.id === "affiche" ? null : renderFilter(c)}
+                  </th>
+                ))}
+                <th />
+              </tr>
+            )}
           </thead>
           <tbody>
             {rows.length === 0 ? (
@@ -719,7 +747,7 @@ export function HistoryTable() {
               rows.map((row) => (
                 <tr
                   key={row.key}
-                  className="border-t align-top hover:bg-muted/30"
+                  className="border-b align-top hover:bg-muted/20"
                 >
                   {visibleColumns.map((c) => (
                     <td key={c.id} className="px-2 py-1.5">

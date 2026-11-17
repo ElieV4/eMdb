@@ -29,15 +29,31 @@ import { TitleSearchResult } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
 
 interface ListQuickAddProps {
-  listId: string;
-  /** Ids locaux des titres déjà dans la liste. */
+  /** Liste où ajouter (action par défaut). */
+  listId?: string;
+  /** Ids locaux des titres déjà « faits » (dans la liste…) : non ajoutables. */
   existingTitleIds: Set<string>;
+  /** Action personnalisée (ex. historique : marquer comme vu aujourd'hui). */
+  onAdd?: (titleId: string) => Promise<unknown>;
+  /** Libellés du bouton : action, et état fait. */
+  addLabel?: string;
+  doneLabel?: string;
+  /** Texte d'aide sous la barre de recherche. */
+  hint?: string;
   className?: string;
 }
 
 const MIN_QUERY_LENGTH = 2;
 
-export function ListQuickAdd({ listId, existingTitleIds, className }: ListQuickAddProps) {
+export function ListQuickAdd({
+  listId,
+  existingTitleIds,
+  onAdd,
+  addLabel = "Ajouter",
+  doneLabel = "Dans la liste",
+  hint = "Tapez au moins 2 caractères pour chercher un titre et l'ajouter à la liste.",
+  className,
+}: ListQuickAddProps) {
   const [query, setQuery] = useState("");
   // Clé du résultat (id local ou tmdb_id) en cours d'ajout, et ajoutés pendant
   // cette session (affichés "Ajouté" avant même le rechargement de la liste).
@@ -70,7 +86,8 @@ export function ListQuickAdd({ listId, existingTitleIds, className }: ListQuickA
         if (!title.tmdbId) throw new Error("Titre sans identifiant TMDB");
         titleId = (await getOrImportTitle.mutateAsync({ tmdbId: title.tmdbId, type: title.type })).id;
       }
-      await addListItem.mutateAsync({ listId, titleId });
+      if (onAdd) await onAdd(titleId);
+      else if (listId) await addListItem.mutateAsync({ listId, titleId });
       setAddedKeys((prev) => new Set(prev).add(key));
     } catch {
       setError(`Impossible d'ajouter « ${title.titre} » à la liste.`);
@@ -110,7 +127,7 @@ export function ListQuickAdd({ listId, existingTitleIds, className }: ListQuickA
 
       {!searching ? (
         <p className="text-sm text-muted-foreground">
-          Tapez au moins {MIN_QUERY_LENGTH} caractères pour chercher un titre et l&apos;ajouter à la liste.
+          {hint}
         </p>
       ) : loading ? (
         <div className="flex gap-4 overflow-hidden pb-2" aria-busy="true">
@@ -150,7 +167,7 @@ export function ListQuickAdd({ listId, existingTitleIds, className }: ListQuickA
                   ) : (
                     <Plus className="h-4 w-4" />
                   )}
-                  {inList ? "Dans la liste" : "Ajouter"}
+                  {inList ? doneLabel : addLabel}
                 </Button>
               </li>
             );

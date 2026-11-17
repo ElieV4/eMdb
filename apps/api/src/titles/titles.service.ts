@@ -62,6 +62,64 @@ export class TitlesService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Données de la vue tableau pour une série de titres locaux : réalisateurs
+   * (dédoublonnés), ma note, durée, nombre d'épisodes et date de sortie.
+   * Quelques requêtes groupées, pas une par titre.
+   */
+  async getTableInfo(userId: string, titleIds: string[]) {
+    const ids = [...new Set(titleIds)];
+    if (ids.length === 0) return {};
+
+    const [titles, directors, ratings] = await Promise.all([
+      this.prisma.titles.findMany({
+        where: { id: { in: ids } },
+        select: {
+          id: true,
+          type: true,
+          date_sortie: true,
+          duree_minutes: true,
+          seasons: { where: { numero: { not: 0 } }, select: { _count: { select: { episodes: true } } } },
+        },
+      }),
+      this.prisma.credits.findMany({
+        where: { title_id: { in: ids }, episode_id: null, roles: { code: 'realisateur' } },
+        select: { title_id: true, people: { select: { id: true, nom: true } } },
+        orderBy: { ordre: 'asc' },
+      }),
+      this.prisma.forUser(userId, (tx) =>
+        tx.user_ratings.findMany({
+          where: { user_id: userId, title_id: { in: ids }, episode_id: null },
+          select: { title_id: true, note_perso: true },
+        }),
+      ),
+    ]);
+
+    const directorsBy = new Map<string, { id: string; nom: string }[]>();
+    for (const d of directors) {
+      const list = directorsBy.get(d.title_id) ?? [];
+      if (!list.some((p) => p.id === d.people.id)) list.push(d.people);
+      directorsBy.set(d.title_id, list);
+    }
+    const ratingBy = new Map(
+      ratings.filter((r) => r.title_id).map((r) => [r.title_id as string, r.note_perso]),
+    );
+
+    return Object.fromEntries(
+      titles.map((t) => [
+        t.id,
+        {
+          realisateurs: directorsBy.get(t.id) ?? [],
+          notePerso: ratingBy.get(t.id) != null ? Number(ratingBy.get(t.id)) : null,
+          duree: t.duree_minutes ?? null,
+          nombreEpisodes:
+            t.type === 'serie' ? t.seasons.reduce((sum, s) => sum + s._count.episodes, 0) : null,
+          dateSortie: t.date_sortie ? t.date_sortie.toISOString() : null,
+        },
+      ]),
+    );
+  }
+
+  /**
    * Recherche un titre via TMDB + résultats locaux, fusionnés.
    *
    * Appelle tmdb-client.searchMovie/searchTv selon le type, puis recherche

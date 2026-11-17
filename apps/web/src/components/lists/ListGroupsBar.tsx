@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import { FolderPlus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -145,15 +146,23 @@ export function ListGroupsBar({
             </span>
           );
         })}
+        {/* Nouveau sous-groupe : tout à droite, icône seule, libellé au survol. */}
         {canCreate && (
-          <button
-            type="button"
-            onClick={() => setNameDialog({ kind: "create", parent: null })}
-            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
-          >
-            <FolderPlus className="h-3.5 w-3.5" />
-            Sous-groupe
-          </button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={() => setNameDialog({ kind: "create", parent: null })}
+                  aria-label="Ajouter un nouveau sous-groupe"
+                  className="ml-auto flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <FolderPlus className="h-4 w-4" />
+                </button>
+              }
+            />
+            <TooltipContent>Ajouter un nouveau sous-groupe</TooltipContent>
+          </Tooltip>
         )}
       </div>
 

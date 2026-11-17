@@ -11,14 +11,16 @@ import { BottomNav } from "./BottomNav";
 type NavChild = { href: string; label: string };
 type NavItem = { href: string; label: string; icon: LucideIcon; children?: NavChild[] };
 
-// "Listes" affiche toujours "Favoris" (liste spéciale type "favoris",
-// toujours créée pour l'utilisateur) puis les listes personnalisées de
-// l'utilisateur (modification N).
+// "Listes" affiche la Watchlist et les Favoris (listes spéciales, toujours
+// créées pour l'utilisateur) puis ses listes personnalisées (modification N ;
+// la Watchlist était sous "Accueil").
 function buildNavTree(userLists: UserList[] | undefined): { main: NavItem[]; profile: NavItem } {
   const favoris = userLists?.find((list) => list.type === "favoris");
+  const watchlist = userLists?.find((list) => list.type === "watchlist");
   const customLists = (userLists ?? []).filter((list) => list.type === "custom");
 
   const listesChildren: NavChild[] = [
+    { href: watchlist ? `/lists/${watchlist.id}` : "/watchlist", label: "Watchlist" },
     ...(favoris ? [{ href: `/lists/${favoris.id}`, label: "Favoris" }] : []),
     ...customLists.map((list) => ({ href: `/lists/${list.id}`, label: list.nom })),
   ];
@@ -32,7 +34,6 @@ function buildNavTree(userLists: UserList[] | undefined): { main: NavItem[]; pro
         icon: Home,
         children: [
           { href: "/continue-watching", label: "Continuer à regarder" },
-          { href: "/watchlist", label: "Watchlist" },
           { href: "/calendar", label: "Calendrier" },
           { href: "/history", label: "Historique" },
           { href: "/recommendations", label: "Recommandés" },

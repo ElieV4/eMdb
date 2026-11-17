@@ -31,7 +31,8 @@ const prismaServiceMock = {
   title_recommendations: {
     findMany: jest.fn(),
   },
-  user_ratings: { count: jest.fn() },
+  user_ratings: { count: jest.fn(), findMany: jest.fn() },
+  credits: { findMany: jest.fn() },
   user_watches: { count: jest.fn() },
   list_items: { count: jest.fn() },
 };
@@ -46,6 +47,44 @@ describe('TitlesService', () => {
 
     service = module.get<TitlesService>(TitlesService);
     jest.clearAllMocks();
+  });
+
+  describe('getTableInfo', () => {
+    it('renvoie réalisateurs dédoublonnés, ma note, durée et épisodes par titre', async () => {
+      prismaServiceMock.titles.findMany.mockResolvedValue([
+        { id: 'f1', type: 'film', date_sortie: new Date('2005-10-26'), duree_minutes: 124, seasons: [] },
+        {
+          id: 's1',
+          type: 'serie',
+          date_sortie: null,
+          duree_minutes: null,
+          seasons: [{ _count: { episodes: 10 } }, { _count: { episodes: 12 } }],
+        },
+      ]);
+      prismaServiceMock.credits.findMany.mockResolvedValue([
+        { title_id: 'f1', people: { id: 'p1', nom: 'Woody Allen' } },
+        { title_id: 'f1', people: { id: 'p1', nom: 'Woody Allen' } },
+      ]);
+      prismaServiceMock.user_ratings.findMany.mockResolvedValue([{ title_id: 'f1', note_perso: 8 }]);
+
+      const info = await service.getTableInfo('u1', ['f1', 's1', 'f1']);
+
+      expect(info.f1).toEqual({
+        realisateurs: [{ id: 'p1', nom: 'Woody Allen' }],
+        notePerso: 8,
+        duree: 124,
+        nombreEpisodes: null,
+        dateSortie: '2005-10-26T00:00:00.000Z',
+      });
+      expect(info.s1).toMatchObject({ realisateurs: [], notePerso: null, nombreEpisodes: 22 });
+      expect(prismaServiceMock.forUser).toHaveBeenCalledWith('u1', expect.any(Function));
+    });
+
+    it('liste vide : aucune requête', async () => {
+      prismaServiceMock.titles.findMany.mockClear();
+      expect(await service.getTableInfo('u1', [])).toEqual({});
+      expect(prismaServiceMock.titles.findMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('getTitleDetail', () => {

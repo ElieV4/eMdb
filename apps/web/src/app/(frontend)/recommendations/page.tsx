@@ -22,8 +22,12 @@
 "use client";
 
 import { TitlesTable } from "@/components/titles/TitlesTable";
-import { ViewModeToggle } from "@/components/titles/ViewModeToggle";
-import { useViewMode } from "@/hooks/useViewMode";
+import { TitlesToolbar } from "@/components/titles/TitlesToolbar";
+import { EditMenuButton } from "@/components/common/EditMenuButton";
+import { BulkEditPanel } from "@/components/common/BulkEditPanel";
+import { useTitlesPage } from "@/hooks/useTitlesPage";
+import { rowMatchesSearch } from "@/lib/titlesTable";
+import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { TitleCard } from "@/components/titles/TitleCard";
@@ -80,12 +84,13 @@ function RecommendationsPageContent() {
     filters.appreciesFr,
   );
   const { data: watchedTitles } = useWatchedTitles();
-  const [viewMode, setViewMode] = useViewMode("recommendations");
+  const page = useTitlesPage("recommendations");
   const { watchlistIds, favoriteIds } = useListMembership();
   const { data: userLists } = useLists(isAuthenticated);
   const listIdsByTitle = buildListIdsByTitle(userLists);
 
   const filteredRecommendations = (recommendations ?? []).filter((title) =>
+    rowMatchesSearch({ title: titleToSearchResult(title) }, page.search) &&
     titleMatchesFilters(
       toFilterableTitle(title, { watchedTitleIds: watchedTitles, listIdsByTitle }),
       filters,
@@ -120,14 +125,41 @@ function RecommendationsPageContent() {
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Recommandés</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Suggestions basées sur vos goûts
-          </p>
-        </div>
-        <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Recommandés</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Suggestions basées sur vos goûts
+        </p>
+      </div>
+      <div className="mb-6 space-y-3">
+      <TitlesToolbar
+        search={page.search}
+        onSearchChange={page.setSearch}
+        viewMode={page.viewMode}
+        onViewModeChange={page.setViewMode}
+        actions={<EditMenuButton onEditContent={page.toggleEditing} editing={page.editing} />}
+        tableControls={
+          page.isTable
+            ? {
+                filtersOpen: page.filtersOpen,
+                onToggleFilters: page.toggleFilters,
+                columnsOpen: page.columnsOpen,
+                onToggleColumns: page.toggleColumns,
+              }
+            : undefined
+        }
+      />
+      {page.editing && (
+        <BulkEditPanel
+          action={page.action}
+          onActionChange={page.setAction}
+          selected={[...page.selectedIds].map((id) => ({ id, titleId: id }))}
+          selectableCount={filteredRecommendations.length}
+          onSelectAll={() => page.selectAll(filteredRecommendations.map((t) => t.id))}
+          onClearSelection={page.clearSelection}
+          onClose={page.stopEditing}
+        />
+      )}
       </div>
 
       {isLoading ? (
@@ -141,8 +173,12 @@ function RecommendationsPageContent() {
         </div>
       ) : filteredRecommendations.length > 0 ? (
         <>
-          {viewMode === "tableau" ? (
+          {page.isTable ? (
             <TitlesTable
+              pageKey="recommendations"
+              search={page.search}
+              filtersOpen={page.filtersOpen}
+              columnsOpen={page.columnsOpen}
               titles={filteredRecommendations.map(titleToSearchResult)}
               flagsOf={(t) => ({
                 watched: watchedTitles?.has(t.id),
@@ -153,14 +189,21 @@ function RecommendationsPageContent() {
           ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {filteredRecommendations.map((title) => (
+              <div key={title.id} className="relative">
+              {page.selecting && (
+                <SelectionCheckbox
+                  selected={page.selectedIds.has(title.id)}
+                  onToggle={() => page.toggleSelected(title.id)}
+                />
+              )}
               <TitleCard
-                key={title.id}
                 title={titleToSearchResult(title)}
                 compact
                 watched={watchedTitles?.has(title.id)}
                 inWatchlist={watchlistIds.has(title.id)}
                 inFavorites={favoriteIds.has(title.id)}
               />
+              </div>
             ))}
           </div>
           )}

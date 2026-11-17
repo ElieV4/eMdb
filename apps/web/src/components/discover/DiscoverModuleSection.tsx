@@ -21,8 +21,12 @@ import { useSearchParams } from "next/navigation";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { CardSlider } from "@/components/common/CardSlider";
 import { TitlesTable } from "@/components/titles/TitlesTable";
-import { ViewModeToggle } from "@/components/titles/ViewModeToggle";
-import { useViewMode } from "@/hooks/useViewMode";
+import { TitlesToolbar } from "@/components/titles/TitlesToolbar";
+import { EditMenuButton } from "@/components/common/EditMenuButton";
+import { BulkEditPanel } from "@/components/common/BulkEditPanel";
+import { useTitlesPage } from "@/hooks/useTitlesPage";
+import { rowMatchesSearch } from "@/lib/titlesTable";
+import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
 import { useDiscoverModule, DiscoverModuleKey } from "@/hooks/api/useDiscover";
 import { useWatchedTitles, useListMembership, useLists } from "@/hooks/api";
 import { useAuth } from "@/hooks/auth/useAuth";
@@ -66,7 +70,7 @@ export function DiscoverModuleSection({
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
   // Bascule affiches / tableau : page dédiée d'un module seulement (grille).
-  const [viewMode, setViewMode] = useViewMode(`discover-${moduleKey}`);
+  const page = useTitlesPage(`discover-${moduleKey}`);
   const { isAuthenticated } = useAuth();
   const { data: userLists } = useLists(isAuthenticated);
   const listIdsByTitle = buildListIdsByTitle(userLists);
@@ -82,7 +86,11 @@ export function DiscoverModuleSection({
     watched: watchedTitles?.has(t.id) ?? false,
   });
 
-  const filtered = (data ?? []).filter((t) => titleMatchesFilters(toFilterable(t), filters));
+  const filtered = (data ?? []).filter(
+    (t) =>
+      (variant !== "grid" || rowMatchesSearch({ title: t }, page.search)) &&
+      titleMatchesFilters(toFilterable(t), filters),
+  );
   // Scroll infini côté client sur la grille (page dédiée /discover/:module) —
   // le backend fournit déjà jusqu'à 100 résultats (plusieurs pages TMDB
   // fusionnées), révélés progressivement plutôt que tous rendus d'un coup.
@@ -97,8 +105,39 @@ export function DiscoverModuleSection({
           <h2 className="text-xl font-semibold">{title}</h2>
           <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
         </div>
-        {variant === "grid" && <ViewModeToggle mode={viewMode} onChange={setViewMode} />}
       </div>
+      {variant === "grid" && (
+        <div className="mb-4 space-y-3">
+      <TitlesToolbar
+        search={page.search}
+        onSearchChange={page.setSearch}
+        viewMode={page.viewMode}
+        onViewModeChange={page.setViewMode}
+        actions={<EditMenuButton onEditContent={page.toggleEditing} editing={page.editing} />}
+        tableControls={
+          page.isTable
+            ? {
+                filtersOpen: page.filtersOpen,
+                onToggleFilters: page.toggleFilters,
+                columnsOpen: page.columnsOpen,
+                onToggleColumns: page.toggleColumns,
+              }
+            : undefined
+        }
+      />
+      {page.editing && (
+        <BulkEditPanel
+          action={page.action}
+          onActionChange={page.setAction}
+          selected={[...page.selectedIds].map((id) => { const t = filtered.find((x) => x.id === id); return { id, titleId: id, local: t?.local, tmdbId: t?.tmdbId, type: t?.type }; })}
+          selectableCount={filtered.length}
+          onSelectAll={() => page.selectAll(filtered.map((t) => t.id))}
+          onClearSelection={page.clearSelection}
+          onClose={page.stopEditing}
+        />
+      )}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex gap-4 overflow-hidden">
@@ -133,8 +172,12 @@ export function DiscoverModuleSection({
             />
           ))}
         </CardSlider>
-      ) : viewMode === "tableau" ? (
+      ) : variant === "grid" && page.isTable ? (
         <TitlesTable
+          pageKey={`discover-${moduleKey}`}
+          search={page.search}
+          filtersOpen={page.filtersOpen}
+          columnsOpen={page.columnsOpen}
           titles={filtered}
           flagsOf={(t) => ({
             watched: watchedTitles?.has(t.id),
@@ -146,14 +189,21 @@ export function DiscoverModuleSection({
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {visible.map((t) => (
+              <div key={`${moduleKey}-${t.id}`} className="relative">
+              {page.selecting && (
+                <SelectionCheckbox
+                  selected={page.selectedIds.has(t.id)}
+                  onToggle={() => page.toggleSelected(t.id)}
+                />
+              )}
               <TitleCard
-                key={`${moduleKey}-${t.id}`}
                 title={t}
                 compact
                 watched={watchedTitles?.has(t.id)}
                 inWatchlist={watchlistIds.has(t.id)}
                 inFavorites={favoriteIds.has(t.id)}
               />
+              </div>
             ))}
           </div>
           <div ref={sentinelRef} />

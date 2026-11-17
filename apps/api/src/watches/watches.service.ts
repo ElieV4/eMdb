@@ -595,6 +595,7 @@ export class WatchesService {
       date_sortie: true,
       note_imdb: true,
       affiche_url: true,
+      duree_minutes: true,
     } as const;
 
     // Une seule transaction pour tout ce qui passe par la RLS de
@@ -624,6 +625,7 @@ export class WatchesService {
               numero: true,
               titre: true,
               date_sortie: true,
+              duree_minutes: true,
               seasons: { select: { numero: true, titles: { select: titleSelect } } },
             },
           },
@@ -765,6 +767,8 @@ export class WatchesService {
             : null,
           // Date de publication : celle de l'épisode pour un épisode.
           dateSortie: w.episodes?.date_sortie ?? title?.date_sortie ?? null,
+          // Durée : celle de l'épisode pour un épisode, du film sinon.
+          duree: w.episodes ? w.episodes.duree_minutes ?? null : title?.duree_minutes ?? null,
           genres: (tid && genresBy.get(tid)) || [],
           studios: (tid && studiosBy.get(tid)) || [],
           realisateurs: (tid && directorsBy.get(tid)) || [],

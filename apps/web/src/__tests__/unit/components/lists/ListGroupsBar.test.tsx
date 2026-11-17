@@ -60,14 +60,14 @@ describe("ListGroupsBar", () => {
   it("en lecture : ni création ni menu de gestion", () => {
     renderBar(none, "sport");
 
-    expect(screen.queryByRole("button", { name: /Sous-groupe$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ajouter un nouveau sous-groupe" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Gérer le sous-groupe/ })).not.toBeInTheDocument();
   });
 
   it("en mode ouvert : bouton de création et menu sur le groupe sélectionné", () => {
     renderBar({ ...none, canAddItems: true, canRemoveItems: true, canEditItems: true }, "sport");
 
-    expect(screen.getByRole("button", { name: /Sous-groupe$/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ajouter un nouveau sous-groupe" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Gérer le sous-groupe Sport" })).toBeInTheDocument();
   });
 
