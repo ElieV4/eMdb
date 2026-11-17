@@ -10,4 +10,10 @@ export class CreateGroupDto {
   @IsOptional()
   @IsUUID()
   parent_id?: string;
+
+  /** Emoji affiché devant le nom (facultatif ; chaîne vide ou null = aucun). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  emoji?: string | null;
 }

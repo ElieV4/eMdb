@@ -190,6 +190,8 @@ export type UserList = {
   nom: string;
   type: "watchlist" | "favoris" | "custom";
   description?: string;
+  /** Emoji affiché devant le nom (facultatif). */
+  emoji?: string | null;
   share_mode?: ShareMode;
   items?: ListItemFilterMeta[];
   /** list_shares : nombre de membres avec qui la liste est partagée. */
@@ -352,6 +354,7 @@ export type SharedListEntry = {
     nom: string;
     type: "watchlist" | "favoris" | "custom" | "collection";
     description: string | null;
+    emoji?: string | null;
     created_at: string;
     item_count: number;
     owner: PublicUser;
@@ -392,6 +395,7 @@ export type ListGroup = {
   id: string;
   parent_id: string | null;
   nom: string;
+  emoji?: string | null;
   position: number;
 };
 
@@ -399,12 +403,14 @@ export type ListCreateInput = {
   nom: string;
   type: "watchlist" | "favoris" | "custom";
   description?: string;
+  emoji?: string | null;
   share_mode?: ShareMode;
 };
 
 export type ListUpdateInput = {
   nom?: string;
   description?: string;
+  emoji?: string | null;
 };
 
 export type ListItemAddInput = {
@@ -420,6 +426,7 @@ export type ListDetail = {
   nom: string;
   type: "watchlist" | "favoris" | "custom";
   description: string | null;
+  emoji?: string | null;
   created_at: string;
   share_mode: ShareMode;
   role: ListRole;

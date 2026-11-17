@@ -31,6 +31,7 @@ import { TitlesToolbar } from "@/components/titles/TitlesToolbar";
 import { BulkEditPanel } from "@/components/common/BulkEditPanel";
 import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
 import { useTitlesPage } from "@/hooks/useTitlesPage";
+import { withEmoji } from "@/components/common/EmojiPicker";
 import { rowMatchesSearch } from "@/lib/titlesTable";
 import { ListItemOverlay } from "@/components/lists/ListItemOverlay";
 import { ItemGroupsDialog } from "@/components/lists/ItemGroupsDialog";
@@ -194,7 +195,7 @@ function ListDetailPageContent() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-2xl font-bold">
-                    {list.nom} ({items.length})
+                    {withEmoji(list.nom, list.emoji)} ({items.length})
                   </h1>
                   <span className="text-xs rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">
                     {typeLabels[list.type] ?? list.type}

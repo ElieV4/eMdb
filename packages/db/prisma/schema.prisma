@@ -113,6 +113,7 @@ model list_groups {
   list_id          String             @db.Uuid
   parent_id        String?            @db.Uuid
   nom              String
+  emoji      String?
   position         Int                @default(0)
   created_at       DateTime           @default(now()) @db.Timestamptz(6)
   user_lists       user_lists         @relation(fields: [list_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -328,6 +329,7 @@ model user_lists {
   nom         String
   type        String
   description String?
+  emoji       String?
   created_at  DateTime      @default(now()) @db.Timestamptz(6)
   /// Mode de partage appliqué à tous les membres (list_shares) :
   /// "lecture" | "collaboratif" | "ouvert" — CHECK en SQL, matrice dans

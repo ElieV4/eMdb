@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Trash2 } from "lucide-react";
+import { EmojiPicker } from "@/components/common/EmojiPicker";
 
 type ListDialogProps = {
   open: boolean;
@@ -30,6 +31,7 @@ type ListDialogProps = {
     nom: string;
     type: "watchlist" | "favoris" | "custom";
     description?: string | null;
+    emoji?: string | null;
   } | null;
   /** Modification seulement : affiche « Supprimer la liste » dans le pied du
    * dialogue (la confirmation est gérée par l'appelant). */
@@ -39,6 +41,7 @@ type ListDialogProps = {
 export function ListDialog({ open, onOpenChange, list, onDelete }: ListDialogProps) {
   const [nom, setNom] = useState("");
   const [description, setDescription] = useState("");
+  const [emoji, setEmoji] = useState<string | null>(null);
 
   const createList = useCreateList();
   const updateList = useUpdateList();
@@ -47,9 +50,11 @@ export function ListDialog({ open, onOpenChange, list, onDelete }: ListDialogPro
     if (list) {
       setNom(list.nom);
       setDescription(list.description || "");
+      setEmoji(list.emoji ?? null);
     } else {
       setNom("");
       setDescription("");
+      setEmoji(null);
     }
   }, [list]);
 
@@ -60,7 +65,7 @@ export function ListDialog({ open, onOpenChange, list, onDelete }: ListDialogPro
       if (list) {
         await updateList.mutateAsync({
           listId: list.id,
-          data: { nom, description: description || undefined },
+          data: { nom, description: description || undefined, emoji: emoji ?? "" },
         });
       } else {
         // Seules les listes personnalisées sont créables depuis ce formulaire :
@@ -70,6 +75,7 @@ export function ListDialog({ open, onOpenChange, list, onDelete }: ListDialogPro
           nom,
           type: "custom",
           description: description || undefined,
+          ...(emoji ? { emoji } : {}),
         });
       }
       onOpenChange(false);
@@ -89,13 +95,16 @@ export function ListDialog({ open, onOpenChange, list, onDelete }: ListDialogPro
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="nom">Nom</Label>
-            <Input
-              id="nom"
-              value={nom}
-              onChange={(e) => setNom(e.target.value)}
-              required
-              maxLength={100}
-            />
+            <div className="flex items-center gap-2">
+              <EmojiPicker value={emoji} onChange={setEmoji} label="Emoji de la liste" />
+              <Input
+                id="nom"
+                value={nom}
+                onChange={(e) => setNom(e.target.value)}
+                required
+                maxLength={100}
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Description (optionnelle)</Label>

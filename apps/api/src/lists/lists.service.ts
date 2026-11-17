@@ -26,6 +26,13 @@ import {
   listCapabilities,
 } from './list-permissions';
 
+/** Emoji d'une liste ou d'un groupe : chaîne vide ou null = aucun. */
+function normalizeEmoji(emoji: string | null | undefined): string | null | undefined {
+  if (emoji === undefined) return undefined;
+  const trimmed = emoji?.trim();
+  return trimmed ? trimmed : null;
+}
+
 /** Champs d'une liste nécessaires pour évaluer les droits. */
 const LIST_ACCESS_SELECT = {
   id: true,
@@ -33,6 +40,7 @@ const LIST_ACCESS_SELECT = {
   nom: true,
   type: true,
   description: true,
+  emoji: true,
   share_mode: true,
   created_at: true,
 } as const;
@@ -169,6 +177,7 @@ export class ListsService {
           nom: dto.nom,
           type: dto.type,
           description: dto.description ?? null,
+          emoji: normalizeEmoji(dto.emoji) ?? null,
           ...(dto.share_mode ? { share_mode: dto.share_mode } : {}),
         },
       });
@@ -345,7 +354,7 @@ export class ListsService {
       Promise.all([
         tx.list_groups.findMany({
           where: { list_id: listId },
-          select: { id: true, parent_id: true, nom: true, position: true },
+          select: { id: true, parent_id: true, nom: true, emoji: true, position: true },
           orderBy: [{ position: 'asc' }, { created_at: 'asc' }],
         }),
         tx.list_shares.count({ where: { list_id: listId } }),
@@ -357,6 +366,7 @@ export class ListsService {
       nom: list.nom,
       type: list.type,
       description: list.description,
+      emoji: list.emoji,
       created_at: list.created_at,
       share_mode: list.share_mode,
       role: list.role,
@@ -682,9 +692,10 @@ export class ListsService {
           list_id: listId,
           parent_id: dto.parent_id ?? null,
           nom: dto.nom.trim(),
+          emoji: normalizeEmoji(dto.emoji) ?? null,
           position: (last?.position ?? -1) + 1,
         },
-        select: { id: true, parent_id: true, nom: true, position: true },
+        select: { id: true, parent_id: true, nom: true, emoji: true, position: true },
       });
     });
   }
@@ -700,8 +711,11 @@ export class ListsService {
       await this.findGroupOrThrow(tx, listId, groupId);
       return tx.list_groups.update({
         where: { id: groupId },
-        data: { nom: dto.nom.trim() },
-        select: { id: true, parent_id: true, nom: true, position: true },
+        data: {
+          ...(dto.nom !== undefined ? { nom: dto.nom.trim() } : {}),
+          ...(dto.emoji !== undefined ? { emoji: normalizeEmoji(dto.emoji) } : {}),
+        },
+        select: { id: true, parent_id: true, nom: true, emoji: true, position: true },
       });
     });
   }
@@ -785,6 +799,7 @@ export class ListsService {
     const data: any = {};
     if (dto.nom !== undefined) data.nom = dto.nom;
     if (dto.description !== undefined) data.description = dto.description;
+    if (dto.emoji !== undefined) data.emoji = normalizeEmoji(dto.emoji);
 
     return this.prisma.forUser(userId, (tx) => tx.user_lists.update({ where: { id: listId }, data }));
   }
@@ -1139,6 +1154,7 @@ export class ListsService {
           nom: share.user_lists.nom,
           type: share.user_lists.type,
           description: share.user_lists.description,
+          emoji: share.user_lists.emoji,
           created_at: share.user_lists.created_at,
           item_count: share.user_lists._count.list_items,
           owner: share.user_lists.users,

@@ -221,6 +221,7 @@ export function BulkEditPanel({
               <option key={g.id} value={g.id}>
                 {"  ".repeat(g.depth)}
                 {g.depth > 0 ? "› " : ""}
+                {g.emoji ? `${g.emoji} ` : ""}
                 {g.nom}
               </option>
             ))}

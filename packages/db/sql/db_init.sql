@@ -284,6 +284,7 @@ CREATE TABLE user_lists (
     nom         TEXT NOT NULL,
     type        TEXT NOT NULL CHECK (type IN ('watchlist','favoris','custom','collection')),
     description TEXT,
+    emoji       TEXT CHECK (emoji IS NULL OR char_length(emoji) BETWEEN 1 AND 16),  -- facultatif, devant le nom
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- Mode de partage appliqué à tous les membres de list_shares. Matrice des
     -- droits : fn_list_can() (migration list_share_modes) et
@@ -330,6 +331,7 @@ CREATE TABLE list_groups (
     list_id     UUID NOT NULL REFERENCES user_lists(id) ON DELETE CASCADE,
     parent_id   UUID,
     nom         TEXT NOT NULL CHECK (char_length(btrim(nom)) BETWEEN 1 AND 100),
+    emoji       TEXT CHECK (emoji IS NULL OR char_length(emoji) BETWEEN 1 AND 16),
     position    INT NOT NULL DEFAULT 0,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (id, list_id),

@@ -22,7 +22,7 @@ function buildNavTree(userLists: UserList[] | undefined): { main: NavItem[]; pro
   const listesChildren: NavChild[] = [
     { href: watchlist ? `/lists/${watchlist.id}` : "/watchlist", label: "Watchlist" },
     ...(favoris ? [{ href: `/lists/${favoris.id}`, label: "Favoris" }] : []),
-    ...customLists.map((list) => ({ href: `/lists/${list.id}`, label: list.nom })),
+    ...customLists.map((list) => ({ href: `/lists/${list.id}`, label: list.emoji ? `${list.emoji} ${list.nom}` : list.nom })),
   ];
 
   return {

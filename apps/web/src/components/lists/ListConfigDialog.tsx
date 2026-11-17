@@ -21,12 +21,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ListSharePanel } from "./ListShareDialog";
+import { EmojiPicker } from "@/components/common/EmojiPicker";
 import { ShareMode } from "@/lib/types/api";
 
 type ListConfigDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  list: { id: string; nom: string; description?: string | null; share_mode?: ShareMode };
+  list: {
+    id: string;
+    nom: string;
+    description?: string | null;
+    emoji?: string | null;
+    share_mode?: ShareMode;
+  };
   /** Renommer / décrire (créateur, ou membre en collaboratif / ouvert). */
   canEdit: boolean;
   /** Partage : créateur uniquement. */
@@ -45,23 +52,28 @@ export function ListConfigDialog({
 }: ListConfigDialogProps) {
   const [nom, setNom] = useState(list.nom);
   const [description, setDescription] = useState(list.description ?? "");
+  const [emoji, setEmoji] = useState<string | null>(list.emoji ?? null);
   const updateList = useUpdateList();
 
   useEffect(() => {
     if (open) {
       setNom(list.nom);
       setDescription(list.description ?? "");
+      setEmoji(list.emoji ?? null);
     }
-  }, [open, list.nom, list.description]);
+  }, [open, list.nom, list.description, list.emoji]);
 
-  const dirty = nom.trim() !== list.nom || (description || "") !== (list.description ?? "");
+  const dirty =
+    nom.trim() !== list.nom ||
+    (description || "") !== (list.description ?? "") ||
+    (emoji ?? null) !== (list.emoji ?? null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!dirty || !nom.trim()) return;
     updateList.mutate({
       listId: list.id,
-      data: { nom: nom.trim(), description: description || undefined },
+      data: { nom: nom.trim(), description: description || undefined, emoji: emoji ?? "" },
     });
   };
 
@@ -78,13 +90,16 @@ export function ListConfigDialog({
             <form onSubmit={handleSave} className="space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="config-nom">Nom</Label>
-                <Input
-                  id="config-nom"
-                  value={nom}
-                  onChange={(e) => setNom(e.target.value)}
-                  required
-                  maxLength={100}
-                />
+                <div className="flex items-center gap-2">
+                  <EmojiPicker value={emoji} onChange={setEmoji} label="Emoji de la liste" />
+                  <Input
+                    id="config-nom"
+                    value={nom}
+                    onChange={(e) => setNom(e.target.value)}
+                    required
+                    maxLength={100}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="config-description">Description (optionnelle)</Label>

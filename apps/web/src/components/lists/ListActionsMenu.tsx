@@ -66,6 +66,7 @@ type ListActionsMenuProps = {
     nom: string;
     type: "watchlist" | "favoris" | "custom";
     description?: string | null;
+    emoji?: string | null;
     share_mode?: ShareMode;
   };
   /** Droits de l'utilisateur (GET /lists/:id). Absent = créateur. */
