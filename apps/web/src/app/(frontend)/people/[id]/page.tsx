@@ -19,10 +19,7 @@ import { useRefreshFilmography } from "@/hooks/api/useRefreshFilmography";
 import { useFollowedPeople } from "@/hooks/api/useFollowedPeople";
 import { useAuthStore } from "@/store/authStore";
 import { RefreshDataButton } from "@/components/common/RefreshDataButton";
-import {
-  FilmographyGrouped,
-  PersonRecommendation,
-} from "@/lib/types/api";
+import { FilmographyGrouped, PersonRecommendation } from "@/lib/types/api";
 import { PersonCard } from "@/components/people/PersonCard";
 import { CardSlider } from "@/components/common/CardSlider";
 import { FollowPersonButton } from "@/components/people/FollowPersonButton";
@@ -121,7 +118,8 @@ export default function PersonDetailPage({
         {/* Recommendations */}
         <section>
           <h2 className="text-2xl font-bold mb-4">
-            Personnes connexes {!isRecsLoading && `(${recommendations?.length ?? 0})`}
+            Personnes connexes{" "}
+            {!isRecsLoading && `(${recommendations?.length ?? 0})`}
           </h2>
           {isRecsLoading ? (
             <LoadingSpinner className="h-6 w-6" />

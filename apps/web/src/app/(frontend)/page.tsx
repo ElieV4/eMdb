@@ -12,7 +12,10 @@ import { useSearchParams } from "next/navigation";
 import { Calendar, TrendingUp, Users, Star } from "lucide-react";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { DateCardSlider, DateCardData } from "@/components/common/DateCardSlider";
+import {
+  DateCardSlider,
+  DateCardData,
+} from "@/components/common/DateCardSlider";
 import { CardSlider } from "@/components/common/CardSlider";
 import { useAuthStore } from "@/store/authStore";
 import {
@@ -137,7 +140,10 @@ function HomePageContent() {
   const listIdsByTitle = buildListIdsByTitle(userLists);
   const watchlistItems = (watchlistDetail?.items ?? []).filter((item) =>
     titleMatchesFilters(
-      toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      toFilterableTitle(item, {
+        watchedTitleIds: watchedTitles,
+        listIdsByTitle,
+      }),
       filters,
     ),
   );
@@ -147,13 +153,19 @@ function HomePageContent() {
   // genres/pays/année/note sont disponibles — tous les filtres s'appliquent.
   const filteredRecommendations = (recommendations ?? []).filter((title) =>
     titleMatchesFilters(
-      toFilterableTitle(title, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      toFilterableTitle(title, {
+        watchedTitleIds: watchedTitles,
+        listIdsByTitle,
+      }),
       filters,
     ),
   );
   const filteredPopularTitles = (popularTitles ?? []).filter((title) =>
     titleMatchesFilters(
-      toFilterableTitle(title, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+      toFilterableTitle(title, {
+        watchedTitleIds: watchedTitles,
+        listIdsByTitle,
+      }),
       filters,
     ),
   );
@@ -197,12 +209,20 @@ function HomePageContent() {
       : null;
     // Titre nu + année/SxxExx et note perso sur la ligne du dessous (même
     // format que /history, cf. cardFormatting.ts).
-    const title = resolvedTitle?.titre_vf || resolvedTitle?.titre_vo || "Titre inconnu";
+    const title =
+      resolvedTitle?.titre_vf || resolvedTitle?.titre_vo || "Titre inconnu";
     const seasonEp = watch.episodes
-      ? formatSeasonEpisodeCompact(watch.episodes.seasons.numero, watch.episodes.numero)
+      ? formatSeasonEpisodeCompact(
+          watch.episodes.seasons.numero,
+          watch.episodes.numero,
+        )
       : null;
     const ratingLabel = formatRatingStars(watch.note_perso);
-    const metaPrimary = watch.episodes ? seasonEp : annee ? String(annee) : null;
+    const metaPrimary = watch.episodes
+      ? seasonEp
+      : annee
+        ? String(annee)
+        : null;
     const subtitle =
       metaPrimary || ratingLabel ? (
         <span className="inline-flex items-center gap-1">
@@ -219,7 +239,11 @@ function HomePageContent() {
       key: watch.id,
       href: watch.episodes
         ? `/episodes/${watch.episodes.id}`
-        : buildEntityUrl("/titles", watch.title_id ?? "", resolvedTitle?.titre_vf || resolvedTitle?.titre_vo),
+        : buildEntityUrl(
+            "/titles",
+            watch.title_id ?? "",
+            resolvedTitle?.titre_vf || resolvedTitle?.titre_vo,
+          ),
       imageUrl: resolvedTitle?.affiche_url,
       title,
       subtitle: subtitle ?? undefined,
@@ -230,8 +254,12 @@ function HomePageContent() {
 
   const calendarCards: DateCardData[] = [...filteredCalendarEntries]
     .sort((a, b) => {
-      const da = a.date_diffusion ? new Date(a.date_diffusion).getTime() : Infinity;
-      const db = b.date_diffusion ? new Date(b.date_diffusion).getTime() : Infinity;
+      const da = a.date_diffusion
+        ? new Date(a.date_diffusion).getTime()
+        : Infinity;
+      const db = b.date_diffusion
+        ? new Date(b.date_diffusion).getTime()
+        : Infinity;
       return da - db;
     })
     .map((entry, idx) => {
@@ -245,7 +273,11 @@ function HomePageContent() {
       });
       return {
         key: `${entry.title_id}-${entry.saison}-${entry.episode_numero}-${idx}`,
-        href: buildEntityUrl("/titles", entry.title_id, entry.titre_vf || entry.titre_vo),
+        href: buildEntityUrl(
+          "/titles",
+          entry.title_id,
+          entry.titre_vf || entry.titre_vo,
+        ),
         imageUrl: entry.affiche_url,
         title,
         subtitle: subtitle ?? undefined,
@@ -311,12 +343,22 @@ function HomePageContent() {
             continueWatching.length > 0 && (
               <DashboardSection
                 title={`Continuer à regarder (${filteredContinueWatching.length})`}
-                actionLabel={filteredContinueWatching.length > 10 ? "Voir plus" : undefined}
-                actionHref={filteredContinueWatching.length > 10 ? "/continue-watching" : undefined}
+                actionLabel={
+                  filteredContinueWatching.length > 10 ? "Voir plus" : undefined
+                }
+                actionHref={
+                  filteredContinueWatching.length > 10
+                    ? "/continue-watching"
+                    : undefined
+                }
               >
                 {filteredContinueWatching.length > 0 ? (
                   <CardSlider
-                    moreHref={filteredContinueWatching.length > 10 ? "/continue-watching" : undefined}
+                    moreHref={
+                      filteredContinueWatching.length > 10
+                        ? "/continue-watching"
+                        : undefined
+                    }
                   >
                     {filteredContinueWatching.slice(0, 10).map((entry) => (
                       <ContinueWatchingCard
@@ -347,7 +389,9 @@ function HomePageContent() {
             actionHref={watchlistItems.length > 0 ? `/watchlist` : undefined}
           >
             {watchlistItems.length > 0 ? (
-              <CardSlider moreHref={watchlistItems.length > 10 ? "/watchlist" : undefined}>
+              <CardSlider
+                moreHref={watchlistItems.length > 10 ? "/watchlist" : undefined}
+              >
                 {watchlistItems.slice(0, 10).map((title) => (
                   <TitleCard
                     key={title.id}
@@ -384,7 +428,13 @@ function HomePageContent() {
                 ))}
               </div>
             ) : filteredRecommendations.length > 0 ? (
-              <CardSlider moreHref={filteredRecommendations.length > 10 ? "/recommendations" : undefined}>
+              <CardSlider
+                moreHref={
+                  filteredRecommendations.length > 10
+                    ? "/recommendations"
+                    : undefined
+                }
+              >
                 {filteredRecommendations.slice(0, 10).map((title) => (
                   <TitleCard
                     key={title.id}
@@ -407,7 +457,8 @@ function HomePageContent() {
           </DashboardSection>
 
           {/* Personnes suivies */}
-          {(isLoadingFollowedPeople || (followedPeople && followedPeople.length > 0)) && (
+          {(isLoadingFollowedPeople ||
+            (followedPeople && followedPeople.length > 0)) && (
             <DashboardSection
               title={`Personnes suivies (${followedPeople?.length ?? 0})`}
               subtitle="Leurs prochains films et séries rejoignent votre watchlist"

@@ -132,7 +132,10 @@ function ListsPageContent() {
         )}
 
         {(filteredSharedLists?.length ?? 0) > 0 && (
-          <section className="space-y-4 pt-4" aria-labelledby="shared-lists-heading">
+          <section
+            className="space-y-4 pt-4"
+            aria-labelledby="shared-lists-heading"
+          >
             <h2 id="shared-lists-heading" className="text-xl font-semibold">
               Partagées avec moi
             </h2>

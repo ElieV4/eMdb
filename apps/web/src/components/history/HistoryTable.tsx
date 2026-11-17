@@ -79,6 +79,7 @@ import {
   SortState,
   episodeCode,
   matchesFilters,
+  columnFilterChoices,
   nextSort,
   sortRows,
   toDisplayRows,
@@ -94,7 +95,7 @@ import {
 import { buildEntityUrl, cn } from "@/lib/utils";
 import { TitlePoster } from "@/components/titles/TitlePoster";
 import { actionBadgeClass } from "@/components/common/ActionBadge";
-import { SortControl } from "@/components/common/SortControl";
+import { ColumnFilterPopover } from "@/components/common/ColumnFilterPopover";
 import { RatingBadgeMenu } from "@/components/ratings/RatingBadgeMenu";
 import { useProgressiveRows } from "@/hooks/useProgressiveRows";
 import { formatDuration } from "@/lib/cardFormatting";
@@ -149,8 +150,6 @@ const selectClass =
 type HistoryTableProps = {
   /** Recherche globale (barre d'outils de la page), sur toutes les colonnes. */
   search?: string;
-  /** « Trier / filtrer » : ligne de filtres par colonne et options. */
-  filtersOpen?: boolean;
   /** « Colonnes » : choix des colonnes visibles. */
   columnsOpen?: boolean;
   /** « Modifier le contenu » : cases de sélection (par visionnage) à gauche. */
@@ -165,7 +164,6 @@ type HistoryTableProps = {
 
 export function HistoryTable({
   search = "",
-  filtersOpen = false,
   columnsOpen = false,
   selection,
   onShownRowsChange,
@@ -214,8 +212,15 @@ export function HistoryTable({
     saveHiddenColumns(next);
   };
 
+  // Toutes les lignes (avant recherche et filtres) : bornes et valeurs
+  // proposées par les filtres des colonnes.
+  const allRows = useMemo(
+    () => toDisplayRows(data?.rows ?? [], groupBySeries),
+    [data, groupBySeries],
+  );
+
   const rows = useMemo(() => {
-    const display = toDisplayRows(data?.rows ?? [], groupBySeries);
+    const display = allRows;
     const query = normalize(search.trim());
     return sortRows(
       display.filter(
@@ -225,7 +230,7 @@ export function HistoryTable({
       ),
       sort,
     );
-  }, [data, groupBySeries, filters, sort, search]);
+  }, [allRows, filters, sort, search]);
 
   useEffect(() => {
     onShownRowsChange?.(rows);
@@ -577,88 +582,18 @@ export function HistoryTable({
     }
   };
 
-  const renderFilter = (column: ColumnDef) => {
-    const current = filters[column.id];
-    if (column.filter === "enum") {
-      const values = current?.kind === "enum" ? current.values : [];
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <button
-                type="button"
-                className={cn(
-                  selectClass,
-                  "w-full text-left",
-                  values.length > 0 && "border-primary",
-                )}
-                aria-label={`Filtrer ${column.label}`}
-              >
-                {values.length > 0 ? `${values.length} choix` : "Tous"}
-              </button>
-            }
-          />
-          <DropdownMenuContent align="start">
-            {column.enumOptions?.map((o) => (
-              <DropdownMenuCheckboxItem
-                key={o.value}
-                checked={values.includes(o.value)}
-                onCheckedChange={() => {
-                  const next = values.includes(o.value)
-                    ? values.filter((v) => v !== o.value)
-                    : [...values, o.value];
-                  setFilter(
-                    column.id,
-                    next.length > 0 ? { kind: "enum", values: next } : null,
-                  );
-                }}
-              >
-                {o.label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    }
-    if (column.filter === "number") {
-      return (
-        <input
-          type="number"
-          min={0}
-          max={10}
-          step={0.5}
-          inputMode="decimal"
-          aria-label={`${column.label} minimum`}
-          placeholder="≥"
-          className={cn(selectClass, "w-full")}
-          value={current?.kind === "number" ? current.min : ""}
-          onChange={(e) =>
-            setFilter(
-              column.id,
-              e.target.value === ""
-                ? null
-                : { kind: "number", min: Number(e.target.value) },
-            )
-          }
-        />
-      );
-    }
-    return (
-      <input
-        type="search"
-        aria-label={`Filtrer ${column.label}`}
-        placeholder="Filtrer…"
-        className={cn(selectClass, "w-full min-w-[6rem]")}
-        value={current?.kind === "text" ? current.value : ""}
-        onChange={(e) =>
-          setFilter(
-            column.id,
-            e.target.value ? { kind: "text", value: e.target.value } : null,
-          )
-        }
+  const renderFilter = (column: ColumnDef) =>
+    column.filter === "none" ? null : (
+      <ColumnFilterPopover
+        label={column.label}
+        kind={column.filter}
+        value={filters[column.id]}
+        onChange={(v) => setFilter(column.id, v)}
+        step={column.step}
+        format={column.format}
+        {...columnFilterChoices(column, allRows)}
       />
     );
-  };
 
   // --- rendu ------------------------------------------------------------------
 
@@ -710,17 +645,15 @@ export function HistoryTable({
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        {filtersOpen && (
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-primary"
-              checked={groupBySeries}
-              onChange={(e) => setGroupBySeries(e.target.checked)}
-            />
-            Regrouper les épisodes par série
-          </label>
-        )}
+        <label className="inline-flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={groupBySeries}
+            onChange={(e) => setGroupBySeries(e.target.checked)}
+          />
+          Regrouper les épisodes par série
+        </label>
 
         {activeFilters > 0 && (
           <Button variant="ghost" size="sm" onClick={() => setFilters({})}>
@@ -735,17 +668,6 @@ export function HistoryTable({
             " · historique tronqué aux 5000 visionnages les plus récents"}
         </span>
       </div>
-
-      {filtersOpen && (
-        <SortControl
-          options={COLUMNS.filter((c) => c.id !== "affiche").map((c) => ({
-            id: c.id,
-            label: c.label,
-          }))}
-          sort={sort}
-          onChange={(next) => setSort(next as SortState)}
-        />
-      )}
 
       {actionError && (
         <p role="alert" className="text-sm text-destructive">
@@ -792,16 +714,26 @@ export function HistoryTable({
                         : "none"
                     }
                   >
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 hover:text-primary"
-                      onClick={() => setSort(nextSort(sort, c.id))}
-                    >
-                      {c.label}
-                      <Icon
-                        className={cn("h-3.5 w-3.5", !active && "opacity-40")}
-                      />
-                    </button>
+                    {c.id === "affiche" ? (
+                      <span className="sr-only">{c.label}</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 hover:text-primary"
+                          onClick={() => setSort(nextSort(sort, c.id))}
+                        >
+                          {c.label}
+                          <Icon
+                            className={cn(
+                              "h-3.5 w-3.5",
+                              !active && "opacity-40",
+                            )}
+                          />
+                        </button>
+                        {renderFilter(c)}
+                      </span>
+                    )}
                   </th>
                 );
               })}
@@ -809,17 +741,6 @@ export function HistoryTable({
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
-            {filtersOpen && (
-              <tr>
-                {selection && <th />}
-                {visibleColumns.map((c) => (
-                  <th key={c.id} className="px-2 pb-2 font-normal">
-                    {c.id === "affiche" ? null : renderFilter(c)}
-                  </th>
-                ))}
-                <th />
-              </tr>
-            )}
           </thead>
           <tbody>
             {rows.length === 0 ? (

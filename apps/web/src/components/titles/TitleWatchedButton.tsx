@@ -118,7 +118,11 @@ export function TitleWatchedButton({
           className,
         )}
       >
-        {watched ? <Eye className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+        {watched ? (
+          <Eye className="h-3.5 w-3.5" />
+        ) : (
+          <Check className="h-3.5 w-3.5" />
+        )}
       </button>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -126,13 +130,16 @@ export function TitleWatchedButton({
           <AlertDialogHeader>
             <AlertDialogTitle>Annuler le visionnage ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tous les visionnages enregistrés pour {episodeId ? "cet épisode" : "ce titre"} seront
-              supprimés.
+              Tous les visionnages enregistrés pour{" "}
+              {episodeId ? "cet épisode" : "ce titre"} seront supprimés.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleConfirmCancel}>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleConfirmCancel}
+            >
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>

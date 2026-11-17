@@ -15,7 +15,11 @@ type PeriodFilterProps = {
   className?: string;
 };
 
-export function PeriodFilter({ value, onChange, className }: PeriodFilterProps) {
+export function PeriodFilter({
+  value,
+  onChange,
+  className,
+}: PeriodFilterProps) {
   return (
     <div className={cn("flex flex-wrap gap-1", className)}>
       {PERIOD_OPTIONS.map((option) => (

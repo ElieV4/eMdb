@@ -50,8 +50,12 @@ export default function SeriesDetailPage({
     isLoading: isSeasonsLoading,
     isError: isSeasonsError,
   } = useSeasons(id);
-  const { data: serieProgress } = useSerieProgress(id, { enabled: isAuthenticated });
-  const progressBySeason = new Map((serieProgress ?? []).map((p) => [p.saison, p]));
+  const { data: serieProgress } = useSerieProgress(id, {
+    enabled: isAuthenticated,
+  });
+  const progressBySeason = new Map(
+    (serieProgress ?? []).map((p) => [p.saison, p]),
+  );
   const refreshTitle = useRefreshTitle(id);
 
   // Import initial limité à réalisateur + acteurs (rapide) — tant qu'aucun
@@ -94,8 +98,14 @@ export default function SeriesDetailPage({
               onRefresh={() => refreshTitle.mutate()}
               isPending={refreshTitle.isPending}
               isError={refreshTitle.isError}
-              label={isCreditsPartial ? "Charger toute la distribution" : "Actualiser"}
-              pendingLabel={isCreditsPartial ? "Chargement..." : "Actualisation..."}
+              label={
+                isCreditsPartial
+                  ? "Charger toute la distribution"
+                  : "Actualiser"
+              }
+              pendingLabel={
+                isCreditsPartial ? "Chargement..." : "Actualisation..."
+              }
             />
           </div>
           {isCreditsLoading ? (

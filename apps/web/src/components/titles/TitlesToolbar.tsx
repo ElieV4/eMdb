@@ -3,8 +3,9 @@
  * watchlist, historique, recommandés, Découvrir...) :
  * - à gauche : recherche sur tous les champs ;
  * - à droite, sur la même ligne : choix de vue (affiches / tableau), bouton
- *   crayon (configurer la liste, modifier le contenu) puis, en vue tableau,
- *   « Trier / filtrer » et « Colonnes ».
+ *   crayon (configurer la liste, modifier le contenu) puis « Trier /
+ *   filtrer » en vue affiches, ou « Colonnes » en vue tableau (où le tri et
+ *   les filtres sont dans les en-têtes de colonnes).
  * Boutons ronds, icône seule, libellé au survol.
  */
 
@@ -13,7 +14,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Columns3, ListFilter, Search, X } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ViewModeToggle } from "@/components/titles/ViewModeToggle";
 import { ViewMode } from "@/hooks/useViewMode";
 import { cn } from "@/lib/utils";
@@ -62,12 +67,17 @@ type TitlesToolbarProps = {
   affichesLabel?: string;
   /** Bouton crayon (EditMenuButton) ou autres actions propres à la page. */
   actions?: ReactNode;
-  /** Vue tableau : boutons « Trier / filtrer » et « Colonnes ». */
+  /** Vue tableau : bouton « Colonnes ». */
   tableControls?: {
-    filtersOpen: boolean;
-    onToggleFilters: () => void;
     columnsOpen: boolean;
     onToggleColumns: () => void;
+  };
+  /** Vue affiches : bouton « Trier / filtrer » (panneau de tri et filtres). */
+  sortFilter?: {
+    open: boolean;
+    onToggle: () => void;
+    /** Nombre de tris / filtres actifs (pastille sur le bouton). */
+    activeCount?: number;
   };
   className?: string;
 };
@@ -80,6 +90,7 @@ export function TitlesToolbar({
   affichesLabel,
   actions,
   tableControls,
+  sortFilter,
   className,
 }: TitlesToolbarProps) {
   const [searchOpen, setSearchOpen] = useState(search.length > 0);
@@ -122,29 +133,47 @@ export function TitlesToolbar({
           </button>
         </div>
       ) : (
-        <ToolbarIconButton label="Rechercher" icon={<Search className="h-4 w-4" />} onClick={() => setSearchOpen(true)} />
+        <ToolbarIconButton
+          label="Rechercher"
+          icon={<Search className="h-4 w-4" />}
+          onClick={() => setSearchOpen(true)}
+        />
       )}
 
       <div className="ml-auto flex items-center gap-2">
         {viewMode && onViewModeChange && (
-          <ViewModeToggle mode={viewMode} onChange={onViewModeChange} affichesLabel={affichesLabel} />
+          <ViewModeToggle
+            mode={viewMode}
+            onChange={onViewModeChange}
+            affichesLabel={affichesLabel}
+          />
         )}
         {actions}
-        {tableControls && (
-          <>
+        {sortFilter && viewMode !== "tableau" && (
+          <span className="relative">
             <ToolbarIconButton
               label="Trier / filtrer"
               icon={<ListFilter className="h-4 w-4" />}
-              onClick={tableControls.onToggleFilters}
-              pressed={tableControls.filtersOpen}
+              onClick={sortFilter.onToggle}
+              pressed={sortFilter.open}
             />
-            <ToolbarIconButton
-              label="Colonnes"
-              icon={<Columns3 className="h-4 w-4" />}
-              onClick={tableControls.onToggleColumns}
-              pressed={tableControls.columnsOpen}
-            />
-          </>
+            {!!sortFilter.activeCount && (
+              <span
+                className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-white"
+                aria-label={`${sortFilter.activeCount} tri(s) ou filtre(s) actif(s)`}
+              >
+                {sortFilter.activeCount}
+              </span>
+            )}
+          </span>
+        )}
+        {tableControls && (
+          <ToolbarIconButton
+            label="Colonnes"
+            icon={<Columns3 className="h-4 w-4" />}
+            onClick={tableControls.onToggleColumns}
+            pressed={tableControls.columnsOpen}
+          />
         )}
       </div>
     </div>

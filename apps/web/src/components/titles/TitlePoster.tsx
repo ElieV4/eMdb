@@ -10,7 +10,11 @@ import Image from "next/image";
 import { Eye, Bookmark, Heart, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { emotionEmojis, emotionLabels } from "@/lib/watchContext";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 
 const TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p";
 const PLACEHOLDER_POSTER = "/placeholder-poster.jpg";

@@ -45,7 +45,11 @@ function NomineeCard({ nominee }: { nominee: FestivalNominee }) {
   );
 }
 
-export default function FestivalEditionPage({ params }: { params: { editionId: string } }) {
+export default function FestivalEditionPage({
+  params,
+}: {
+  params: { editionId: string };
+}) {
   const { editionId } = params;
   const { data: editions } = useFestivalEditions();
   const { data: nominees, isLoading, error } = useFestivalSelection(editionId);
@@ -56,7 +60,9 @@ export default function FestivalEditionPage({ params }: { params: { editionId: s
   const [gagnantsUniquement, setGagnantsUniquement] = useState(false);
 
   const categories = useMemo(() => {
-    const set = new Set((nominees ?? []).map((n) => n.categorie ?? SANS_CATEGORIE));
+    const set = new Set(
+      (nominees ?? []).map((n) => n.categorie ?? SANS_CATEGORIE),
+    );
     return [...set].sort((a, b) => {
       // "Sélection officielle" (pas de catégorie précise) en dernier.
       if (a === SANS_CATEGORIE) return 1;
@@ -67,25 +73,37 @@ export default function FestivalEditionPage({ params }: { params: { editionId: s
 
   const filtered = (nominees ?? []).filter((n) => {
     if (gagnantsUniquement && !n.gagnant) return false;
-    if (categorie && (n.categorie ?? SANS_CATEGORIE) !== categorie) return false;
+    if (categorie && (n.categorie ?? SANS_CATEGORIE) !== categorie)
+      return false;
     return true;
   });
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">{edition?.sourceNom ?? "Sélection"}</h1>
-        {edition && <p className="text-sm text-muted-foreground mt-1">{edition.editionLabel}</p>}
+        <h1 className="text-2xl font-bold">
+          {edition?.sourceNom ?? "Sélection"}
+        </h1>
+        {edition && (
+          <p className="text-sm text-muted-foreground mt-1">
+            {edition.editionLabel}
+          </p>
+        )}
       </div>
 
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] rounded-lg bg-muted/50 animate-pulse" />
+            <div
+              key={i}
+              className="aspect-[2/3] rounded-lg bg-muted/50 animate-pulse"
+            />
           ))}
         </div>
       ) : error ? (
-        <p className="text-sm text-muted-foreground py-4">Erreur lors du chargement de cette sélection.</p>
+        <p className="text-sm text-muted-foreground py-4">
+          Erreur lors du chargement de cette sélection.
+        </p>
       ) : !nominees || nominees.length === 0 ? (
         <p className="text-sm text-muted-foreground py-4">
           Sélection pas encore disponible pour cette édition.
@@ -98,7 +116,9 @@ export default function FestivalEditionPage({ params }: { params: { editionId: s
               onClick={() => setCategorie(null)}
               className={cn(
                 "px-3 py-1.5 text-sm rounded-full border transition-colors",
-                categorie === null ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted",
+                categorie === null
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "hover:bg-muted",
               )}
             >
               Toutes catégories
@@ -110,7 +130,9 @@ export default function FestivalEditionPage({ params }: { params: { editionId: s
                 onClick={() => setCategorie(c)}
                 className={cn(
                   "px-3 py-1.5 text-sm rounded-full border transition-colors",
-                  categorie === c ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted",
+                  categorie === c
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "hover:bg-muted",
                 )}
               >
                 {c}
@@ -132,11 +154,16 @@ export default function FestivalEditionPage({ params }: { params: { editionId: s
           </div>
 
           {filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">Aucun titre ne correspond aux filtres actifs.</p>
+            <p className="text-sm text-muted-foreground py-4">
+              Aucun titre ne correspond aux filtres actifs.
+            </p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {filtered.map((nominee, i) => (
-                <NomineeCard key={`${nominee.id}-${nominee.categorie ?? "none"}-${i}`} nominee={nominee} />
+                <NomineeCard
+                  key={`${nominee.id}-${nominee.categorie ?? "none"}-${i}`}
+                  nominee={nominee}
+                />
               ))}
             </div>
           )}

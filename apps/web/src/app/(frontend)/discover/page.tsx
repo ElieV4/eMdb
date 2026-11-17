@@ -17,7 +17,10 @@
 "use client";
 
 import { Suspense } from "react";
-import { DiscoverModuleSection, DISCOVER_MODULES } from "@/components/discover/DiscoverModuleSection";
+import {
+  DiscoverModuleSection,
+  DISCOVER_MODULES,
+} from "@/components/discover/DiscoverModuleSection";
 import { FestivalModuleSection } from "@/components/discover/FestivalModuleSection";
 
 function DiscoverPageContent() {

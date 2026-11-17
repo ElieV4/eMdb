@@ -84,13 +84,20 @@ export function BulkActionsBar({
 
   const uniqueTitleIds = Array.from(new Set(items.map((item) => item.titleId)));
   const serieTitleIds = Array.from(
-    new Set(items.filter((item) => item.type === "serie").map((item) => item.titleId)),
+    new Set(
+      items.filter((item) => item.type === "serie").map((item) => item.titleId),
+    ),
   );
   const watchIds = Array.from(
-    new Set(items.map((item) => item.watchId).filter((id): id is string => !!id)),
+    new Set(
+      items.map((item) => item.watchId).filter((id): id is string => !!id),
+    ),
   );
 
-  const runForEach = async (titleIds: string[], run: (titleId: string) => Promise<unknown>) => {
+  const runForEach = async (
+    titleIds: string[],
+    run: (titleId: string) => Promise<unknown>,
+  ) => {
     setPending(true);
     try {
       await Promise.all(titleIds.map((titleId) => run(titleId)));
@@ -109,7 +116,9 @@ export function BulkActionsBar({
 
   const handleUnfollow = () =>
     watchlistId &&
-    runForEach(uniqueTitleIds, (titleId) => removeItem.mutateAsync({ listId: watchlistId, titleId }));
+    runForEach(uniqueTitleIds, (titleId) =>
+      removeItem.mutateAsync({ listId: watchlistId, titleId }),
+    );
 
   const handleAbandon = () =>
     watchlistId &&
@@ -117,8 +126,15 @@ export function BulkActionsBar({
       // L'item peut ne pas encore être dans la watchlist (série suivie via
       // `user_follows_serie` sans y avoir été ajoutée, cf. Continuer à
       // regarder) — addItem est idempotent, donc sûr à appeler avant.
-      await addItem.mutateAsync({ listId: watchlistId, data: { title_id: titleId } });
-      await updateItemStatus.mutateAsync({ listId: watchlistId, titleId, statut: "abandonnee" });
+      await addItem.mutateAsync({
+        listId: watchlistId,
+        data: { title_id: titleId },
+      });
+      await updateItemStatus.mutateAsync({
+        listId: watchlistId,
+        titleId,
+        statut: "abandonnee",
+      });
     });
 
   const handleAddFavorite = () =>
@@ -129,12 +145,16 @@ export function BulkActionsBar({
 
   const handleRemoveFavorite = () =>
     favorisId &&
-    runForEach(uniqueTitleIds, (titleId) => removeItem.mutateAsync({ listId: favorisId, titleId }));
+    runForEach(uniqueTitleIds, (titleId) =>
+      removeItem.mutateAsync({ listId: favorisId, titleId }),
+    );
 
   const handleDeleteHistory = async () => {
     setPending(true);
     try {
-      await Promise.all(watchIds.map((watchId) => deleteWatch.mutateAsync(watchId)));
+      await Promise.all(
+        watchIds.map((watchId) => deleteWatch.mutateAsync(watchId)),
+      );
     } finally {
       setPending(false);
       setConfirmDeleteOpen(false);
@@ -159,18 +179,31 @@ export function BulkActionsBar({
         <DropdownMenu open={open} onOpenChange={setOpen}>
           <DropdownMenuTrigger
             render={
-              <Button type="button" variant="secondary" size="sm" disabled={pending}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={pending}
+              >
                 <ListChecks className="mr-2 h-4 w-4" />
                 Actions
               </Button>
             }
           />
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={handleFollow} disabled={!watchlistId} className="cursor-pointer">
+            <DropdownMenuItem
+              onClick={handleFollow}
+              disabled={!watchlistId}
+              className="cursor-pointer"
+            >
               <BookmarkPlus className="mr-2 h-4 w-4" />
               Ajouter à la watchlist
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleUnfollow} disabled={!watchlistId} className="cursor-pointer">
+            <DropdownMenuItem
+              onClick={handleUnfollow}
+              disabled={!watchlistId}
+              className="cursor-pointer"
+            >
               <BookmarkMinus className="mr-2 h-4 w-4" />
               Retirer de la watchlist
             </DropdownMenuItem>
@@ -182,11 +215,19 @@ export function BulkActionsBar({
               <Archive className="mr-2 h-4 w-4" />
               Abandonner la série
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddFavorite} disabled={!favorisId} className="cursor-pointer">
+            <DropdownMenuItem
+              onClick={handleAddFavorite}
+              disabled={!favorisId}
+              className="cursor-pointer"
+            >
               <Heart className="mr-2 h-4 w-4" />
               Ajouter aux favoris
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleRemoveFavorite} disabled={!favorisId} className="cursor-pointer">
+            <DropdownMenuItem
+              onClick={handleRemoveFavorite}
+              disabled={!favorisId}
+              className="cursor-pointer"
+            >
               <HeartOff className="mr-2 h-4 w-4" />
               Supprimer des favoris
             </DropdownMenuItem>
@@ -215,15 +256,22 @@ export function BulkActionsBar({
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer de l&apos;historique ?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Supprimer de l&apos;historique ?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {watchIds.length} visionnage{watchIds.length > 1 ? "s" : ""} sélectionné
-              {watchIds.length > 1 ? "s" : ""} seront supprimés de l&apos;historique.
+              {watchIds.length} visionnage{watchIds.length > 1 ? "s" : ""}{" "}
+              sélectionné
+              {watchIds.length > 1 ? "s" : ""} seront supprimés de
+              l&apos;historique.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDeleteHistory}>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDeleteHistory}
+            >
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>

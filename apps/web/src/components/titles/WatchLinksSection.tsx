@@ -25,9 +25,13 @@ function LinkCard({ link }: { link: WatchLink }) {
       className="flex h-16 flex-col items-center justify-center gap-0.5 rounded-lg border border-border bg-background/70 px-1.5 text-center hover:bg-muted/60"
     >
       {Icon && <Icon className="h-4 w-4" />}
-      <span className="w-full truncate text-xs font-medium text-foreground">{link.name}</span>
+      <span className="w-full truncate text-xs font-medium text-foreground">
+        {link.name}
+      </span>
       {link.subtitle && (
-        <span className="w-full truncate text-[10px] text-muted-foreground">{link.subtitle}</span>
+        <span className="w-full truncate text-[10px] text-muted-foreground">
+          {link.subtitle}
+        </span>
       )}
     </a>
   );
@@ -45,7 +49,9 @@ export function WatchLinksSection({
           Streaming officiel
         </h2>
         {officialProviders.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucune plateforme disponible.</p>
+          <p className="text-sm text-muted-foreground">
+            Aucune plateforme disponible.
+          </p>
         ) : (
           <div className="grid grid-cols-2 gap-2">
             {officialProviders.map((link) => (

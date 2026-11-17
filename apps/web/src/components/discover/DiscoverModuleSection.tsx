@@ -25,6 +25,8 @@ import { TitlesToolbar } from "@/components/titles/TitlesToolbar";
 import { EditMenuButton } from "@/components/common/EditMenuButton";
 import { BulkEditPanel } from "@/components/common/BulkEditPanel";
 import { useTitlesPage } from "@/hooks/useTitlesPage";
+import { useTitleSortFilter } from "@/hooks/useTitleSortFilter";
+import { TitlesSortFilterPanel } from "@/components/titles/TitlesSortFilterPanel";
 import { rowMatchesSearch } from "@/lib/titlesTable";
 import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
 import { useDiscoverModule, DiscoverModuleKey } from "@/hooks/api/useDiscover";
@@ -39,10 +41,26 @@ import {
 } from "@/lib/titleFilters";
 import { TitleSearchResult } from "@/lib/types/api";
 
-export const DISCOVER_MODULES: { key: DiscoverModuleKey; title: string; subtitle: string }[] = [
-  { key: "tendances", title: "Tendances", subtitle: "Ce qui buzz cette semaine" },
-  { key: "populaires", title: "Populaires", subtitle: "Les films et séries les plus populaires" },
-  { key: "attendus", title: "Attendus", subtitle: "Pas encore sortis, déjà très suivis" },
+export const DISCOVER_MODULES: {
+  key: DiscoverModuleKey;
+  title: string;
+  subtitle: string;
+}[] = [
+  {
+    key: "tendances",
+    title: "Tendances",
+    subtitle: "Ce qui buzz cette semaine",
+  },
+  {
+    key: "populaires",
+    title: "Populaires",
+    subtitle: "Les films et séries les plus populaires",
+  },
+  {
+    key: "attendus",
+    title: "Attendus",
+    subtitle: "Pas encore sortis, déjà très suivis",
+  },
   { key: "sorties", title: "Sorties", subtitle: "Sorti récemment" },
 ];
 
@@ -94,8 +112,19 @@ export function DiscoverModuleSection({
   // Scroll infini côté client sur la grille (page dédiée /discover/:module) —
   // le backend fournit déjà jusqu'à 100 résultats (plusieurs pages TMDB
   // fusionnées), révélés progressivement plutôt que tous rendus d'un coup.
-  const { visibleItems: gridVisible, sentinelRef } = useProgressiveReveal(filtered, 24);
-  const visible = variant === "row" ? filtered.slice(0, ROW_PREVIEW_COUNT) : gridVisible;
+  // Vue affiches : tri et filtres du panneau « Trier / filtrer ».
+  const sortFilter = useTitleSortFilter(
+    filtered,
+    page.filtersOpen && !page.isTable,
+  );
+  const cardFiltered =
+    variant === "grid" ? sortFilter.apply(filtered, (t) => t.id) : filtered;
+  const { visibleItems: gridVisible, sentinelRef } = useProgressiveReveal(
+    cardFiltered,
+    24,
+  );
+  const visible =
+    variant === "row" ? filtered.slice(0, ROW_PREVIEW_COUNT) : gridVisible;
   const hasMore = variant === "row" && filtered.length > ROW_PREVIEW_COUNT;
 
   return (
@@ -108,34 +137,54 @@ export function DiscoverModuleSection({
       </div>
       {variant === "grid" && (
         <div className="mb-4 space-y-3">
-      <TitlesToolbar
-        search={page.search}
-        onSearchChange={page.setSearch}
-        viewMode={page.viewMode}
-        onViewModeChange={page.setViewMode}
-        actions={<EditMenuButton onEditContent={page.toggleEditing} editing={page.editing} />}
-        tableControls={
-          page.isTable
-            ? {
-                filtersOpen: page.filtersOpen,
-                onToggleFilters: page.toggleFilters,
-                columnsOpen: page.columnsOpen,
-                onToggleColumns: page.toggleColumns,
-              }
-            : undefined
-        }
-      />
-      {page.editing && (
-        <BulkEditPanel
-          action={page.action}
-          onActionChange={page.setAction}
-          selected={[...page.selectedIds].map((id) => { const t = filtered.find((x) => x.id === id); return { id, titleId: id, local: t?.local, tmdbId: t?.tmdbId, type: t?.type }; })}
-          selectableCount={filtered.length}
-          onSelectAll={() => page.selectAll(filtered.map((t) => t.id))}
-          onClearSelection={page.clearSelection}
-          onClose={page.stopEditing}
-        />
-      )}
+          <TitlesToolbar
+            search={page.search}
+            onSearchChange={page.setSearch}
+            viewMode={page.viewMode}
+            onViewModeChange={page.setViewMode}
+            actions={
+              <EditMenuButton
+                onEditContent={page.toggleEditing}
+                editing={page.editing}
+              />
+            }
+            sortFilter={{
+              open: page.filtersOpen,
+              onToggle: page.toggleFilters,
+              activeCount: sortFilter.activeCount,
+            }}
+            tableControls={
+              page.isTable
+                ? {
+                    columnsOpen: page.columnsOpen,
+                    onToggleColumns: page.toggleColumns,
+                  }
+                : undefined
+            }
+          />
+          {page.filtersOpen && !page.isTable && (
+            <TitlesSortFilterPanel state={sortFilter} />
+          )}
+          {page.editing && (
+            <BulkEditPanel
+              action={page.action}
+              onActionChange={page.setAction}
+              selected={[...page.selectedIds].map((id) => {
+                const t = filtered.find((x) => x.id === id);
+                return {
+                  id,
+                  titleId: id,
+                  local: t?.local,
+                  tmdbId: t?.tmdbId,
+                  type: t?.type,
+                };
+              })}
+              selectableCount={filtered.length}
+              onSelectAll={() => page.selectAll(filtered.map((t) => t.id))}
+              onClearSelection={page.clearSelection}
+              onClose={page.stopEditing}
+            />
+          )}
         </div>
       )}
 
@@ -177,7 +226,6 @@ export function DiscoverModuleSection({
           pageKey={`discover-${moduleKey}`}
           search={page.search}
           selection={page.tableSelection}
-          filtersOpen={page.filtersOpen}
           columnsOpen={page.columnsOpen}
           titles={filtered}
           flagsOf={(t) => ({
@@ -191,19 +239,19 @@ export function DiscoverModuleSection({
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {visible.map((t) => (
               <div key={`${moduleKey}-${t.id}`} className="relative">
-              {page.selecting && (
-                <SelectionCheckbox
-                  selected={page.selectedIds.has(t.id)}
-                  onToggle={() => page.toggleSelected(t.id)}
+                {page.selecting && (
+                  <SelectionCheckbox
+                    selected={page.selectedIds.has(t.id)}
+                    onToggle={() => page.toggleSelected(t.id)}
+                  />
+                )}
+                <TitleCard
+                  title={t}
+                  compact
+                  watched={watchedTitles?.has(t.id)}
+                  inWatchlist={watchlistIds.has(t.id)}
+                  inFavorites={favoriteIds.has(t.id)}
                 />
-              )}
-              <TitleCard
-                title={t}
-                compact
-                watched={watchedTitles?.has(t.id)}
-                inWatchlist={watchlistIds.has(t.id)}
-                inFavorites={favoriteIds.has(t.id)}
-              />
               </div>
             ))}
           </div>
