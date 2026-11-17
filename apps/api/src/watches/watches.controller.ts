@@ -143,6 +143,12 @@ export class WatchesController {
    * directement (titles.id) ou via un épisode (episodes -> seasons.title_id)
    * — alimente l'icone "vu" affichée sur les affiches dans toute l'app.
    */
+  /** Émotions de l'utilisateur par titre (affiches des listes et modules). */
+  @Get('watches/title-emotions')
+  async getTitleEmotions(@CurrentUser() user: any) {
+    return this.watchesService.getTitleEmotions(user.id);
+  }
+
   @Get('watches/watched-title-ids')
   async getWatchedTitleIds(@CurrentUser() user: any) {
     return this.watchesService.getWatchedTitleIds(user.id);

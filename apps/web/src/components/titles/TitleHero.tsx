@@ -74,8 +74,8 @@ export function TitleHero({ title, credits, className }: TitleHeroProps) {
       const c = compagnieLabel(watch.compagnie);
       if (c) compagnies.add(c);
       for (const e of watch.emotion ?? []) {
-        const label = WATCH_EMOTION_OPTIONS.find((o) => o.value === e)?.label;
-        if (label) emotions.add(label);
+        const option = WATCH_EMOTION_OPTIONS.find((o) => o.value === e);
+        if (option) emotions.add(`${option.emoji} ${option.label}`);
       }
     }
     return [...supports, ...compagnies, ...emotions];

@@ -48,7 +48,7 @@ export function MultiChipGroup<T extends string>({
   values,
   onToggle,
 }: {
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; emoji?: string; color?: string; hint?: string }[];
   values: string[] | null | undefined;
   onToggle: (value: T) => void;
 }) {
@@ -56,14 +56,24 @@ export function MultiChipGroup<T extends string>({
     <div className="flex flex-wrap gap-1.5">
       {options.map((option) => {
         const selected = (values ?? []).includes(option.value);
+        // Tag coloré (émotions) : bordure à sa couleur, fond teinté si choisi.
+        const style = option.color
+          ? {
+              borderColor: option.color,
+              backgroundColor: selected ? `${option.color}33` : undefined,
+            }
+          : undefined;
         return (
           <button
             key={option.value}
             type="button"
             onClick={() => onToggle(option.value)}
             aria-pressed={selected}
-            className={chipClass(selected)}
+            title={option.hint}
+            className={cn(chipClass(selected), option.color && "border", option.color && selected && "text-foreground")}
+            style={style}
           >
+            {option.emoji && <span aria-hidden className="mr-1">{option.emoji}</span>}
             {option.label}
           </button>
         );

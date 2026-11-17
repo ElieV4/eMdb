@@ -11,6 +11,7 @@ import { TitleWatchedButton } from "./TitleWatchedButton";
 import { TitleSearchResult } from "@/lib/types/api";
 import { buildEntityUrl, cn } from "@/lib/utils";
 import { usePosterScale } from "@/hooks/usePosterScale";
+import { useTitleEmotions } from "@/hooks/api/useTitleEmotions";
 import { buildTitleCardMeta } from "@/lib/cardFormatting";
 
 interface TitleCardProps {
@@ -58,6 +59,7 @@ export function TitleCard({
     : `/titles/tmdb/${title.tmdbId}?type=${type}`;
 
   const posterScale = usePosterScale();
+  const { data: titleEmotions } = useTitleEmotions();
   const posterWidth = Math.round((compact ? 150 : 200) * posterScale);
   const posterHeight = Math.round(posterWidth * 1.5);
 
@@ -115,6 +117,7 @@ export function TitleCard({
           inWatchlist={inWatchlist}
           inFavorites={inFavorites}
           watchlistStatus={watchlistStatus}
+          emotions={local ? titleEmotions?.[id] : undefined}
         />
 
         {/* Padding proportionnel à la taille d'affiche réglée (page paramètres) :
@@ -178,6 +181,7 @@ export function TitleCardHorizontal({
     local,
   } = title;
   const year = dateSortie ? new Date(dateSortie).getFullYear() : null;
+  const { data: titleEmotions } = useTitleEmotions();
 
   const href = local
     ? buildEntityUrl("/titles", id, titre)
@@ -215,6 +219,7 @@ export function TitleCardHorizontal({
           inWatchlist={inWatchlist}
           inFavorites={inFavorites}
           watchlistStatus={watchlistStatus}
+          emotions={local ? titleEmotions?.[id] : undefined}
         />
 
         <div className="flex-1 min-w-0">

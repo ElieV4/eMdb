@@ -85,4 +85,23 @@ describe("TitlePoster", () => {
     expect(screen.queryByLabelText("Série abandonnée")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Dans la watchlist")).toBeInTheDocument();
   });
+
+  it("affiche jusqu'à 3 emojis d'émotion en bas à gauche", () => {
+    render(
+      <TitlePoster
+        src="/test.jpg"
+        alt="Test"
+        title="Test"
+        emotions={["peur", "choc", "tension", "rire"]}
+      />,
+    );
+    const badge = screen.getByLabelText(/^Émotions :/);
+    expect(badge).toHaveTextContent("😱🤯😬");
+    expect(badge).not.toHaveTextContent("😂");
+  });
+
+  it("n'affiche pas de badge sans émotion", () => {
+    render(<TitlePoster src="/test.jpg" alt="Test" title="Test" emotions={[]} />);
+    expect(screen.queryByLabelText(/^Émotions :/)).not.toBeInTheDocument();
+  });
 });

@@ -18,6 +18,8 @@ import { TitleWatchedButton } from "@/components/titles/TitleWatchedButton";
 import { ContinueWatchingEntry } from "@/lib/types/api";
 import { buildEntityUrl, cn } from "@/lib/utils";
 import { buildCardText, formatDuration } from "@/lib/cardFormatting";
+import { useTitleEmotions } from "@/hooks/api/useTitleEmotions";
+import { emotionEmojis, emotionLabels } from "@/lib/watchContext";
 
 const TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p/w300";
 const POSTER_WIDTH = 144;
@@ -39,6 +41,7 @@ export function ContinueWatchingCard({
   watchlistStatus,
   className,
 }: ContinueWatchingCardProps) {
+  const { data: titleEmotions } = useTitleEmotions();
   const { title, subtitle } = buildCardText({
     type: "serie",
     titre: entry.titre_vf || entry.titre_vo,
@@ -56,6 +59,9 @@ export function ContinueWatchingCard({
     entry.total_episodes > 0
       ? Math.round((entry.episodes_vus / entry.total_episodes) * 100)
       : 0;
+
+  const emotions = titleEmotions?.[entry.title_id];
+  const emotionText = emotionEmojis(emotions?.slice(0, 3));
 
   return (
     <div
@@ -76,6 +82,17 @@ export function ContinueWatchingCard({
               sizes={`${POSTER_WIDTH}px`}
             />
           ) : null}
+
+          {/* Émotions (évaluation par émotion) : en bas à gauche, au-dessus
+              de la barre de progression. */}
+          {emotionText && (
+            <div
+              className="absolute bottom-12 left-1.5 z-10 rounded-full bg-black/70 px-1.5 py-0.5 text-sm leading-none"
+              title={emotionLabels(emotions) ?? undefined}
+            >
+              {emotionText}
+            </div>
+          )}
 
           <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1.5 pt-1 pb-1.5">
             <p className="mb-1 text-[10px] font-medium text-white">

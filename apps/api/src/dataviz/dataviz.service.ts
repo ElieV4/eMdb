@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WatchTimeQueryDto } from './dto/watch-time-query.dto';
 import { WatchCountQueryDto } from './dto/watch-count-query.dto';
+import { WATCH_EMOTIONS } from '../watches/dto/update-watch-context.dto';
 import {
   DatavizAggregation,
   DatavizGranularity,
@@ -618,16 +619,10 @@ export class DatavizService {
         const em = `em${aliasSuffix}`;
         return {
           categoryIdExpr: 'NULL::TEXT',
-          categoryExpr: `(CASE ${em}.value
-            WHEN 'content' THEN 'Content'
-            WHEN 'triste' THEN 'Triste'
-            WHEN 'emu' THEN 'Ému'
-            WHEN 'enthousiaste' THEN 'Enthousiaste'
-            WHEN 'decu' THEN 'Déçu'
-            WHEN 'tendu' THEN 'Tendu'
-            WHEN 'effraye' THEN 'Effrayé'
-            WHEN 'neutre' THEN 'Neutre'
-          END)`,
+          // Libellé "emoji + nom" (constantes du DTO, valeurs sûres).
+          categoryExpr: `(CASE ${em}.value ${WATCH_EMOTIONS.map(
+            (e) => `WHEN '${e.value}' THEN '${e.emoji} ${e.label.replace(/'/g, "''")}'`,
+          ).join(' ')} END)`,
           joinSql: `CROSS JOIN LATERAL UNNEST(uw.emotion) AS ${em}(value)`,
           groupByExpr: `${em}.value`,
           orderExpr: `${em}.value`,

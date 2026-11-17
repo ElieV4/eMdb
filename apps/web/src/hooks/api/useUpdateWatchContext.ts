@@ -18,6 +18,7 @@ export function useUpdateWatchContext() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["watches"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["title-emotions"] });
     },
   });
 }

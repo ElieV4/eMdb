@@ -209,8 +209,9 @@ CREATE TABLE user_watches (
     -- Contexte de visionnage, saisi a posteriori (jamais a la creation du
     -- watch) : support ("ordinateur"/"tv"/"telephone"/"cinema"), compagnie
     -- ("seul"/"accompagne"), emotion (tableau, un watch peut avoir plusieurs
-    -- emotions : "content"/"triste"/"emu"/"enthousiaste"/"decu"/"tendu"/
-    -- "effraye"/"neutre"). Tous nullable (contexte optionnel). Valide cote
+    -- tags d'emotion : "joie"/"rire"/"emerveillement"/"tendresse"/"nostalgie"/
+    -- "tristesse"/"choc"/"fascination"/"tension"/"peur"/"revolte"/"malaise").
+    -- Tous nullable (contexte optionnel). Valide cote
     -- API (DTO @IsEnum), pas de CHECK ici (meme convention que
     -- list_items.statut, cf. packages/db/prisma/schema.prisma).
     support     TEXT,

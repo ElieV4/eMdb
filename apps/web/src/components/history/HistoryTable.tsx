@@ -454,7 +454,7 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
                       });
                     }}
                   >
-                    {o.label}
+                    {o.emoji} {o.label}
                   </DropdownMenuCheckboxItem>
                 );
               })}
