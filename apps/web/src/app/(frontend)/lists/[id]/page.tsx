@@ -331,6 +331,9 @@ function ListDetailPageContent() {
             listId={list?.id ?? ""}
             items={items.map(titleToSearchResult)}
             canRemove={list?.capabilities.canRemoveItems ?? false}
+            groups={groups}
+            groupIdsByTitle={new Map(items.map((i) => [i.id, i.groupIds ?? []]))}
+            canEditGroups={canEditItems}
           />
         ) : filteredItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">
