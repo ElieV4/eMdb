@@ -74,7 +74,7 @@ Le mode de partage est porté par la liste (`user_lists.share_mode`) et s'appliq
 | Retirer un titre | ❌ | ❌ | ✅ |
 | Supprimer la liste, gérer les membres, changer le mode | créateur | créateur | créateur |
 
-- **`fn_list_can(list_id, action)`** (`SECURITY DEFINER`) évalue cette matrice pour `app.user_id`. Toutes les policies de `user_lists`, `list_items` et `list_shares` passent par elle. Elle lit les tables sans repasser par leurs policies : c'est ce qui évite la récursion `user_lists` ↔ `list_shares`. Son `EXECUTE` est retiré à `PUBLIC` (Data API Supabase) et accordé à `emdb_app` seulement.
+- **`fn_list_can(list_id, action)`** (`SECURITY DEFINER`) évalue cette matrice pour `app.user_id`. Toutes les policies de `user_lists`, `list_items` et `list_shares` passent par elle. Elle lit les tables sans repasser par leurs policies : c'est ce qui évite la récursion `user_lists` ↔ `list_shares`. Son `EXECUTE` est retiré à `PUBLIC` et accordé à `emdb_app` seulement. Sur Supabase, `anon` et `authenticated` reçoivent en plus un `EXECUTE` direct par défaut : c'est `lock_down_supabase_data_api` qui le leur retire.
 - **Policies par commande** (`SELECT` / `INSERT` / `UPDATE` / `DELETE`) au lieu d'une policy unique par table. `list_shares` a désormais sa propre RLS : un membre voit et peut supprimer sa propre entrée (quitter la liste), le créateur gère toutes les entrées.
 - **`trg_user_lists_guard_owner_columns`** : la RLS filtre des lignes, pas des colonnes. Ce trigger empêche un membre autorisé à renommer la liste de modifier aussi `share_mode`, `type` ou `user_id`. Il ne s'applique qu'aux requêtes faites au nom d'un utilisateur (`app.user_id` défini) : le worker et les scripts d'administration, qui contournent la RLS sans définir ce contexte, ne sont pas bloqués.
 - La même matrice existe côté API dans `apps/api/src/lists/list-permissions.ts`. Les deux doivent rester synchronisées.
@@ -98,7 +98,17 @@ Le mode de partage est porté par la liste (`user_lists.share_mode`) et s'appliq
 - `emdb_app` (sans `BYPASSRLS`) : celui que l'API doit utiliser (`DATABASE_URL`), sinon les policies n'ont strictement aucun effet.
 - Rôle d'origine (`emdb` en local, `postgres` sur Supabase, avec `BYPASSRLS`) : celui du worker (`WORKER_DATABASE_URL`), dont les jobs sont par nature transverses à tous les utilisateurs.
 
-**⚠️ Supabase active RLS par défaut sur *toute* nouvelle table** (indépendamment de cette migration) — sans policy, ça bloque tout accès pour un rôle sans bypass. La migration `disable_default_rls_non_user_scoped_tables` désactive ce défaut sur les 21 autres tables (catalogue/techniques, pas de notion d'utilisateur).
+**⚠️ Supabase active RLS par défaut sur *toute* nouvelle table** — sans policy, ça bloque tout accès pour un rôle sans bypass. La migration `lock_down_supabase_data_api` active RLS sur toutes les tables du schéma `public` et ajoute une policy permissive `emdb_app_full_access` sur les tables sans notion d'utilisateur (catalogue, techniques, tables dataviz). Les tables user-scoped, dont les 4 tables des listes partagées, n'en ont **pas** : une policy permissive s'ajoute en OR aux autres et annulerait leur matrice de droits.
+
+### Data API Supabase fermée (migration `lock_down_supabase_data_api`)
+
+Supabase expose le schéma `public` en REST (`/rest/v1/<table>`) aux rôles `anon` et `authenticated`, avec des `GRANT ALL` par défaut sur chaque objet créé. La clé publishable (ou `anon`) est publique par nature. L'application ne se sert jamais de cette API : l'API et le worker passent par Prisma en connexion directe. La migration retire donc tout droit à ces deux rôles, sur les objets existants et futurs (default privileges de `postgres` et `supabase_admin`).
+
+- **Pourquoi c'était grave** : les vues dbt `stg_user_watches` et `int_watches_enriched` s'exécutent avec les droits de leur propriétaire (`postgres`, `BYPASSRLS`) ; la RLS de `user_watches` ne s'y applique pas. Avant le 17/11/2026, l'historique de visionnage de tous les utilisateurs était lisible en production avec la seule clé publishable. Les tables dataviz `mv_watch_*` (par `user_id`, sans RLS) étaient lisibles et modifiables.
+- **dbt** recrée vues et tables à chaque build : un `post-hook` global (`packages/dbt-analytics/dbt_project.yml`) refait le `REVOKE` pour `anon`/`authenticated` sur chaque modèle.
+- Les vues dbt restent volontairement en droits du propriétaire (pas de `security_invoker`) : l'API les lit sans contexte `app.user_id` et filtre elle-même par `user_id`.
+- Les fonctions du schéma `public` reçoivent un `search_path` fixe.
+- **Vérifier après tout changement de schéma en production** : advisor sécurité Supabase (Dashboard → Advisors), et une requête anonyme `curl -I "https://<projet>.supabase.co/rest/v1/<table>" -H "apikey: <clé publishable>"` doit répondre `401`.
 
 ### Statut production (Supabase)
 
