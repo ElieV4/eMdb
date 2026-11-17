@@ -40,6 +40,19 @@ const ROLE_LIBELLES: Record<string, string> = {
   autre: 'Autre',
 };
 
+/**
+ * Credit déjà présent : violation de l'index unique
+ * credits_title_id_person_id_role_id_episode_id_key. Prisma la signale par le
+ * code P2002 (« Unique constraint failed », avec une majuscule) ; Postgres
+ * brut par « duplicate key ». Avant la migration credits_unique_nulls_not_distinct,
+ * cet index laissait passer les doublons des credits de titre (episode_id
+ * NULL) : chaque synchro les réinsérait.
+ */
+export function isUniqueViolation(error: unknown): boolean {
+  const e = error as { code?: string; message?: string } | null;
+  return e?.code === 'P2002' || /duplicate key|unique constraint/i.test(e?.message ?? '');
+}
+
 async function ensureRoleId(code: string, libelle?: string) {
   const resolvedLibelle = libelle ?? ROLE_LIBELLES[code] ?? 'Autre';
 
@@ -83,7 +96,7 @@ export async function ensureCreditRecord(params: {
       },
     });
   } catch (error: any) {
-    if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
+    if (isUniqueViolation(error)) {
       return;
     }
     throw error;
@@ -225,7 +238,7 @@ export async function importEpisodeGuestCredits(
         },
       });
     } catch (error: any) {
-      if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
+      if (isUniqueViolation(error)) {
         continue;
       }
       throw error;
@@ -414,7 +427,7 @@ export async function importTitleByTmdbId(
               },
             });
           } catch (error: any) {
-            if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
+            if (isUniqueViolation(error)) {
               return;
             }
             console.error('[importTitleByTmdbId] credit failed', tmdbId, credit.tmdb_person_id, error?.message);
@@ -516,7 +529,7 @@ export async function importCreditsForTitle(
         });
         imported++;
       } catch (error: any) {
-        if (/duplicate key/i.test(error.message) || /unique constraint/.test(error.message)) {
+        if (isUniqueViolation(error)) {
           return;
         }
         console.error('[importCreditsForTitle] credit failed', titleId, credit.tmdb_person_id, error?.message);

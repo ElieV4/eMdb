@@ -116,6 +116,17 @@ Supabase expose le schéma `public` en REST (`/rest/v1/<table>`) aux rôles `ano
 
 ---
 
+## 🎬 Unicité des credits (migration `credits_unique_nulls_not_distinct`)
+
+`credits` est unique sur `(title_id, person_id, role_id, episode_id)`. Pour les credits d'un titre entier, `episode_id` est NULL ; avec un index unique classique, Postgres considère deux NULL comme différents, donc l'index ne bloquait rien. Chaque import ou actualisation TMDB réinsérait tout le casting et l'équipe : en production, 125 346 des 191 210 lignes étaient des doublons (27 024 groupes), ce qui faisait apparaître un réalisateur plusieurs fois.
+
+- L'index est maintenant en **`NULLS NOT DISTINCT`** (Postgres 15+). Prisma 5 ne sait pas l'exprimer : le `@@unique` du schéma reste tel quel, et `prisma migrate diff` ne voit pas de différence.
+- La migration garde une ligne par groupe (plus petit `ordre`, puis plus petit `id`) et réunit sur elle les noms de personnage distincts, séparés par « / ».
+- Côté synchro (`packages/tmdb-sync`), un credit déjà présent est ignoré grâce à `isUniqueViolation` (code Prisma P2002, ou « duplicate key »).
+- Test d'intégration : `apps/api/src/db-constraints.spec.ts`.
+
+---
+
 ## 🛠️ Objets SQL "Hors Prisma"
 
 Prisma **ne gère pas** les objets suivants (extension `pgcrypto`, triggers, fonctions, vues matérialisées). Ils sont définis dans `../sql/db_init.sql` et appliqués via `npm run apply:raw-sql` (script `../scripts/apply-raw-sql.ts`, idempotent).

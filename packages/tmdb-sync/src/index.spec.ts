@@ -80,6 +80,8 @@ const {
   generateSeasonPremiereNotification,
   checkFollowedPersonsForNewTitles,
   checkFollowedStudiosForNewTitles,
+  ensureCreditRecord,
+  isUniqueViolation,
 } = require('./index');
 
 const tmdbClient = require('@emdb/tmdb-client') as any;
@@ -928,5 +930,38 @@ describe('tmdb-sync', () => {
       };
       expect(data.map((r) => r.recommended_id)).toContain('femme-1');
     });
+  });
+});
+
+describe('credits en double', () => {
+  it("reconnaît une violation d'unicité Prisma (P2002) comme Postgres brute", () => {
+    // Prisma : « Unique constraint failed » avec une majuscule — l'ancienne
+    // expression régulière, sensible à la casse, ne le reconnaissait pas.
+    expect(isUniqueViolation({ code: 'P2002', message: 'Unique constraint failed on the fields: (`title_id`,...)' })).toBe(true);
+    expect(isUniqueViolation({ message: 'duplicate key value violates unique constraint "credits_..."' })).toBe(true);
+    expect(isUniqueViolation({ code: 'P2003', message: 'Foreign key constraint failed' })).toBe(false);
+    expect(isUniqueViolation(null)).toBe(false);
+  });
+
+  it('ensureCreditRecord ignore un credit déjà présent (index unique)', async () => {
+    asMock(prismaMock.roles.upsert).mockResolvedValue({ id: 'role-1' });
+    asMock(prismaMock.credits.create).mockRejectedValue(
+      Object.assign(new Error('Unique constraint failed on the fields: (`title_id`,`person_id`,`role_id`,`episode_id`)'), {
+        code: 'P2002',
+      }),
+    );
+
+    await expect(
+      ensureCreditRecord({ titleId: 't1', personId: 'p1', role: 'realisateur', roleLibelle: 'Réalisation' }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('ensureCreditRecord remonte les autres erreurs', async () => {
+    asMock(prismaMock.roles.upsert).mockResolvedValue({ id: 'role-1' });
+    asMock(prismaMock.credits.create).mockRejectedValue(new Error('connection lost'));
+
+    await expect(
+      ensureCreditRecord({ titleId: 't1', personId: 'p1', role: 'realisateur', roleLibelle: 'Réalisation' }),
+    ).rejects.toThrow('connection lost');
   });
 });

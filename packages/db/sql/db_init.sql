@@ -179,13 +179,16 @@ CREATE TABLE credits (
     role_id     UUID NOT NULL REFERENCES roles(id),              -- [v3] remplace l'ancien CHECK figé role TEXT IN (...)
     personnage  TEXT,           -- rempli seulement si le role est de type acteur
     ordre       INT,            -- ordre d'affichage dans la distribution
-    source      TEXT NOT NULL DEFAULT 'tmdb',
-    UNIQUE (title_id, person_id, role_id, episode_id)
-    -- ATTENTION (meme caveat que user_ratings, cf. Phase 1.5) : Postgres ignore les NULL
-    -- dans les contraintes UNIQUE, donc plusieurs credits avec episode_id NULL et memes
-    -- title_id/person_id/role_id ne sont PAS bloques par cette contrainte seule.
-    -- A couvrir par un test d'integration dedie, comme pour user_ratings.
+    source      TEXT NOT NULL DEFAULT 'tmdb'
+    -- Unicite (title_id, person_id, role_id, episode_id) : index NULLS NOT
+    -- DISTINCT ci-dessous. Une contrainte UNIQUE classique laisserait passer
+    -- les doublons des credits de titre (episode_id NULL, deux NULL etant
+    -- distincts par defaut) : c'est ce qui a duplique 65 % des credits en
+    -- production (migration credits_unique_nulls_not_distinct).
 );
+
+CREATE UNIQUE INDEX credits_title_id_person_id_role_id_episode_id_key
+    ON credits (title_id, person_id, role_id, episode_id) NULLS NOT DISTINCT;
 
 CREATE INDEX idx_credits_person ON credits(person_id);
 CREATE INDEX idx_credits_title ON credits(title_id);

@@ -100,6 +100,33 @@ describe('Phase 1.5 - cohérence base de données', () => {
     ).rejects.toThrow(/P2002|unique constraint|duplicate key/i);
   });
 
+  it("doit refuser deux credits identiques au niveau d'un titre (episode_id NULL)", async () => {
+    // Index unique NULLS NOT DISTINCT (migration credits_unique_nulls_not_distinct) :
+    // avant, deux episode_id NULL comptaient comme différents et chaque synchro
+    // TMDB réinsérait tout le casting.
+    const creditTitleId = randomUUID();
+    const personId = randomUUID();
+    await prisma.titles.create({ data: { id: creditTitleId, type: 'film', titre_vo: 'Credits Test' } });
+    await prisma.people.create({ data: { id: personId, nom: 'Credits Test Person' } });
+    const role = await prisma.roles.upsert({
+      where: { code: 'realisateur' },
+      update: {},
+      create: { code: 'realisateur', libelle: 'Réalisation' },
+    });
+
+    try {
+      const credit = { title_id: creditTitleId, person_id: personId, role_id: role.id, episode_id: null };
+      await prisma.credits.create({ data: credit });
+      await expect(prisma.credits.create({ data: credit })).rejects.toThrow(
+        /P2002|unique constraint|duplicate key/i,
+      );
+    } finally {
+      await prisma.credits.deleteMany({ where: { title_id: creditTitleId } });
+      await prisma.titles.deleteMany({ where: { id: creditTitleId } });
+      await prisma.people.deleteMany({ where: { id: personId } });
+    }
+  });
+
   it('doit refuser deux ratings identiques pour un même épisode', async () => {
     await prisma.titles.create({
       data: {
