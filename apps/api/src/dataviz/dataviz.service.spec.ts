@@ -396,7 +396,8 @@ describe('DatavizService', () => {
 
         const sql = mockPrismaService.$queryRawUnsafe.mock.calls[0][0] as string;
         expect(sql).toContain('CROSS JOIN LATERAL UNNEST(uw.emotion) AS em(value)');
-        expect(sql).toContain("WHEN 'emu' THEN 'Ému'");
+        expect(sql).toContain("WHEN 'tendresse' THEN '🥹 Tendresse'");
+        expect(sql).toContain("WHEN 'emerveillement' THEN '✨ Émerveillement'");
         expect(sql).toContain('GROUP BY em.value');
       });
 

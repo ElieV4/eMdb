@@ -27,6 +27,7 @@ import { EditMenuButton } from "@/components/common/EditMenuButton";
 import { TitlesToolbar, ToolbarIconButton } from "@/components/titles/TitlesToolbar";
 import { ListQuickAdd } from "@/components/lists/ListQuickAdd";
 import { normalize } from "@/lib/titlesTable";
+import { emotionEmojis, emotionLabels } from "@/lib/watchContext";
 import { TitleQuickActionsMenu } from "@/components/titles/TitleQuickActionsMenu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -329,8 +330,10 @@ function HistoryPageContent() {
                           : dateSortie
                             ? String(dateSortie)
                             : null;
+                        // Émotions du visionnage : emojis après la note.
+                        const emotions = emotionEmojis(watch.emotion);
                         const subtitle =
-                          metaPrimary || ratingLabel ? (
+                          metaPrimary || ratingLabel || emotions ? (
                             <span className="inline-flex items-center gap-1">
                               {metaPrimary}
                               {ratingLabel && (
@@ -338,6 +341,9 @@ function HistoryPageContent() {
                                   <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />
                                   {ratingLabel}
                                 </span>
+                              )}
+                              {emotions && (
+                                <span title={emotionLabels(watch.emotion) ?? undefined}>{emotions}</span>
                               )}
                             </span>
                           ) : null;

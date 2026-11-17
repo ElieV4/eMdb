@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import { Eye, Bookmark, Heart, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { emotionEmojis, emotionLabels } from "@/lib/watchContext";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p";
@@ -29,6 +30,8 @@ interface TitlePosterProps {
   /** Statut de progression dans la watchlist — "abandonnee" remplace l'icone
    * watchlist par un "sens interdit". */
   watchlistStatus?: "en_cours" | "a_jour" | "abandonnee";
+  /** Émotions de l'utilisateur pour ce titre : emojis en bas à gauche. */
+  emotions?: string[];
 }
 
 export function TitlePoster({
@@ -44,7 +47,9 @@ export function TitlePoster({
   inWatchlist = false,
   inFavorites = false,
   watchlistStatus,
+  emotions,
 }: TitlePosterProps) {
+  const emotionText = emotionEmojis(emotions?.slice(0, 3));
   const isAbandoned = watchlistStatus === "abandonnee";
   const imageSrc = src
     ? src.startsWith("http://") || src.startsWith("https://")
@@ -89,6 +94,18 @@ export function TitlePoster({
           {type === "film" ? "Film" : "Série"}
         </span>
       </div>
+
+      {/* Émotions (évaluation par émotion) — en bas à gauche, les 3 plus
+          fréquentes ; le libellé complet au survol. */}
+      {emotionText && (
+        <div
+          className="absolute bottom-2 left-2 z-10 rounded-full bg-black/70 px-1.5 py-0.5 text-sm leading-none"
+          title={emotionLabels(emotions) ?? undefined}
+          aria-label={`Émotions : ${emotionLabels(emotions) ?? ""}`}
+        >
+          {emotionText}
+        </div>
+      )}
 
       {/* Icones d'état utilisateur — empilées en haut à gauche, sur le bord :
           favori, watchlist, vu (dans cet ordre). */}

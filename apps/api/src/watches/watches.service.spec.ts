@@ -295,6 +295,21 @@ describe('WatchesService', () => {
     });
   });
 
+  describe('getTitleEmotions', () => {
+    it('regroupe les émotions par titre (épisodes comptés pour la série), les plus fréquentes en premier', async () => {
+      prismaServiceMock.user_watches.findMany.mockResolvedValue([
+        { title_id: 'film-1', emotion: ['choc', 'peur'], episodes: null },
+        { title_id: 'film-1', emotion: ['peur'], episodes: null },
+        { title_id: null, emotion: ['rire'], episodes: { seasons: { title_id: 'serie-1' } } },
+        { title_id: null, emotion: ['rire', 'tendresse'], episodes: { seasons: { title_id: 'serie-1' } } },
+      ]);
+
+      const result = await service.getTitleEmotions(userId);
+
+      expect(result).toEqual({ 'film-1': ['peur', 'choc'], 'serie-1': ['rire', 'tendresse'] });
+    });
+  });
+
   describe('getHistoryTable', () => {
     const film = {
       id: 'film-1',
@@ -314,7 +329,7 @@ describe('WatchesService', () => {
           date_vue: new Date('2026-11-10'),
           support: 'cinema',
           compagnie: 'accompagne',
-          emotion: ['emu'],
+          emotion: ['tendresse'],
           title_id: 'film-1',
           episode_id: null,
           titles: film,
@@ -377,7 +392,7 @@ describe('WatchesService', () => {
         notePerso: 8,
         commentaire: 'Glaçant',
         support: 'cinema',
-        emotion: ['emu'],
+        emotion: ['tendresse'],
         listes: [{ id: 'l1', nom: 'Ciné-club', type: 'custom' }],
       });
     });
@@ -455,19 +470,19 @@ describe('WatchesService', () => {
         id: watchId,
         support: 'cinema',
         compagnie: 'accompagne',
-        emotion: ['emu', 'enthousiaste'],
+        emotion: ['tendresse', 'joie'],
       });
 
       const result = await service.updateWatchContext(watchId, userId, {
         support: 'cinema',
         compagnie: 'accompagne',
-        emotion: ['emu', 'enthousiaste'],
+        emotion: ['tendresse', 'joie'],
       });
 
       expect(result.support).toBe('cinema');
       expect(prismaServiceMock.user_watches.update).toHaveBeenCalledWith({
         where: { id: watchId },
-        data: { support: 'cinema', compagnie: 'accompagne', emotion: ['emu', 'enthousiaste'] },
+        data: { support: 'cinema', compagnie: 'accompagne', emotion: ['tendresse', 'joie'] },
       });
     });
 

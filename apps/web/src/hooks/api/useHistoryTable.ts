@@ -35,6 +35,7 @@ export function useUpdateWatch() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: HISTORY_TABLE_KEY });
       queryClient.invalidateQueries({ queryKey: ["watches"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["title-emotions"] });
     },
   });
 }

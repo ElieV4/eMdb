@@ -404,6 +404,42 @@ export class WatchesService {
     return [...titleIds];
   }
 
+  /**
+   * GET /watches/title-emotions
+   * Émotions renseignées par l'utilisateur pour chaque titre, tous ses
+   * visionnages confondus (ceux d'épisodes comptent pour la série), de la
+   * plus fréquente à la moins fréquente. Affichées en bas à gauche des
+   * affiches (listes, modules horizontaux).
+   */
+  async getTitleEmotions(userId: string): Promise<Record<string, string[]>> {
+    const watches = await this.prisma.forUser(userId, (tx) =>
+      tx.user_watches.findMany({
+        where: { user_id: userId, NOT: { emotion: { isEmpty: true } } },
+        select: {
+          title_id: true,
+          emotion: true,
+          episodes: { select: { seasons: { select: { title_id: true } } } },
+        },
+      }),
+    );
+
+    const counts = new Map<string, Map<string, number>>();
+    for (const watch of watches) {
+      const titleId = watch.title_id ?? watch.episodes?.seasons.title_id;
+      if (!titleId || !watch.emotion?.length) continue;
+      const byEmotion = counts.get(titleId) ?? new Map<string, number>();
+      for (const e of watch.emotion) byEmotion.set(e, (byEmotion.get(e) ?? 0) + 1);
+      counts.set(titleId, byEmotion);
+    }
+
+    return Object.fromEntries(
+      [...counts].map(([titleId, byEmotion]) => [
+        titleId,
+        [...byEmotion].sort((a, b) => b[1] - a[1]).map(([e]) => e),
+      ]),
+    );
+  }
+
   async listWatches(userId: string, filters: ListWatchesFilterDto) {
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 20;
