@@ -3,6 +3,14 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@emdb/db';
 
 /**
+ * Délais d'une transaction interactive Prisma (`forUser` / `asSystem`).
+ * Par défaut : `maxWait` 2 s pour obtenir une connexion du pool, `timeout`
+ * 5 s pour l'ensemble de la transaction. À relever pour les lectures
+ * volumineuses (ex. la vue tableau de l'historique).
+ */
+export type TransactionOptions = { maxWait?: number; timeout?: number };
+
+/**
  * Service NestJS qui enveloppe le singleton Prisma partagé (@emdb/db).
  *
  * Le singleton `prisma` est réexporté depuis @emdb/db pour éviter d'ouvrir
@@ -112,11 +120,15 @@ export class PrismaService implements OnModuleDestroy {
    * vérification avant suppression, notification à l'admin), voir
    * `asSystem()`.
    */
-  async forUser<T>(userId: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  async forUser<T>(
+    userId: string,
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+    options?: TransactionOptions,
+  ): Promise<T> {
     return prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.user_id', ${userId}, true)`;
       return fn(tx);
-    });
+    }, options);
   }
 
   /**
@@ -128,11 +140,14 @@ export class PrismaService implements OnModuleDestroy {
    * utilisateur pour décider du bypass — jamais conditionné par une donnée
    * de requête.
    */
-  async asSystem<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  async asSystem<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+    options?: TransactionOptions,
+  ): Promise<T> {
     return prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.bypass_rls', 'true', true)`;
       return fn(tx);
-    });
+    }, options);
   }
 
   onModuleDestroy() {

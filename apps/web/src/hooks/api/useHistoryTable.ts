@@ -12,7 +12,9 @@ export const HISTORY_TABLE_KEY = ["history-table"] as const;
 export function useHistoryTable(enabled = true) {
   return useQuery<HistoryTableResponse>({
     queryKey: HISTORY_TABLE_KEY,
-    queryFn: () => apiFetch<HistoryTableResponse>("/watches/table"),
+    // Tout l'historique d'un coup (jusqu'à 5000 visionnages) : bien plus
+    // long que le délai par défaut d'apiFetch (10 s) pour un gros historique.
+    queryFn: () => apiFetch<HistoryTableResponse>("/watches/table", { timeoutMs: 60_000 }),
     enabled,
     staleTime: 60 * 1000,
   });
