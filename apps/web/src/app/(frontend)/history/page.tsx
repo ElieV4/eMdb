@@ -265,8 +265,6 @@ function HistoryPageContent() {
           tableControls={
             isTable
               ? {
-                  filtersOpen: page.filtersOpen,
-                  onToggleFilters: page.toggleFilters,
                   columnsOpen: page.columnsOpen,
                   onToggleColumns: page.toggleColumns,
                 }
@@ -306,7 +304,6 @@ function HistoryPageContent() {
         {isTable ? (
           <HistoryTable
             search={page.search}
-            filtersOpen={page.filtersOpen}
             columnsOpen={page.columnsOpen}
             selection={page.tableSelection}
             onShownRowsChange={setTableRows}

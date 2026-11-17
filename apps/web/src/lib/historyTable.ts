@@ -5,6 +5,15 @@
  */
 
 import {
+  FilterValue,
+  dayNumber,
+  formatDay,
+  matchesFilter,
+  rangeBounds,
+  setOptions,
+} from "@/lib/columnFilters";
+import type { FilterOption } from "@/lib/columnFilters";
+import {
   WATCH_COMPAGNIE_OPTIONS,
   WATCH_EMOTION_OPTIONS,
   WATCH_SUPPORT_OPTIONS,
@@ -90,7 +99,12 @@ export type ColumnId =
   | "commentaire"
   | "listes";
 
-export type FilterKind = "text" | "number" | "enum";
+/**
+ * Filtre d'une colonne (entonnoir de l'en-tête) : recherche (`text`),
+ * curseur à deux bornes (`range`, valeur de `number`) ou liste de cases
+ * (`set`, valeurs de `enumValues`) ; `none` : pas de filtre.
+ */
+export type FilterKind = "text" | "range" | "set" | "none";
 
 export type ColumnDef = {
   id: ColumnId;
@@ -104,9 +118,14 @@ export type ColumnDef = {
   enumOptions?: { value: string; label: string }[];
   /** Valeurs (pour enum) portées par la ligne. */
   enumValues?: (row: DisplayRow) => string[];
+  /** Filtre « plage » : valeur numérique, pas du curseur, format. */
+  number?: (row: DisplayRow) => number | null;
+  step?: number;
+  format?: (n: number) => string;
 };
 
 const time = (iso: string | null) => (iso ? new Date(iso).getTime() : null);
+
 const joinNoms = (items: { nom: string }[]) =>
   items.map((i) => i.nom).join(", ");
 
@@ -122,14 +141,16 @@ export const COLUMNS: ColumnDef[] = [
   {
     id: "affiche",
     label: "Affiche",
-    filter: "text",
+    filter: "none",
     sortValue: () => null,
     filterText: () => "",
   },
   {
     id: "dateVue",
     label: "Vu le",
-    filter: "text",
+    filter: "range",
+    number: (r) => dayNumber(r.dateVue),
+    format: formatDay,
     sortValue: (r) => time(r.dateVue),
     filterText: (r) => new Date(r.dateVue).toLocaleDateString("fr-FR"),
   },
@@ -146,7 +167,7 @@ export const COLUMNS: ColumnDef[] = [
   {
     id: "type",
     label: "Type",
-    filter: "enum",
+    filter: "set",
     sortValue: (r) => r.title?.type ?? null,
     filterText: (r) => r.title?.type ?? "",
     enumOptions: [
@@ -158,7 +179,9 @@ export const COLUMNS: ColumnDef[] = [
   {
     id: "dateSortie",
     label: "Sortie",
-    filter: "text",
+    filter: "range",
+    number: (r) => dayNumber(r.dateSortie),
+    format: formatDay,
     sortValue: (r) => time(r.dateSortie),
     filterText: (r) =>
       r.dateSortie ? new Date(r.dateSortie).toLocaleDateString("fr-FR") : "",
@@ -166,28 +189,33 @@ export const COLUMNS: ColumnDef[] = [
   {
     id: "duree",
     label: "Durée",
-    filter: "number",
+    filter: "range",
+    number: (r) => r.duree ?? null,
+    format: (n) => `${n} min`,
     sortValue: (r) => r.duree ?? null,
     filterText: (r) => (r.duree != null ? String(r.duree) : ""),
   },
   {
     id: "genres",
     label: "Genres",
-    filter: "text",
+    filter: "set",
+    enumValues: (r) => r.genres,
     sortValue: (r) => r.genres.join(", ").toLocaleLowerCase("fr") || null,
     filterText: (r) => r.genres.join(", "),
   },
   {
     id: "pays",
     label: "Pays",
-    filter: "text",
+    filter: "set",
+    enumValues: (r) => r.pays ?? [],
     sortValue: (r) => (r.pays ?? []).join(", ").toLocaleLowerCase("fr") || null,
     filterText: (r) => (r.pays ?? []).join(", "),
   },
   {
     id: "studios",
     label: "Studios",
-    filter: "text",
+    filter: "set",
+    enumValues: (r) => r.studios.map((x) => x.nom),
     sortValue: (r) => joinNoms(r.studios).toLocaleLowerCase("fr") || null,
     filterText: (r) => joinNoms(r.studios),
   },
@@ -201,28 +229,36 @@ export const COLUMNS: ColumnDef[] = [
   {
     id: "noteImdb",
     label: "IMDb",
-    filter: "number",
+    filter: "range",
+    number: (r) => r.noteImdb,
+    step: 0.1,
+    format: (n) => n.toFixed(1),
     sortValue: (r) => r.noteImdb,
     filterText: (r) => (r.noteImdb ?? "").toString(),
   },
   {
     id: "moyenneApp",
     label: "Moyenne eMDB",
-    filter: "number",
+    filter: "range",
+    number: (r) => r.moyenneApp,
+    step: 0.1,
+    format: (n) => n.toFixed(1),
     sortValue: (r) => r.moyenneApp,
     filterText: (r) => (r.moyenneApp ?? "").toString(),
   },
   {
     id: "notePerso",
     label: "Ma note",
-    filter: "number",
+    filter: "range",
+    number: (r) => r.notePerso,
+    step: 0.5,
     sortValue: (r) => r.notePerso,
     filterText: (r) => (r.notePerso ?? "").toString(),
   },
   {
     id: "support",
     label: "Support",
-    filter: "enum",
+    filter: "set",
     sortValue: (r) => supportLabel(r.support),
     filterText: (r) => supportLabel(r.support) ?? "",
     enumOptions: [
@@ -235,7 +271,7 @@ export const COLUMNS: ColumnDef[] = [
   {
     id: "compagnie",
     label: "Compagnie",
-    filter: "enum",
+    filter: "set",
     sortValue: (r) => compagnieLabel(r.compagnie),
     filterText: (r) => compagnieLabel(r.compagnie) ?? "",
     enumOptions: [...WATCH_COMPAGNIE_OPTIONS, NOT_SET],
@@ -245,7 +281,7 @@ export const COLUMNS: ColumnDef[] = [
   {
     id: "emotion",
     label: "Émotions",
-    filter: "enum",
+    filter: "set",
     sortValue: (r) => emotionLabels(r.emotion),
     filterText: (r) => emotionLabels(r.emotion) ?? "",
     enumOptions: WATCH_EMOTION_OPTIONS,
@@ -261,7 +297,8 @@ export const COLUMNS: ColumnDef[] = [
   {
     id: "listes",
     label: "Listes",
-    filter: "text",
+    filter: "set",
+    enumValues: (r) => r.listes.map((l) => l.nom),
     sortValue: (r) => joinNoms(r.listes).toLocaleLowerCase("fr") || null,
     filterText: (r) => joinNoms(r.listes),
   },
@@ -380,11 +417,8 @@ export function toDisplayRows(
 
 // --- Filtres et tri ---------------------------------------------------------
 
-/** Filtre d'une colonne : texte (contient), nombre (minimum), enum (une des valeurs). */
-export type ColumnFilter =
-  | { kind: "text"; value: string }
-  | { kind: "number"; min: number }
-  | { kind: "enum"; values: string[] };
+/** Filtre d'une colonne : texte (contient), plage (entre deux bornes), liste (une des valeurs). */
+export type ColumnFilter = FilterValue;
 
 export type SortState = { column: ColumnId; direction: "asc" | "desc" } | null;
 
@@ -398,24 +432,37 @@ export function matchesFilters(
   for (const column of COLUMNS) {
     const filter = filters[column.id];
     if (!filter) continue;
-    if (filter.kind === "text") {
-      if (
-        filter.value.trim() &&
-        !normalize(column.filterText(row)).includes(
-          normalize(filter.value.trim()),
-        )
-      ) {
-        return false;
-      }
-    } else if (filter.kind === "number") {
-      const value = column.sortValue(row);
-      if (typeof value !== "number" || value < filter.min) return false;
-    } else if (filter.values.length > 0) {
-      const values = column.enumValues?.(row) ?? [];
-      if (!filter.values.some((v) => values.includes(v))) return false;
-    }
+    const ok = matchesFilter(row, filter, {
+      text: column.filterText,
+      number: column.number,
+      set: column.enumValues,
+    });
+    if (!ok) return false;
   }
   return true;
+}
+
+/** Bornes (plage) ou valeurs proposées (liste) du filtre d'une colonne. */
+export function columnFilterChoices(
+  column: ColumnDef,
+  rows: DisplayRow[],
+): { bounds?: [number, number] | null; options?: FilterOption[] } {
+  if (column.filter === "range" && column.number) {
+    return { bounds: rangeBounds(rows, column.number) };
+  }
+  if (column.filter === "set" && column.enumValues) {
+    const labels = new Map(
+      (column.enumOptions ?? []).map((o) => [o.value, o.label]),
+    );
+    return {
+      options: setOptions(
+        rows,
+        column.enumValues,
+        (v) => labels.get(v) ?? (v || "Non renseigné"),
+      ),
+    };
+  }
+  return {};
 }
 
 export function sortRows(rows: DisplayRow[], sort: SortState): DisplayRow[] {

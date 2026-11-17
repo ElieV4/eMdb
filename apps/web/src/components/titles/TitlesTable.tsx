@@ -7,8 +7,9 @@
  *   en fin de ligne. Les autres (type, note IMDb, statut, genres, pays,
  *   émotions, colonnes propres à la page) s'ajoutent via « Colonnes »
  *   (barre d'outils), choix mémorisé par page.
- * - « Trier / filtrer » : choix du tri (colonne + sens) et filtres par
- *   colonne ; le clic sur un en-tête trie aussi.
+ * - Tri au clic sur l'en-tête ; à droite de chaque en-tête, un entonnoir
+ *   ouvre le filtre de la colonne : recherche (texte), curseur à deux bornes
+ *   (sortie, durée, notes) ou liste de cases (type, genres, pays, émotions).
  * - Valeurs modifiables (ma note...) en badges ; réalisateurs cliquables ;
  *   titre français en infobulle du titre.
  * - « Modifier le contenu » : colonne de cases à cocher tout à gauche.
@@ -22,11 +23,19 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Bookmark, Eye, Heart, Star } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Bookmark,
+  Eye,
+  Heart,
+  Star,
+  X,
+} from "lucide-react";
 import { TitlePoster } from "@/components/titles/TitlePoster";
 import { TitleQuickActionsMenu } from "@/components/titles/TitleQuickActionsMenu";
 import { RatingBadgeMenu } from "@/components/ratings/RatingBadgeMenu";
-import { SortControl } from "@/components/common/SortControl";
+import { ColumnFilterPopover } from "@/components/common/ColumnFilterPopover";
 import { useTitlesTableInfo } from "@/hooks/api/useTitlesTableInfo";
 import { useTitleEmotions } from "@/hooks/api/useTitleEmotions";
 import { useUpsertRating } from "@/hooks/api/useUpsertRating";
@@ -38,13 +47,17 @@ import {
   BaseColumnId,
   ExtraColumn,
   SortState,
+  TitleFilters,
+  applyFilters,
+  baseFilterDef,
+  extraFilterDef,
+  filterChoices,
   TitleRow,
   TitleRowFlags,
   countryNames,
   frenchTitleHint,
   genreNames,
   lengthValue,
-  matchesColumnFilter,
   nextSort,
   releaseYear,
   rowMatchesSearch,
@@ -63,7 +76,6 @@ type TitlesTableProps = {
   /** Colonnes communes non proposées sur cette page. */
   hideColumns?: BaseColumnId[];
   search?: string;
-  filtersOpen?: boolean;
   columnsOpen?: boolean;
   /** « Modifier le contenu » : cases de sélection tout à gauche. */
   selection?: {
@@ -91,13 +103,12 @@ export function TitlesTable({
   extraColumns = [],
   hideColumns = [],
   search = "",
-  filtersOpen = false,
   columnsOpen = false,
   selection,
   className,
 }: TitlesTableProps) {
   const [sort, setSort] = useState<SortState>(null);
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [filters, setFilters] = useState<TitleFilters>({});
   const { data: infoById } = useTitlesTableInfo(
     titles.filter((t) => t.local).map((t) => t.id),
   );
@@ -165,36 +176,25 @@ export function TitlesTable({
       extraColumns.find((c) => c.id === column)?.sortValue?.(row.title) ?? null
     );
   };
-  const textOf = (column: string, row: TitleRow) => {
-    const base = BASE_COLUMNS.find((c) => c.id === column);
-    if (base) return base.text(row);
-    return String(
-      extraColumns.find((c) => c.id === column)?.sortValue?.(row.title) ?? "",
-    );
-  };
-  const filterKindOf = (column: string): "text" | "number" | null => {
-    const base = BASE_COLUMNS.find((c) => c.id === column);
-    if (base) return base.filter;
-    const extra = extraColumns.find((c) => c.id === column);
-    return extra?.sortValue ? "text" : null;
-  };
+  const filterDefs = [
+    ...baseColumns.map(baseFilterDef),
+    ...extraColumns.map(extraFilterDef),
+  ].filter((d): d is NonNullable<typeof d> => d !== null);
+  const filterDefOf = (id: string) => filterDefs.find((d) => d.id === id);
+  const setFilter = (id: string, value: TitleFilters[string] | null) =>
+    setFilters((current) => {
+      const next = { ...current };
+      if (value) next[id] = value;
+      else delete next[id];
+      return next;
+    });
+  const activeFilters = Object.keys(filters).length;
 
   const shown = sortRows(
-    rows.filter(
-      (row) =>
-        rowMatchesSearch(row, search, extraText(row.title)) &&
-        Object.entries(filters).every(([column, f]) => {
-          const kind = filterKindOf(column);
-          return (
-            !kind ||
-            matchesColumnFilter(
-              valueOf(column, row),
-              textOf(column, row),
-              kind,
-              f,
-            )
-          );
-        }),
+    applyFilters(
+      rows.filter((row) => rowMatchesSearch(row, search, extraText(row.title))),
+      filters,
+      filterDefs,
     ),
     sort,
     valueOf,
@@ -394,14 +394,15 @@ export function TitlesTable({
         </fieldset>
       )}
 
-      {filtersOpen && (
-        <SortControl
-          options={allColumns
-            .filter((c) => sortable(c.id))
-            .map((c) => ({ id: c.id, label: c.label }))}
-          sort={sort}
-          onChange={setSort}
-        />
+      {activeFilters > 0 && (
+        <button
+          type="button"
+          onClick={() => setFilters({})}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-3.5 w-3.5" />
+          Effacer les filtres ({activeFilters})
+        </button>
       )}
 
       {/* `relative` : contient les éléments en position absolue (sr-only). */}
@@ -432,19 +433,38 @@ export function TitlesTable({
                   >
                     {id === "affiche" ? (
                       <span className="sr-only">{labelOf(id)}</span>
-                    ) : sortable(id) ? (
-                      <button
-                        type="button"
-                        onClick={() => setSort((s) => nextSort(s, id))}
-                        className="inline-flex items-center gap-1 hover:text-foreground"
-                        aria-label={`Trier par ${labelOf(id)}`}
-                      >
-                        {labelOf(id)}
-                        {active === "asc" && <ArrowUp className="h-3 w-3" />}
-                        {active === "desc" && <ArrowDown className="h-3 w-3" />}
-                      </button>
                     ) : (
-                      labelOf(id)
+                      <span className="inline-flex items-center gap-1">
+                        {sortable(id) ? (
+                          <button
+                            type="button"
+                            onClick={() => setSort((s) => nextSort(s, id))}
+                            className="inline-flex items-center gap-1 hover:text-foreground"
+                            aria-label={`Trier par ${labelOf(id)}`}
+                          >
+                            {labelOf(id)}
+                            {active === "asc" && (
+                              <ArrowUp className="h-3 w-3" />
+                            )}
+                            {active === "desc" && (
+                              <ArrowDown className="h-3 w-3" />
+                            )}
+                          </button>
+                        ) : (
+                          labelOf(id)
+                        )}
+                        {filterDefOf(id) && (
+                          <ColumnFilterPopover
+                            label={labelOf(id)}
+                            kind={filterDefOf(id)!.kind}
+                            value={filters[id]}
+                            onChange={(v) => setFilter(id, v)}
+                            step={filterDefOf(id)!.step}
+                            format={filterDefOf(id)!.format}
+                            {...filterChoices(filterDefOf(id)!, rows)}
+                          />
+                        )}
+                      </span>
                     )}
                   </th>
                 );
@@ -453,31 +473,6 @@ export function TitlesTable({
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
-            {filtersOpen && (
-              <tr>
-                {selection && <th />}
-                {columnIds.map((id) => {
-                  const kind = filterKindOf(id);
-                  return (
-                    <th key={id} className="px-2 pb-2 font-normal">
-                      {kind && (
-                        <input
-                          type={kind === "number" ? "number" : "text"}
-                          value={filters[id] ?? ""}
-                          onChange={(e) =>
-                            setFilters((f) => ({ ...f, [id]: e.target.value }))
-                          }
-                          placeholder={kind === "number" ? "min." : "Filtrer"}
-                          aria-label={`Filtrer ${labelOf(id)}`}
-                          className="h-7 w-full min-w-16 rounded-md border bg-transparent px-1.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                      )}
-                    </th>
-                  );
-                })}
-                <th />
-              </tr>
-            )}
           </thead>
           <tbody>
             {shown.length === 0 ? (

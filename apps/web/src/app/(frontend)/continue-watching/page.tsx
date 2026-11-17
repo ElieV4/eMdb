@@ -18,6 +18,8 @@ import { TitlesToolbar } from "@/components/titles/TitlesToolbar";
 import { EditMenuButton } from "@/components/common/EditMenuButton";
 import { BulkEditPanel } from "@/components/common/BulkEditPanel";
 import { useTitlesPage } from "@/hooks/useTitlesPage";
+import { useTitleSortFilter } from "@/hooks/useTitleSortFilter";
+import { TitlesSortFilterPanel } from "@/components/titles/TitlesSortFilterPanel";
 import { rowMatchesSearch } from "@/lib/titlesTable";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -30,18 +32,38 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
 import { AlertCircle } from "lucide-react";
-import { parseTitleFilters, titleMatchesFilters, buildListIdsByTitle } from "@/lib/titleFilters";
+import {
+  parseTitleFilters,
+  titleMatchesFilters,
+  buildListIdsByTitle,
+} from "@/lib/titleFilters";
 
 function ContinueWatchingPageContent() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const filters = parseTitleFilters(useSearchParams());
-  const { data: entries, isLoading, error } = useContinueWatching(isAuthenticated);
-  const { watchlistIds, favoriteIds, watchlistStatuses } =
-    useListMembership();
+  const {
+    data: entries,
+    isLoading,
+    error,
+  } = useContinueWatching(isAuthenticated);
+  const { watchlistIds, favoriteIds, watchlistStatuses } = useListMembership();
   const { data: userLists } = useLists(isAuthenticated);
   const { data: watchedTitles } = useWatchedTitles();
   const page = useTitlesPage("continue-watching");
   const listIdsByTitle = buildListIdsByTitle(userLists);
+  // Vue affiches : tri et filtres du panneau « Trier / filtrer » (appelé
+  // avant les retours anticipés : règle des hooks).
+  const sortFilter = useTitleSortFilter(
+    (entries ?? []).map((entry) => ({
+      id: entry.title_id,
+      titre: entry.titre_vf || entry.titre_vo,
+      titreOriginal: entry.titre_vo,
+      type: "serie" as const,
+      nombreEpisodes: entry.total_episodes,
+      local: true,
+    })),
+    page.filtersOpen && !page.isTable,
+  );
 
   if (isAuthLoading) {
     return (
@@ -63,24 +85,33 @@ function ContinueWatchingPageContent() {
   }
 
   const items = entries ?? [];
-  const filteredItems = items.filter((entry) =>
-    rowMatchesSearch(
-      { title: { id: entry.title_id, titre: entry.titre_vf || entry.titre_vo, titreOriginal: entry.titre_vo, type: "serie", local: true } },
-      page.search,
-    ) &&
-    titleMatchesFilters(
-      {
-        id: entry.title_id,
-        type: "serie",
-        year: undefined,
-        note: undefined,
-        genreIds: undefined,
-        countryIds: undefined,
-        listIds: listIdsByTitle.get(entry.title_id) ?? [],
-        watched: watchedTitles?.has(entry.title_id) ?? false,
-      },
-      filters,
-    ),
+  const filteredItems = items.filter(
+    (entry) =>
+      rowMatchesSearch(
+        {
+          title: {
+            id: entry.title_id,
+            titre: entry.titre_vf || entry.titre_vo,
+            titreOriginal: entry.titre_vo,
+            type: "serie",
+            local: true,
+          },
+        },
+        page.search,
+      ) &&
+      titleMatchesFilters(
+        {
+          id: entry.title_id,
+          type: "serie",
+          year: undefined,
+          note: undefined,
+          genreIds: undefined,
+          countryIds: undefined,
+          listIds: listIdsByTitle.get(entry.title_id) ?? [],
+          watched: watchedTitles?.has(entry.title_id) ?? false,
+        },
+        filters,
+      ),
   );
 
   return (
@@ -88,42 +119,56 @@ function ContinueWatchingPageContent() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Continuer à regarder ({items.length})</h1>
+            <h1 className="text-2xl font-bold">
+              Continuer à regarder ({items.length})
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Vos séries suivies avec des épisodes restants
             </p>
           </div>
         </div>
 
-      <TitlesToolbar
-        search={page.search}
-        onSearchChange={page.setSearch}
-        viewMode={page.viewMode}
-        onViewModeChange={page.setViewMode}
-        actions={<EditMenuButton onEditContent={page.toggleEditing} editing={page.editing} />}
-        tableControls={
-          page.isTable
-            ? {
-                filtersOpen: page.filtersOpen,
-                onToggleFilters: page.toggleFilters,
-                columnsOpen: page.columnsOpen,
-                onToggleColumns: page.toggleColumns,
-              }
-            : undefined
-        }
-      />
-      {page.editing && (
-        <BulkEditPanel
-          action={page.action}
-          onActionChange={page.setAction}
-          selected={[...page.selectedIds].map((id) => ({ id, titleId: id }))}
-          selectableCount={filteredItems.length}
-          onSelectAll={() => page.selectAll(filteredItems.map((e) => e.title_id))}
-          onClearSelection={page.clearSelection}
-          onClose={page.stopEditing}
+        <TitlesToolbar
+          search={page.search}
+          onSearchChange={page.setSearch}
+          viewMode={page.viewMode}
+          onViewModeChange={page.setViewMode}
+          actions={
+            <EditMenuButton
+              onEditContent={page.toggleEditing}
+              editing={page.editing}
+            />
+          }
+          sortFilter={{
+            open: page.filtersOpen,
+            onToggle: page.toggleFilters,
+            activeCount: sortFilter.activeCount,
+          }}
+          tableControls={
+            page.isTable
+              ? {
+                  columnsOpen: page.columnsOpen,
+                  onToggleColumns: page.toggleColumns,
+                }
+              : undefined
+          }
         />
-      )}
-
+        {page.filtersOpen && !page.isTable && (
+          <TitlesSortFilterPanel state={sortFilter} />
+        )}
+        {page.editing && (
+          <BulkEditPanel
+            action={page.action}
+            onActionChange={page.setAction}
+            selected={[...page.selectedIds].map((id) => ({ id, titleId: id }))}
+            selectableCount={filteredItems.length}
+            onSelectAll={() =>
+              page.selectAll(filteredItems.map((e) => e.title_id))
+            }
+            onClearSelection={page.clearSelection}
+            onClose={page.stopEditing}
+          />
+        )}
 
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -152,7 +197,6 @@ function ContinueWatchingPageContent() {
             pageKey="continue-watching"
             search={page.search}
             selection={page.tableSelection}
-            filtersOpen={page.filtersOpen}
             columnsOpen={page.columnsOpen}
             titles={filteredItems.map((entry) => ({
               id: entry.title_id,
@@ -179,7 +223,12 @@ function ContinueWatchingPageContent() {
                   return (
                     <span className="text-xs">
                       <span className="font-medium">{code}</span>
-                      {e.episode_titre && <span className="text-muted-foreground"> · {e.episode_titre}</span>}
+                      {e.episode_titre && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {e.episode_titre}
+                        </span>
+                      )}
                     </span>
                   );
                 },
@@ -201,7 +250,9 @@ function ContinueWatchingPageContent() {
                 },
                 sortValue: (t) => {
                   const e = filteredItems.find((x) => x.title_id === t.id);
-                  return e && e.total_episodes ? e.episodes_vus / e.total_episodes : null;
+                  return e && e.total_episodes
+                    ? e.episodes_vus / e.total_episodes
+                    : null;
                 },
               },
               {
@@ -209,31 +260,36 @@ function ContinueWatchingPageContent() {
                 label: "Restants",
                 render: (t) => (
                   <span className="text-xs text-muted-foreground">
-                    {filteredItems.find((x) => x.title_id === t.id)?.episodes_restants ?? "—"}
+                    {filteredItems.find((x) => x.title_id === t.id)
+                      ?.episodes_restants ?? "—"}
                   </span>
                 ),
-                sortValue: (t) => filteredItems.find((x) => x.title_id === t.id)?.episodes_restants ?? null,
+                sortValue: (t) =>
+                  filteredItems.find((x) => x.title_id === t.id)
+                    ?.episodes_restants ?? null,
               },
             ]}
           />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {filteredItems.map((entry) => (
-              <div key={entry.title_id} className="relative">
-                {page.selecting && (
-                  <SelectionCheckbox
-                    selected={page.selectedIds.has(entry.title_id)}
-                    onToggle={() => page.toggleSelected(entry.title_id)}
+            {sortFilter
+              .apply(filteredItems, (e) => e.title_id)
+              .map((entry) => (
+                <div key={entry.title_id} className="relative">
+                  {page.selecting && (
+                    <SelectionCheckbox
+                      selected={page.selectedIds.has(entry.title_id)}
+                      onToggle={() => page.toggleSelected(entry.title_id)}
+                    />
+                  )}
+                  <ContinueWatchingCard
+                    entry={entry}
+                    inWatchlist={watchlistIds.has(entry.title_id)}
+                    inFavorites={favoriteIds.has(entry.title_id)}
+                    watchlistStatus={watchlistStatuses.get(entry.title_id)}
                   />
-                )}
-                <ContinueWatchingCard
-                  entry={entry}
-                  inWatchlist={watchlistIds.has(entry.title_id)}
-                  inFavorites={favoriteIds.has(entry.title_id)}
-                  watchlistStatus={watchlistStatuses.get(entry.title_id)}
-                />
-              </div>
-            ))}
+                </div>
+              ))}
           </div>
         )}
       </div>

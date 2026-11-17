@@ -6,7 +6,16 @@
 
 import type { ReactNode } from "react";
 import { TitleSearchResult } from "@/lib/types/api";
-import { emotionLabels } from "@/lib/watchContext";
+import { emotionLabels, emotionOption } from "@/lib/watchContext";
+import {
+  FilterAccessors,
+  FilterKind,
+  FilterOption,
+  FilterValue,
+  matchesFilter,
+  rangeBounds,
+  setOptions,
+} from "@/lib/columnFilters";
 
 export type TitleRowFlags = {
   watched?: boolean;
@@ -68,7 +77,18 @@ export type BaseColumn = {
   sortValue: ((row: TitleRow) => string | number | null) | null;
   /** Texte cherché par la recherche globale et le filtre texte. */
   text: (row: TitleRow) => string;
-  filter: "text" | "number" | null;
+  /**
+   * Filtre de la colonne (entonnoir de l'en-tête) : barre de recherche,
+   * curseur à deux bornes (`number`) ou liste de cases (`set`).
+   */
+  filter: FilterKind | null;
+  /** Filtre « plage » : valeur numérique, pas du curseur, format. */
+  number?: (row: TitleRow) => number | null;
+  step?: number;
+  format?: (n: number) => string;
+  /** Filtre « liste » : valeurs de la ligne et libellé d'une valeur. */
+  set?: (row: TitleRow) => string[];
+  setLabel?: (value: string) => string;
   defaultVisible: boolean;
 };
 
@@ -136,7 +156,8 @@ export const BASE_COLUMNS: BaseColumn[] = [
     label: "Sortie",
     sortValue: (r) => releaseYear(r.title),
     text: (r) => String(releaseYear(r.title) ?? ""),
-    filter: "number",
+    filter: "range",
+    number: (r) => releaseYear(r.title),
     defaultVisible: true,
   },
   {
@@ -144,7 +165,8 @@ export const BASE_COLUMNS: BaseColumn[] = [
     label: "Durée / épisodes",
     sortValue: lengthValue,
     text: (r) => String(lengthValue(r) ?? ""),
-    filter: "number",
+    filter: "range",
+    number: lengthValue,
     defaultVisible: true,
   },
   {
@@ -152,7 +174,9 @@ export const BASE_COLUMNS: BaseColumn[] = [
     label: "Ma note",
     sortValue: (r) => r.info?.notePerso ?? null,
     text: (r) => (r.info?.notePerso != null ? String(r.info.notePerso) : ""),
-    filter: "number",
+    filter: "range",
+    number: (r) => r.info?.notePerso ?? null,
+    step: 0.5,
     defaultVisible: true,
   },
   {
@@ -160,7 +184,8 @@ export const BASE_COLUMNS: BaseColumn[] = [
     label: "Type",
     sortValue: (r) => r.title.type,
     text: (r) => (r.title.type === "film" ? "Film" : "Série"),
-    filter: "text",
+    filter: "set",
+    set: (r) => [r.title.type === "film" ? "Film" : "Série"],
     defaultVisible: false,
   },
   {
@@ -168,7 +193,10 @@ export const BASE_COLUMNS: BaseColumn[] = [
     label: "Note IMDb",
     sortValue: (r) => (r.title.note != null ? Number(r.title.note) : null),
     text: (r) => (r.title.note != null ? String(r.title.note) : ""),
-    filter: "number",
+    filter: "range",
+    number: (r) => (r.title.note != null ? Number(r.title.note) : null),
+    step: 0.1,
+    format: (n) => n.toFixed(1),
     defaultVisible: false,
   },
   {
@@ -184,7 +212,8 @@ export const BASE_COLUMNS: BaseColumn[] = [
     label: "Genres",
     sortValue: (r) => lowerOrNull(genreNames(r).join(", ")),
     text: (r) => genreNames(r).join(", "),
-    filter: "text",
+    filter: "set",
+    set: genreNames,
     defaultVisible: false,
   },
   {
@@ -192,7 +221,8 @@ export const BASE_COLUMNS: BaseColumn[] = [
     label: "Pays",
     sortValue: (r) => lowerOrNull(countryNames(r).join(", ")),
     text: (r) => countryNames(r).join(", "),
-    filter: "text",
+    filter: "set",
+    set: countryNames,
     defaultVisible: false,
   },
   {
@@ -200,7 +230,12 @@ export const BASE_COLUMNS: BaseColumn[] = [
     label: "Émotions",
     sortValue: (r) => lowerOrNull(emotionLabels(r.emotions) ?? ""),
     text: (r) => emotionLabels(r.emotions) ?? "",
-    filter: "text",
+    filter: "set",
+    set: (r) => r.emotions ?? [],
+    setLabel: (v) => {
+      const o = emotionOption(v);
+      return o ? `${o.emoji} ${o.label}` : v;
+    },
     defaultVisible: false,
   },
 ];
@@ -222,24 +257,71 @@ export function rowMatchesSearch(
   return normalize(haystack).includes(q);
 }
 
-/**
- * Filtre d'une colonne : texte contenu (sans casse ni accents) ou minimum
- * pour une colonne numérique. Valeur vide = pas de filtre.
- */
-export function matchesColumnFilter(
-  value: string | number | null,
-  text: string,
-  kind: "text" | "number",
-  filter: string,
-): boolean {
-  const f = filter.trim();
-  if (!f) return true;
-  if (kind === "number") {
-    const min = Number(f.replace(",", "."));
-    if (Number.isNaN(min)) return true;
-    return typeof value === "number" && value >= min;
+/** Filtres actifs du tableau, par identifiant de colonne. */
+export type TitleFilters = Record<string, FilterValue>;
+
+/** Description du filtre d'une colonne (commune ou propre à la page). */
+export type ColumnFilterDef = {
+  id: string;
+  label: string;
+  kind: FilterKind;
+  accessors: FilterAccessors<TitleRow>;
+  step?: number;
+  format?: (n: number) => string;
+  setLabel?: (value: string) => string;
+};
+
+export function baseFilterDef(c: BaseColumn): ColumnFilterDef | null {
+  if (!c.filter) return null;
+  return {
+    id: c.id,
+    label: c.label,
+    kind: c.filter,
+    accessors: { text: c.text, number: c.number, set: c.set },
+    step: c.step,
+    format: c.format,
+    setLabel: c.setLabel,
+  };
+}
+
+/** Colonnes propres à la page : filtre texte sur leur valeur de tri. */
+export function extraFilterDef(c: ExtraColumn): ColumnFilterDef | null {
+  if (!c.sortValue) return null;
+  const value = c.sortValue;
+  return {
+    id: c.id,
+    label: c.label,
+    kind: "text",
+    accessors: { text: (r) => String(value(r.title) ?? "") },
+  };
+}
+
+/** Bornes (plage) ou valeurs proposées (liste) d'un filtre, d'après les lignes. */
+export function filterChoices(
+  def: ColumnFilterDef,
+  rows: TitleRow[],
+): { bounds?: [number, number] | null; options?: FilterOption[] } {
+  if (def.kind === "range" && def.accessors.number) {
+    return { bounds: rangeBounds(rows, def.accessors.number) };
   }
-  return normalize(text).includes(normalize(f));
+  if (def.kind === "set" && def.accessors.set) {
+    return { options: setOptions(rows, def.accessors.set, def.setLabel) };
+  }
+  return {};
+}
+
+export function applyFilters(
+  rows: TitleRow[],
+  filters: TitleFilters,
+  defs: ColumnFilterDef[],
+): TitleRow[] {
+  const active = Object.entries(filters)
+    .map(([id, value]) => ({ value, def: defs.find((d) => d.id === id) }))
+    .filter((f): f is { value: FilterValue; def: ColumnFilterDef } => !!f.def);
+  if (active.length === 0) return rows;
+  return rows.filter((row) =>
+    active.every(({ value, def }) => matchesFilter(row, value, def.accessors)),
+  );
 }
 
 /** Cycle du tri au clic sur un en-tête : croissant → décroissant → aucun. */

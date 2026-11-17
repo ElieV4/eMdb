@@ -31,6 +31,8 @@ import { TitlesToolbar } from "@/components/titles/TitlesToolbar";
 import { BulkEditPanel } from "@/components/common/BulkEditPanel";
 import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
 import { useTitlesPage } from "@/hooks/useTitlesPage";
+import { useTitleSortFilter } from "@/hooks/useTitleSortFilter";
+import { TitlesSortFilterPanel } from "@/components/titles/TitlesSortFilterPanel";
 import { withEmoji } from "@/components/common/EmojiPicker";
 import { rowMatchesSearch } from "@/lib/titlesTable";
 import { ListItemOverlay } from "@/components/lists/ListItemOverlay";
@@ -118,6 +120,13 @@ function ListDetailPageContent() {
     );
   };
 
+  // Vue affiches : tri et filtres du panneau « Trier / filtrer » (appelé
+  // avant les retours anticipés : règle des hooks).
+  const sortFilter = useTitleSortFilter(
+    (list?.items ?? []).map(titleToSearchResult),
+    page.filtersOpen && !page.isTable,
+  );
+
   if (isAuthLoading) {
     return (
       <div className="container mx-auto max-w-7xl px-4 py-12">
@@ -176,6 +185,8 @@ function ListDetailPageContent() {
     if (item.type === "film") return false;
     return (item.statut ?? "en_cours") === progressionFilter;
   });
+
+  const cardItems = sortFilter.apply(filteredItems, (i) => i.id);
 
   const groupCounts = new Map(
     groups.map((g) => [
@@ -280,17 +291,24 @@ function ListDetailPageContent() {
                 onDeleted={() => router.push("/lists")}
               />
             }
+            sortFilter={{
+              open: page.filtersOpen,
+              onToggle: page.toggleFilters,
+              activeCount: sortFilter.activeCount,
+            }}
             tableControls={
               page.isTable
                 ? {
-                    filtersOpen: page.filtersOpen,
-                    onToggleFilters: page.toggleFilters,
                     columnsOpen: page.columnsOpen,
                     onToggleColumns: page.toggleColumns,
                   }
                 : undefined
             }
           />
+        )}
+
+        {list && page.filtersOpen && !page.isTable && (
+          <TitlesSortFilterPanel state={sortFilter} />
         )}
 
         {list && page.editing && (
@@ -458,7 +476,6 @@ function ListDetailPageContent() {
             pageKey="list"
             search={page.search}
             selection={page.tableSelection}
-            filtersOpen={page.filtersOpen}
             columnsOpen={page.columnsOpen}
             titles={filteredItems.map(titleToSearchResult)}
             flagsOf={(t) => ({
@@ -587,7 +604,7 @@ function ListDetailPageContent() {
           />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {filteredItems.map((title) => (
+            {cardItems.map((title) => (
               <div key={title.id} className="relative">
                 {page.selecting && (
                   <SelectionCheckbox

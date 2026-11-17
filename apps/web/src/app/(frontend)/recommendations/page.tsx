@@ -26,6 +26,8 @@ import { TitlesToolbar } from "@/components/titles/TitlesToolbar";
 import { EditMenuButton } from "@/components/common/EditMenuButton";
 import { BulkEditPanel } from "@/components/common/BulkEditPanel";
 import { useTitlesPage } from "@/hooks/useTitlesPage";
+import { useTitleSortFilter } from "@/hooks/useTitleSortFilter";
+import { TitlesSortFilterPanel } from "@/components/titles/TitlesSortFilterPanel";
 import { rowMatchesSearch } from "@/lib/titlesTable";
 import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
 import { useEffect, useState, Suspense } from "react";
@@ -79,22 +81,37 @@ function RecommendationsPageContent() {
     setLimit(INITIAL_LIMIT);
   }, [filtersKey]);
 
-  const { data: recommendations, isLoading, isFetching } = useRecommendations(
-    limit,
-    filters.appreciesFr,
-  );
+  const {
+    data: recommendations,
+    isLoading,
+    isFetching,
+  } = useRecommendations(limit, filters.appreciesFr);
   const { data: watchedTitles } = useWatchedTitles();
   const page = useTitlesPage("recommendations");
   const { watchlistIds, favoriteIds } = useListMembership();
   const { data: userLists } = useLists(isAuthenticated);
   const listIdsByTitle = buildListIdsByTitle(userLists);
 
-  const filteredRecommendations = (recommendations ?? []).filter((title) =>
-    rowMatchesSearch({ title: titleToSearchResult(title) }, page.search) &&
-    titleMatchesFilters(
-      toFilterableTitle(title, { watchedTitleIds: watchedTitles, listIdsByTitle }),
-      filters,
-    ),
+  const filteredRecommendations = (recommendations ?? []).filter(
+    (title) =>
+      rowMatchesSearch({ title: titleToSearchResult(title) }, page.search) &&
+      titleMatchesFilters(
+        toFilterableTitle(title, {
+          watchedTitleIds: watchedTitles,
+          listIdsByTitle,
+        }),
+        filters,
+      ),
+  );
+
+  // Vue affiches : tri et filtres du panneau « Trier / filtrer ».
+  const sortFilter = useTitleSortFilter(
+    filteredRecommendations.map(titleToSearchResult),
+    page.filtersOpen && !page.isTable,
+  );
+  const cardRecommendations = sortFilter.apply(
+    filteredRecommendations,
+    (t) => t.id,
   );
 
   // Le backend recalcule un classement complet pour `limit` — s'il a
@@ -132,34 +149,47 @@ function RecommendationsPageContent() {
         </p>
       </div>
       <div className="mb-6 space-y-3">
-      <TitlesToolbar
-        search={page.search}
-        onSearchChange={page.setSearch}
-        viewMode={page.viewMode}
-        onViewModeChange={page.setViewMode}
-        actions={<EditMenuButton onEditContent={page.toggleEditing} editing={page.editing} />}
-        tableControls={
-          page.isTable
-            ? {
-                filtersOpen: page.filtersOpen,
-                onToggleFilters: page.toggleFilters,
-                columnsOpen: page.columnsOpen,
-                onToggleColumns: page.toggleColumns,
-              }
-            : undefined
-        }
-      />
-      {page.editing && (
-        <BulkEditPanel
-          action={page.action}
-          onActionChange={page.setAction}
-          selected={[...page.selectedIds].map((id) => ({ id, titleId: id }))}
-          selectableCount={filteredRecommendations.length}
-          onSelectAll={() => page.selectAll(filteredRecommendations.map((t) => t.id))}
-          onClearSelection={page.clearSelection}
-          onClose={page.stopEditing}
+        <TitlesToolbar
+          search={page.search}
+          onSearchChange={page.setSearch}
+          viewMode={page.viewMode}
+          onViewModeChange={page.setViewMode}
+          actions={
+            <EditMenuButton
+              onEditContent={page.toggleEditing}
+              editing={page.editing}
+            />
+          }
+          sortFilter={{
+            open: page.filtersOpen,
+            onToggle: page.toggleFilters,
+            activeCount: sortFilter.activeCount,
+          }}
+          tableControls={
+            page.isTable
+              ? {
+                  columnsOpen: page.columnsOpen,
+                  onToggleColumns: page.toggleColumns,
+                }
+              : undefined
+          }
         />
-      )}
+        {page.filtersOpen && !page.isTable && (
+          <TitlesSortFilterPanel state={sortFilter} />
+        )}
+        {page.editing && (
+          <BulkEditPanel
+            action={page.action}
+            onActionChange={page.setAction}
+            selected={[...page.selectedIds].map((id) => ({ id, titleId: id }))}
+            selectableCount={filteredRecommendations.length}
+            onSelectAll={() =>
+              page.selectAll(filteredRecommendations.map((t) => t.id))
+            }
+            onClearSelection={page.clearSelection}
+            onClose={page.stopEditing}
+          />
+        )}
       </div>
 
       {isLoading ? (
@@ -178,7 +208,6 @@ function RecommendationsPageContent() {
               pageKey="recommendations"
               search={page.search}
               selection={page.tableSelection}
-              filtersOpen={page.filtersOpen}
               columnsOpen={page.columnsOpen}
               titles={filteredRecommendations.map(titleToSearchResult)}
               flagsOf={(t) => ({
@@ -188,25 +217,25 @@ function RecommendationsPageContent() {
               })}
             />
           ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {filteredRecommendations.map((title) => (
-              <div key={title.id} className="relative">
-              {page.selecting && (
-                <SelectionCheckbox
-                  selected={page.selectedIds.has(title.id)}
-                  onToggle={() => page.toggleSelected(title.id)}
-                />
-              )}
-              <TitleCard
-                title={titleToSearchResult(title)}
-                compact
-                watched={watchedTitles?.has(title.id)}
-                inWatchlist={watchlistIds.has(title.id)}
-                inFavorites={favoriteIds.has(title.id)}
-              />
-              </div>
-            ))}
-          </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {cardRecommendations.map((title) => (
+                <div key={title.id} className="relative">
+                  {page.selecting && (
+                    <SelectionCheckbox
+                      selected={page.selectedIds.has(title.id)}
+                      onToggle={() => page.toggleSelected(title.id)}
+                    />
+                  )}
+                  <TitleCard
+                    title={titleToSearchResult(title)}
+                    compact
+                    watched={watchedTitles?.has(title.id)}
+                    inWatchlist={watchlistIds.has(title.id)}
+                    inFavorites={favoriteIds.has(title.id)}
+                  />
+                </div>
+              ))}
+            </div>
           )}
 
           {canLoadMore && (
@@ -214,7 +243,9 @@ function RecommendationsPageContent() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setLimit((l) => Math.min(l + LOAD_MORE_STEP, MAX_LIMIT))}
+                onClick={() =>
+                  setLimit((l) => Math.min(l + LOAD_MORE_STEP, MAX_LIMIT))
+                }
                 disabled={isFetching}
               >
                 {isFetching ? "Chargement..." : "Charger plus"}
