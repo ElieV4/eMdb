@@ -26,6 +26,9 @@ import { ListActionsMenu } from "@/components/lists/ListActionsMenu";
 import { ListReorder } from "@/components/lists/ListReorder";
 import { ListGroupsBar } from "@/components/lists/ListGroupsBar";
 import { ListQuickAdd } from "@/components/lists/ListQuickAdd";
+import { TitlesTable } from "@/components/titles/TitlesTable";
+import { ViewModeToggle } from "@/components/titles/ViewModeToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 import { ListItemOverlay } from "@/components/lists/ListItemOverlay";
 import { ItemGroupsDialog } from "@/components/lists/ItemGroupsDialog";
 import { ItemCommentsDialog } from "@/components/lists/ItemCommentsDialog";
@@ -83,6 +86,7 @@ function ListDetailPageContent() {
   const [rangerItemId, setRangerItemId] = useState<string | null>(null);
   const [commentsItemId, setCommentsItemId] = useState<string | null>(null);
   const setItemVu = useSetItemVu();
+  const [viewMode, setViewMode] = useViewMode("list");
 
   const filters = parseTitleFilters(searchParams);
   const listIdsByTitle = buildListIdsByTitle(allLists);
@@ -155,6 +159,13 @@ function ListDetailPageContent() {
   const rangerItem = items.find((i) => i.id === rangerItemId) ?? null;
   const commentsItem = items.find((i) => i.id === commentsItemId) ?? null;
   const canEditItems = list?.capabilities.canEditItems ?? false;
+  const groupNames = (ids: string[]) =>
+    groups
+      .filter((g) => ids.includes(g.id))
+      .map((g) => g.nom)
+      .join(", ");
+  const commentCountOf = (item?: (typeof items)[number]) =>
+    item ? (item.commentCount ?? 0) + (item.memberComments?.length ?? 0) + (item.myComment ? 1 : 0) : 0;
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
@@ -304,6 +315,12 @@ function ListDetailPageContent() {
           </div>
         )}
 
+        {!editMode && !isLoading && !error && items.length > 0 && (
+          <div className="flex justify-end">
+            <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+          </div>
+        )}
+
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -341,6 +358,89 @@ function ListDetailPageContent() {
               ? "Aucun titre rangé dans ce sous-groupe ne correspond aux filtres actifs."
               : "Aucun titre de cette liste ne correspond aux filtres actifs."}
           </p>
+        ) : viewMode === "tableau" ? (
+          <TitlesTable
+            titles={filteredItems.map(titleToSearchResult)}
+            flagsOf={(t) => ({
+              watched: watchedTitles?.has(t.id),
+              inWatchlist: watchlistIds.has(t.id),
+              inFavorites: favoriteIds.has(t.id),
+            })}
+            extraColumns={[
+              ...(isShared
+                ? [
+                    {
+                      id: "vuListe",
+                      label: "Vu dans la liste",
+                      sortValue: (t: TitleSearchResult) =>
+                        filteredItems.find((i) => i.id === t.id)?.vu ? 1 : 0,
+                      render: (t: TitleSearchResult) => {
+                        const item = filteredItems.find((i) => i.id === t.id);
+                        if (!item) return null;
+                        return canEditItems && list ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setItemVu.mutate({ listId: list.id, titleId: item.id, vu: !item.vu })
+                            }
+                            className={cn(
+                              "rounded-full border px-2 py-0.5 text-xs",
+                              item.vu ? "border-emerald-600 text-emerald-500" : "text-muted-foreground",
+                            )}
+                            aria-label={`${item.vu ? "Marquer comme pas vu" : "Marquer comme vu"} dans la liste : ${item.titre}`}
+                          >
+                            {item.vu ? "Vu" : "Pas vu"}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">{item.vu ? "Vu" : "Pas vu"}</span>
+                        );
+                      },
+                    },
+                  ]
+                : []),
+              ...(groups.length > 0
+                ? [
+                    {
+                      id: "groupes",
+                      label: "Sous-groupes",
+                      sortValue: (t: TitleSearchResult) =>
+                        groupNames(filteredItems.find((i) => i.id === t.id)?.groupIds ?? []) || null,
+                      render: (t: TitleSearchResult) => {
+                        const item = filteredItems.find((i) => i.id === t.id);
+                        const names = groupNames(item?.groupIds ?? []);
+                        return canEditItems ? (
+                          <button
+                            type="button"
+                            onClick={() => setRangerItemId(t.id)}
+                            className="text-left text-xs text-muted-foreground hover:text-foreground"
+                            aria-label={`Ranger dans des sous-groupes : ${t.titre}`}
+                          >
+                            {names || "Ranger…"}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">{names || "—"}</span>
+                        );
+                      },
+                    },
+                  ]
+                : []),
+              {
+                id: "commentaires",
+                label: "Commentaires",
+                sortValue: (t: TitleSearchResult) => commentCountOf(filteredItems.find((i) => i.id === t.id)),
+                render: (t: TitleSearchResult) => (
+                  <button
+                    type="button"
+                    onClick={() => setCommentsItemId(t.id)}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    aria-label={`Commentaires : ${t.titre}`}
+                  >
+                    {commentCountOf(filteredItems.find((i) => i.id === t.id)) || "Écrire"}
+                  </button>
+                ),
+              },
+            ]}
+          />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {filteredItems.map((title) => (
@@ -365,11 +465,7 @@ function ListDetailPageContent() {
                   showRanger={canEditItems && groups.length > 0}
                   onRanger={() => setRangerItemId(title.id)}
                   onComments={() => setCommentsItemId(title.id)}
-                  commentCount={
-                    (title.commentCount ?? 0) +
-                    (title.memberComments?.length ?? 0) +
-                    (title.myComment ? 1 : 0)
-                  }
+                  commentCount={commentCountOf(title)}
                 />
               </div>
             ))}

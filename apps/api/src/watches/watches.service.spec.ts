@@ -382,6 +382,35 @@ describe('WatchesService', () => {
       });
     });
 
+    it('dédoublonne réalisateurs, studios et genres présents plusieurs fois en base', async () => {
+      // La table credits contient des lignes en double (synchro TMDB) :
+      // Surf's Up avait 7 fois Ash Brannon et 7 fois Chris Buck.
+      prismaServiceMock.credits.findMany.mockResolvedValue([
+        { title_id: 'film-1', people: { id: 'p1', nom: 'Ash Brannon' } },
+        { title_id: 'film-1', people: { id: 'p2', nom: 'Chris Buck' } },
+        { title_id: 'film-1', people: { id: 'p1', nom: 'Ash Brannon' } },
+        { title_id: 'film-1', people: { id: 'p2', nom: 'Chris Buck' } },
+        { title_id: 'film-1', people: { id: 'p1', nom: 'Ash Brannon' } },
+      ]);
+      prismaServiceMock.title_studios.findMany.mockResolvedValue([
+        { title_id: 'film-1', studios: { id: 's1', nom: 'Sony Pictures Animation' } },
+        { title_id: 'film-1', studios: { id: 's1', nom: 'Sony Pictures Animation' } },
+      ]);
+      prismaServiceMock.title_genres.findMany.mockResolvedValue([
+        { title_id: 'film-1', genres: { nom: 'Animation' } },
+        { title_id: 'film-1', genres: { nom: 'Animation' } },
+      ]);
+
+      const { rows } = await service.getHistoryTable(userId);
+
+      expect(rows[0].realisateurs).toEqual([
+        { id: 'p1', nom: 'Ash Brannon' },
+        { id: 'p2', nom: 'Chris Buck' },
+      ]);
+      expect(rows[0].studios).toEqual([{ id: 's1', nom: 'Sony Pictures Animation' }]);
+      expect(rows[0].genres).toEqual(['Animation']);
+    });
+
     it("pour un épisode : la série porte la ligne, note et commentaire sont ceux de l'épisode", async () => {
       const { rows } = await service.getHistoryTable(userId);
 

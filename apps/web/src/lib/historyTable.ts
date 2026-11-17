@@ -239,11 +239,12 @@ export const COLUMNS: ColumnDef[] = [
   },
 ];
 
-export const DEFAULT_HIDDEN_COLUMNS: ColumnId[] = [
-  "type",
-  "studios",
-  "compagnie",
-];
+/** Colonnes visibles par défaut : titre, réalisation, sortie, ma note. */
+export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = ["titre", "realisateurs", "dateSortie", "notePerso"];
+
+export const DEFAULT_HIDDEN_COLUMNS: ColumnId[] = COLUMNS.map((c) => c.id).filter(
+  (id) => !DEFAULT_VISIBLE_COLUMNS.includes(id),
+);
 
 // --- Regroupement par série -------------------------------------------------
 

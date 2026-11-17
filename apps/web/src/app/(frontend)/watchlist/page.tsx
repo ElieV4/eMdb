@@ -19,6 +19,9 @@ import { useWatchedTitles, useListMembership } from "@/hooks/api";
 import { useProgressiveReveal } from "@/hooks/useProgressiveReveal";
 import { useSelectionMode } from "@/hooks/useSelectionMode";
 import { TitleCard } from "@/components/titles/TitleCard";
+import { TitlesTable } from "@/components/titles/TitlesTable";
+import { ViewModeToggle } from "@/components/titles/ViewModeToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -55,6 +58,7 @@ function titleToSearchResult(title: Title): TitleSearchResult {
 
 function WatchlistPageContent() {
   const searchParams = useSearchParams();
+  const [viewMode, setViewMode] = useViewMode("watchlist");
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const { data: lists, isLoading: isListsLoading } = useLists(isAuthenticated);
   const watchlistId = lists?.find((list) => list.type === "watchlist")?.id;
@@ -82,6 +86,13 @@ function WatchlistPageContent() {
   // `if (...) return` d'authentification ci-dessous.
   const listIdsByTitle = buildListIdsByTitle(lists);
   const items = watchlist?.items ?? [];
+  const PROGRESSION_LABELS: Record<string, string> = {
+    a_jour: "À jour",
+    en_cours: "En cours",
+    abandonnee: "Abandonnée",
+  };
+  const progressionOf = (titleId: string) =>
+    PROGRESSION_LABELS[items.find((i) => i.id === titleId)?.statut ?? "en_cours"] ?? "En cours";
   const filteredItems = items.filter((item) => {
     if (!titleMatchesFilters(
       toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
@@ -142,6 +153,7 @@ function WatchlistPageContent() {
         )}
 
         {/* Filtres de progression — sélectionner une option retire les films */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
           {[
             { value: "tous", label: "Tous" },
@@ -173,6 +185,9 @@ function WatchlistPageContent() {
             </button>
           ))}
         </div>
+          {/* Sélection multiple : uniquement sur les affiches. */}
+          {!selectionMode && <ViewModeToggle mode={viewMode} onChange={setViewMode} />}
+        </div>
 
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -196,6 +211,26 @@ function WatchlistPageContent() {
           <p className="text-sm text-muted-foreground">
             Aucun titre de votre watchlist ne correspond aux filtres actifs.
           </p>
+        ) : viewMode === "tableau" && !selectionMode ? (
+          <TitlesTable
+            titles={filteredItems.map(titleToSearchResult)}
+            flagsOf={(t) => ({
+              watched: watchedTitles?.has(t.id),
+              inWatchlist: watchlistIds.has(t.id),
+              inFavorites: favoriteIds.has(t.id),
+            })}
+            extraColumns={[
+              {
+                id: "progression",
+                label: "Progression",
+                sortValue: (t) => (t.type === "serie" ? progressionOf(t.id) : null),
+                render: (t) =>
+                  t.type === "serie" ? (
+                    <span className="text-xs text-muted-foreground">{progressionOf(t.id)}</span>
+                  ) : null,
+              },
+            ]}
+          />
         ) : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">

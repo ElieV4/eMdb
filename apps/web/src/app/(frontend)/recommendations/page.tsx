@@ -21,6 +21,9 @@
 
 "use client";
 
+import { TitlesTable } from "@/components/titles/TitlesTable";
+import { ViewModeToggle } from "@/components/titles/ViewModeToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { TitleCard } from "@/components/titles/TitleCard";
@@ -77,6 +80,7 @@ function RecommendationsPageContent() {
     filters.appreciesFr,
   );
   const { data: watchedTitles } = useWatchedTitles();
+  const [viewMode, setViewMode] = useViewMode("recommendations");
   const { watchlistIds, favoriteIds } = useListMembership();
   const { data: userLists } = useLists(isAuthenticated);
   const listIdsByTitle = buildListIdsByTitle(userLists);
@@ -116,11 +120,14 @@ function RecommendationsPageContent() {
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Recommandés</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Suggestions basées sur vos goûts
-        </p>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Recommandés</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Suggestions basées sur vos goûts
+          </p>
+        </div>
+        <ViewModeToggle mode={viewMode} onChange={setViewMode} />
       </div>
 
       {isLoading ? (
@@ -134,6 +141,16 @@ function RecommendationsPageContent() {
         </div>
       ) : filteredRecommendations.length > 0 ? (
         <>
+          {viewMode === "tableau" ? (
+            <TitlesTable
+              titles={filteredRecommendations.map(titleToSearchResult)}
+              flagsOf={(t) => ({
+                watched: watchedTitles?.has(t.id),
+                inWatchlist: watchlistIds.has(t.id),
+                inFavorites: favoriteIds.has(t.id),
+              })}
+            />
+          ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {filteredRecommendations.map((title) => (
               <TitleCard
@@ -146,6 +163,7 @@ function RecommendationsPageContent() {
               />
             ))}
           </div>
+          )}
 
           {canLoadMore && (
             <div className="mt-6 flex justify-center">

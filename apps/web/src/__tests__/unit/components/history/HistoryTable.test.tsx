@@ -83,6 +83,9 @@ describe("HistoryTable", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     window.localStorage.clear();
+    // Toutes les colonnes visibles pour les tests d'édition et de filtre ;
+    // les colonnes par défaut ont leur propre test plus bas.
+    window.localStorage.setItem("emdb.historyTable.hiddenColumns.v2", "[]");
   });
 
   it("affiche une ligne par visionnage avec les colonnes principales", () => {
@@ -132,12 +135,17 @@ describe("HistoryTable", () => {
     expect(upsertRating).toHaveBeenCalledWith({ title_id: "t2", commentaire: "Drôle" }, expect.any(Object));
   });
 
-  it("colonnes masquées par défaut : type, studios, compagnie", () => {
+  it("colonnes par défaut : titre, réalisation, sortie, ma note", () => {
+    window.localStorage.clear();
     renderTable();
 
-    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
-    expect(headers).not.toContain("Studios");
-    expect(headers).not.toContain("Compagnie");
-    expect(headers).toContain("Réalisation");
+    const headers = screen
+      .getAllByRole("columnheader")
+      .map((h) => h.textContent?.trim())
+      .filter(Boolean);
+    expect(headers).toEqual(expect.arrayContaining(["Titre", "Réalisation", "Sortie", "Ma note"]));
+    for (const hidden of ["Vu le", "Studios", "Compagnie", "Support", "Commentaire", "Moyenne eMDB"]) {
+      expect(headers).not.toContain(hidden);
+    }
   });
 });

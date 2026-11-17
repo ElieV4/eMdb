@@ -707,9 +707,21 @@ export class WatchesService {
       }
       return map;
     };
-    const genresBy = group(genres, (g) => g.title_id, (g) => g.genres.nom);
-    const studiosBy = group(studios, (s) => s.title_id, (s) => s.studios);
-    const directorsBy = group(directors, (d) => d.title_id, (d) => d.people);
+    // Dédoublonnage : la table credits contient des lignes en double (même
+    // personne, même rôle, réinsérées à chaque synchro TMDB) — sans ça, un
+    // réalisateur apparaissait plusieurs fois (ex. Surf's Up, Pan's Labyrinth).
+    const uniqueBy = <T,>(items: T[], key: (i: T) => string) => [
+      ...new Map(items.map((i) => [key(i), i])).values(),
+    ];
+    const genresBy = new Map(
+      [...group(genres, (g) => g.title_id, (g) => g.genres.nom)].map(([k, v]) => [k, [...new Set(v)]]),
+    );
+    const studiosBy = new Map(
+      [...group(studios, (s) => s.title_id, (s) => s.studios)].map(([k, v]) => [k, uniqueBy(v, (x) => x.id)]),
+    );
+    const directorsBy = new Map(
+      [...group(directors, (d) => d.title_id, (d) => d.people)].map(([k, v]) => [k, uniqueBy(v, (x) => x.id)]),
+    );
     const listsBy = group(lists, (l) => l.title_id, (l) => l.user_lists);
     const avgBy = new Map(
       averages.map((a) => [
