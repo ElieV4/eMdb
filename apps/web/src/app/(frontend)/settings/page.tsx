@@ -21,6 +21,7 @@ import { FreeWatchSitesSection } from "@/components/settings/FreeWatchSitesSecti
 import { AccountRequestsSection } from "@/components/settings/AccountRequestsSection";
 import { WorkerSection } from "@/components/settings/WorkerSection";
 import { CommentsVisibilitySection } from "@/components/settings/CommentsVisibilitySection";
+import { ChangePasswordSection } from "@/components/settings/ChangePasswordSection";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -209,6 +210,8 @@ export default function SettingsPage() {
         <AccountRequestsSection />
 
         <WorkerSection />
+
+        <ChangePasswordSection />
 
         <section className="space-y-3 border-t pt-8">
           <h2 className="text-lg font-semibold flex items-center gap-2 text-destructive">

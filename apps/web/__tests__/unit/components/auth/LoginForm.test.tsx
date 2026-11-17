@@ -13,12 +13,22 @@ import { LoginForm } from "@/components/auth/LoginForm";
 
 // Mock useLogin
 const mockMutate = jest.fn();
+let mockLoginError: Error | null = null;
 jest.mock("@/hooks/auth/useLogin", () => ({
   useLogin: () => ({
     mutate: mockMutate,
     isPending: false,
-    isError: false,
-    error: null,
+    isError: !!mockLoginError,
+    error: mockLoginError,
+    isSuccess: false,
+  }),
+}));
+
+const mockResendMutate = jest.fn();
+jest.mock("@/hooks/auth/useResendVerification", () => ({
+  useResendVerification: () => ({
+    mutate: mockResendMutate,
+    isPending: false,
     isSuccess: false,
   }),
 }));
@@ -32,6 +42,7 @@ jest.mock("next/navigation", () => ({
 describe("LoginForm", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLoginError = null;
   });
 
   it("rend le formulaire avec email, password et bouton", () => {
@@ -113,5 +124,33 @@ describe("LoginForm", () => {
     render(<LoginForm />);
     fireEvent.click(screen.getByRole("button", { name: "Se connecter" }));
     expect(mockMutate).not.toHaveBeenCalled();
+  });
+
+  it("affiche un lien « Mot de passe oublié ? » vers /forgot-password", () => {
+    render(<LoginForm />);
+    expect(screen.getByRole("link", { name: "Mot de passe oublié ?" })).toHaveAttribute(
+      "href",
+      "/forgot-password",
+    );
+  });
+
+  it("propose de renvoyer l'email de confirmation si l'email n'est pas confirmé", () => {
+    mockLoginError = new Error(
+      "Votre compte n'est pas encore validé : confirmez votre adresse email via le lien qui vous a été envoyé.",
+    );
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Renvoyer l'email de confirmation" }));
+    expect(mockResendMutate).toHaveBeenCalledWith("user@example.com");
+  });
+
+  it("ne propose pas le renvoi pour un compte en attente de l'admin", () => {
+    mockLoginError = new Error("Votre compte n'est pas encore validé par l'administrateur.");
+    render(<LoginForm />);
+    expect(
+      screen.queryByRole("button", { name: "Renvoyer l'email de confirmation" }),
+    ).not.toBeInTheDocument();
   });
 });
