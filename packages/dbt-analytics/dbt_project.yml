@@ -11,6 +11,13 @@ clean-targets: ['target', 'dbt_packages']
 
 models:
   emdb_analytics:
+    # dbt recrée vues et tables à chaque build : on retire à chaque fois tout
+    # droit aux rôles de la Data API Supabase (anon / authenticated), qui
+    # n'existent que sur Supabase. Sans ça, une vue comme stg_user_watches
+    # (droits du propriétaire, contourne la RLS) serait lisible par quiconque
+    # a la clé publishable. Cf. migration 20261117120000_lock_down_supabase_data_api.
+    +post-hook:
+      - "DO $$ BEGIN IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN EXECUTE 'REVOKE ALL ON {{ this }} FROM anon, authenticated'; END IF; END $$"
     staging:
       +materialized: view
     intermediate:
