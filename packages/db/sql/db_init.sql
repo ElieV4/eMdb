@@ -22,15 +22,16 @@ CREATE TABLE users (
     password_hash   TEXT NOT NULL,
     pseudo          TEXT NOT NULL UNIQUE,
     avatar_url      TEXT,
-    -- 'pending' à l'inscription (en attente de validation par l'admin, cf.
+    -- 'unverified' à l'inscription (email pas encore confirmé), 'pending'
+    -- une fois l'email confirmé (en attente de validation par l'admin, cf.
     -- ADMIN_EMAILS), 'active' une fois approuvé, 'rejected' si refusé (login
-    -- bloqué dans les deux cas hors 'active', cf. auth.service.ts).
+    -- bloqué hors 'active', cf. auth.service.ts).
     -- NB : colonne du chantier "notifications push" (pas du chantier
     -- studios), incluse par erreur dans le commit 2ede937 en même temps que
     -- user_follows_studio — le code applicatif correspondant n'est pas
     -- encore committé au moment de cette note, et cette colonne n'a pas
     -- encore été appliquée en production.
-    status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('pending','active','rejected')),
+    status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('unverified','pending','active','rejected')),
     -- Commentaires perso visibles des membres de ses listes partagées
     -- (réglage, migration title_comments).
     commentaires_visibles BOOLEAN NOT NULL DEFAULT false,

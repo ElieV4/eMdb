@@ -10,10 +10,19 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Routes publiques : /login, /register, /titles/:id, /people/:id (fiches
+// Routes publiques : /login, /register, les liens reçus par email
+// (confirmation, mot de passe oublié), /titles/:id, /people/:id (fiches
 // consultables sans connexion). L'accueil ("/") n'en fait PAS partie : il
 // nécessite une connexion, comme toutes les autres pages.
-const PUBLIC_PATHS = ["/login", "/register", "/titles", "/people"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/register",
+  "/verify-email",
+  "/forgot-password",
+  "/reset-password",
+  "/titles",
+  "/people",
+];
 const COOKIE_NAME = "emdb_access_token";
 
 export async function middleware(request: NextRequest) {
