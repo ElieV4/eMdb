@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import {
   MoreVertical,
   BookmarkPlus,
@@ -64,6 +64,14 @@ import { useGetOrImportTitle } from "@/hooks/api/useGetOrImportTitle";
 import { cn } from "@/lib/utils";
 import { resolveWatchDateVue, WatchDateSelection } from "@/lib/watchDates";
 
+/** Entrée ajoutée par la page en fin de menu (ex. « Ranger dans des sous-groupes »). */
+export type QuickMenuItem = {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  onSelect: () => void;
+};
+
 type TitleQuickActionsMenuProps = {
   titleId?: string;
   episodeId?: string;
@@ -87,6 +95,8 @@ type TitleQuickActionsMenuProps = {
    * de poser le statut "abandonnee".
    */
   allowAbandonWithoutWatchlist?: boolean;
+  /** Entrées propres à la page, ajoutées en fin de menu. */
+  extraItems?: QuickMenuItem[];
   className?: string;
 };
 
@@ -102,6 +112,7 @@ export function TitleQuickActionsMenu({
   watched = false,
   watchlistStatus,
   allowAbandonWithoutWatchlist = false,
+  extraItems = [],
   className,
 }: TitleQuickActionsMenuProps) {
   const isEpisode = !!episodeId;
@@ -321,6 +332,20 @@ export function TitleQuickActionsMenu({
             <HistoryIcon className="mr-2 h-4 w-4" />
             Gérer l&apos;historique de visionnage
           </DropdownMenuItem>
+          {extraItems.length > 0 && <DropdownMenuSeparator />}
+          {extraItems.map((item) => (
+            <DropdownMenuItem
+              key={item.key}
+              onClick={() => {
+                setOpen(false);
+                item.onSelect();
+              }}
+              className="cursor-pointer"
+            >
+              {item.icon}
+              {item.label}
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
 

@@ -25,7 +25,28 @@ import { matchesFilter, rangeBounds, setOptions } from "@/lib/columnFilters";
 import { TitleSearchResult } from "@/lib/types/api";
 
 jest.mock("@/components/titles/TitleQuickActionsMenu", () => ({
-  TitleQuickActionsMenu: () => <button type="button">Actions rapides</button>,
+  TitleQuickActionsMenu: ({
+    extraItems = [],
+  }: {
+    extraItems?: { key: string; label: string; onSelect: () => void }[];
+  }) => (
+    <>
+      <button type="button">Actions rapides</button>
+      {extraItems.map((i) => (
+        <button key={i.key} type="button" onClick={i.onSelect}>
+          {i.label}
+        </button>
+      ))}
+    </>
+  ),
+}));
+const watchItems: { id: string; date_vue: string; emotion: string[] | null }[] = [];
+jest.mock("@/hooks/api/useWatches", () => ({
+  useWatches: () => ({ data: { items: watchItems }, isLoading: false }),
+}));
+const updateContext = jest.fn();
+jest.mock("@/hooks/api/useUpdateWatchContext", () => ({
+  useUpdateWatchContext: () => ({ mutate: updateContext }),
 }));
 jest.mock("@/components/titles/TitlePoster", () => ({
   TitlePoster: () => <span data-testid="poster" />,
@@ -209,6 +230,80 @@ describe("TitlesTable", () => {
     expect(
       screen.getByRole("button", { name: "Ma note pour The Office" }),
     ).toHaveTextContent("Noter");
+  });
+
+  it("colonne Émotions : badge « Noter » en pointillés quand vide, choix sur le dernier visionnage", async () => {
+    render(<TitlesTable titles={titles} pageKey="test" columnsOpen />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Émotions" }));
+
+    const empty = screen.getByRole("button", { name: "Émotions pour Annie Hall" });
+    expect(empty).toHaveTextContent("Noter");
+    expect(empty.className).toContain("border-dashed");
+
+    // Jamais vu : invite à marquer le titre comme vu.
+    fireEvent.click(empty);
+    expect(await screen.findByText(/Marquez d'abord le titre comme vu/)).toBeInTheDocument();
+  });
+
+  it("colonne Émotions : coche une émotion du dernier visionnage", async () => {
+    watchItems.push({ id: "w1", date_vue: "2026-11-01T20:00:00Z", emotion: null });
+    render(<TitlesTable titles={titles} pageKey="test" columnsOpen />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Émotions" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Émotions pour Annie Hall" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Joie/ }));
+    expect(updateContext).toHaveBeenCalledWith({ watchId: "w1", data: { emotion: ["joie"] } });
+    watchItems.length = 0;
+  });
+
+  it("ordre des colonnes : flèches du panneau et glisser-déposer, mémorisé", () => {
+    const headers = () =>
+      screen.getAllByRole("columnheader").map((h) => h.textContent?.trim()).filter(Boolean);
+    const { unmount } = render(<TitlesTable titles={titles} pageKey="test" columnsOpen />);
+    expect(headers().slice(0, 3)).toEqual(["Affiche", "Titre", "Réalisation"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Déplacer Réalisation vers la gauche" }));
+    expect(headers().slice(0, 3)).toEqual(["Affiche", "Réalisation", "Titre"]);
+
+    // Glisser « Sortie » sur « Affiche ».
+    const th = (name: string) =>
+      screen.getAllByRole("columnheader").find((h) => h.textContent?.trim() === name)!;
+    fireEvent.dragStart(th("Sortie"), { dataTransfer: { setData: jest.fn() } });
+    fireEvent.dragOver(th("Affiche"));
+    fireEvent.drop(th("Affiche"));
+    expect(headers().slice(0, 3)).toEqual(["Sortie", "Affiche", "Réalisation"]);
+    unmount();
+
+    render(<TitlesTable titles={titles} pageKey="test" columnsOpen />);
+    expect(headers().slice(0, 2)).toEqual(["Sortie", "Affiche"]);
+    fireEvent.click(screen.getByRole("button", { name: "Ordre par défaut" }));
+    expect(headers().slice(0, 2)).toEqual(["Affiche", "Titre"]);
+  });
+
+  it("largeur des colonnes : poignée au clavier, double-clic pour revenir en automatique", () => {
+    render(<TitlesTable titles={titles} pageKey="test" />);
+    const handle = screen.getByRole("separator", { name: "Redimensionner la colonne Titre" });
+    const th = handle.closest("th")!;
+
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    expect(th.style.width).not.toBe("");
+    fireEvent.doubleClick(handle);
+    expect(th.style.width).toBe("");
+  });
+
+  it("menu ⋮ de ligne : entrées propres à la page", () => {
+    const onSelect = jest.fn();
+    render(
+      <TitlesTable
+        titles={titles}
+        pageKey="test"
+        rowMenuItems={(t) => [
+          { key: "vu", label: `Marquer comme vu dans la liste ${t.titre}`, onSelect },
+        ]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Marquer comme vu dans la liste Annie Hall" }));
+    expect(onSelect).toHaveBeenCalled();
   });
 
   it("colonnes ajoutables : genres, pays, émotions", () => {

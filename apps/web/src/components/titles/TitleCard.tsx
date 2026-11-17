@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { Star } from "lucide-react";
 import { TitlePoster } from "./TitlePoster";
-import { TitleQuickActionsMenu } from "./TitleQuickActionsMenu";
+import { QuickMenuItem, TitleQuickActionsMenu } from "./TitleQuickActionsMenu";
 import { TitleWatchedButton } from "./TitleWatchedButton";
 import { TitleSearchResult } from "@/lib/types/api";
 import { buildEntityUrl, cn } from "@/lib/utils";
@@ -24,6 +24,8 @@ interface TitleCardProps {
   inFavorites?: boolean;
   /** Statut de progression dans la watchlist ("en_cours" / "a_jour" / "abandonnee"). */
   watchlistStatus?: "en_cours" | "a_jour" | "abandonnee";
+  /** Entrées propres à la page, ajoutées en fin du menu « ⋮ ». */
+  menuItems?: QuickMenuItem[];
 }
 
 export function TitleCard({
@@ -35,6 +37,7 @@ export function TitleCard({
   inWatchlist = false,
   inFavorites = false,
   watchlistStatus,
+  menuItems,
 }: TitleCardProps) {
   const {
     id,
@@ -84,6 +87,7 @@ export function TitleCard({
         inFavorites={inFavorites}
         watched={watched}
         watchlistStatus={watchlistStatus}
+        extraItems={menuItems}
         className="absolute top-2 right-2 z-30"
       />
       {/* Mini bouton "marquer comme vu" — sous le coin bas droit de

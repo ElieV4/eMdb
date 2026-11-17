@@ -12,6 +12,9 @@
  *   (sortie, durée, notes) ou liste de cases (type, genres, pays, émotions).
  * - Valeurs modifiables (ma note...) en badges ; réalisateurs cliquables ;
  *   titre français en infobulle du titre.
+ * - Ordre des colonnes : glisser-déposer des en-têtes ou flèches du panneau
+ *   « Colonnes » ; largeur : poignée au bord droit de l'en-tête. Mémorisés
+ *   par page.
  * - « Modifier le contenu » : colonne de cases à cocher tout à gauche.
  * - Recherche globale (barre d'outils) sur tous les champs.
  * - Réalisation, ma note et durée viennent de POST /titles/table-info
@@ -33,14 +36,20 @@ import {
   X,
 } from "lucide-react";
 import { TitlePoster } from "@/components/titles/TitlePoster";
-import { TitleQuickActionsMenu } from "@/components/titles/TitleQuickActionsMenu";
+import {
+  QuickMenuItem,
+  TitleQuickActionsMenu,
+} from "@/components/titles/TitleQuickActionsMenu";
 import { RatingBadgeMenu } from "@/components/ratings/RatingBadgeMenu";
+import { EmotionsBadgeMenu } from "@/components/ratings/EmotionsBadgeMenu";
 import { ColumnFilterPopover } from "@/components/common/ColumnFilterPopover";
+import { ColumnsPanel } from "@/components/common/ColumnsPanel";
+import { useColumnOrder } from "@/hooks/useColumnOrder";
+import { useColumnWidths } from "@/hooks/useColumnWidths";
 import { useTitlesTableInfo } from "@/hooks/api/useTitlesTableInfo";
 import { useTitleEmotions } from "@/hooks/api/useTitleEmotions";
 import { useUpsertRating } from "@/hooks/api/useUpsertRating";
 import { useProgressiveRows } from "@/hooks/useProgressiveRows";
-import { emotionEmojis, emotionLabels } from "@/lib/watchContext";
 import { formatDuration } from "@/lib/cardFormatting";
 import {
   BASE_COLUMNS,
@@ -84,6 +93,8 @@ type TitlesTableProps = {
     /** Coche (ou décoche) d'un coup toutes les lignes affichées. */
     onSetAll: (ids: string[], selected: boolean) => void;
   };
+  /** Entrées propres à la page, ajoutées au menu « ⋮ » de chaque ligne. */
+  rowMenuItems?: (title: TitleSearchResult) => QuickMenuItem[];
   className?: string;
 };
 
@@ -105,6 +116,7 @@ export function TitlesTable({
   search = "",
   columnsOpen = false,
   selection,
+  rowMenuItems,
   className,
 }: TitlesTableProps) {
   const [sort, setSort] = useState<SortState>(null);
@@ -153,6 +165,13 @@ export function TitlesTable({
     }
   };
   const isVisible = (id: string) => id === "titre" || visible.includes(id);
+  const columnOrder = useColumnOrder(
+    `emdb.titlesTable.columnOrder.${pageKey}`,
+    allColumns.map((c) => c.id),
+  );
+  const columnWidths = useColumnWidths(
+    `emdb.titlesTable.columnWidths.${pageKey}`,
+  );
 
   const rows: TitleRow[] = useMemo(
     () =>
@@ -213,10 +232,11 @@ export function TitlesTable({
 
   const visibleBase = baseColumns.filter((c) => isVisible(c.id));
   const visibleExtra = extraColumns.filter((c) => isVisible(c.id));
-  const columnIds = [
+  const columnIds = columnOrder.arrange([
     ...visibleBase.map((c) => c.id as string),
     ...visibleExtra.map((c) => c.id),
-  ];
+  ]);
+  const extraById = new Map(visibleExtra.map((c) => [c.id, c]));
   const labelOf = (id: string) =>
     allColumns.find((c) => c.id === id)?.label ?? id;
   const sortable = (id: string) => {
@@ -324,10 +344,12 @@ export function TitlesTable({
           </span>
         );
       case "emotions":
-        return row.emotions?.length ? (
-          <span title={emotionLabels(row.emotions) ?? undefined}>
-            {emotionEmojis(row.emotions)}
-          </span>
+        return title.local ? (
+          <EmotionsBadgeMenu
+            titleId={title.id}
+            titleName={title.titre}
+            emotions={row.emotions}
+          />
         ) : (
           <span className="text-muted-foreground">—</span>
         );
@@ -372,26 +394,15 @@ export function TitlesTable({
   return (
     <div className={cn("space-y-3", className)}>
       {columnsOpen && (
-        <fieldset className="flex flex-wrap gap-x-4 gap-y-2 rounded-lg border p-3">
-          <legend className="px-1 text-xs text-muted-foreground">
-            Colonnes affichées
-          </legend>
-          {allColumns.map((c) => (
-            <label
-              key={c.id}
-              className="inline-flex items-center gap-1.5 text-sm"
-            >
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-primary"
-                checked={isVisible(c.id)}
-                disabled={c.id === "titre"}
-                onChange={() => toggleColumn(c.id)}
-              />
-              {c.label}
-            </label>
-          ))}
-        </fieldset>
+        <ColumnsPanel
+          columns={columnOrder
+            .arrange(allColumns.map((c) => c.id))
+            .map((id) => ({ id, label: labelOf(id) }))}
+          isVisible={isVisible}
+          onToggle={toggleColumn}
+          onShift={(id, delta) => columnOrder.shift(id, delta)}
+          onResetOrder={columnOrder.isCustom ? columnOrder.reset : undefined}
+        />
       )}
 
       {activeFilters > 0 && (
@@ -429,8 +440,11 @@ export function TitlesTable({
                   <th
                     key={id}
                     scope="col"
-                    className="px-2 py-2 font-medium whitespace-nowrap"
+                    {...columnOrder.headerProps(id)}
+                    style={columnWidths.styleOf(id)}
+                    className="relative cursor-grab px-2 py-2 font-medium whitespace-nowrap data-[drop-target]:bg-primary/10"
                   >
+                    <span {...columnWidths.handleProps(id, labelOf(id))} />
                     {id === "affiche" ? (
                       <span className="sr-only">{labelOf(id)}</span>
                     ) : (
@@ -507,22 +521,23 @@ export function TitlesTable({
                         />
                       </td>
                     )}
-                    {visibleBase.map((c) => (
-                      <td
-                        key={c.id}
-                        className={cn(
-                          "px-2 py-2 align-middle",
-                          c.id === "affiche" && "w-10",
-                        )}
-                      >
-                        {baseCell(c.id, row, flags)}
-                      </td>
-                    ))}
-                    {visibleExtra.map((c) => (
-                      <td key={c.id} className="px-2 py-2 align-middle">
-                        {c.render(row.title)}
-                      </td>
-                    ))}
+                    {columnIds.map((id) => {
+                      const extra = extraById.get(id);
+                      return (
+                        <td
+                          key={id}
+                          style={columnWidths.styleOf(id)}
+                          className={cn(
+                            "px-2 py-2 align-middle",
+                            id === "affiche" && "w-10",
+                          )}
+                        >
+                          {extra
+                            ? extra.render(row.title)
+                            : baseCell(id as BaseColumnId, row, flags)}
+                        </td>
+                      );
+                    })}
                     <td className="px-2 py-2 text-right align-middle">
                       <TitleQuickActionsMenu
                         titleId={row.title.id}
@@ -533,6 +548,7 @@ export function TitlesTable({
                         inWatchlist={flags.inWatchlist}
                         inFavorites={flags.inFavorites}
                         watched={flags.watched}
+                        extraItems={rowMenuItems?.(row.title)}
                         className="bg-transparent hover:bg-muted [&_svg]:text-muted-foreground"
                       />
                     </td>

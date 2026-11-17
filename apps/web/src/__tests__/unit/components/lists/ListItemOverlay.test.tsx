@@ -1,5 +1,6 @@
 /**
- * Tests unitaires pour ListItemOverlay : "vu dans la liste" et "Ranger".
+ * Tests unitaires pour ListItemOverlay : "vu dans la liste" (Ranger et
+ * Commentaires sont dans le menu « ⋮ » de l'affiche).
  */
 
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -11,8 +12,6 @@ const base = {
   vu: false,
   canEdit: true,
   onToggleVu: jest.fn(),
-  showRanger: false,
-  onRanger: jest.fn(),
 };
 
 describe("ListItemOverlay", () => {
@@ -43,20 +42,8 @@ describe("ListItemOverlay", () => {
     expect(screen.queryByLabelText(/Vu dans la liste/)).not.toBeInTheDocument();
   });
 
-  it("bouton commentaires avec compteur", () => {
-    const onComments = jest.fn();
-    render(<ListItemOverlay {...base} showVu={false} onComments={onComments} commentCount={3} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Commentaires : Match Point (3)" }));
-    expect(onComments).toHaveBeenCalled();
-    expect(screen.getByText("3")).toBeInTheDocument();
-  });
-
-  it("ouvre le rangement en sous-groupes", () => {
-    render(<ListItemOverlay {...base} showVu={false} showRanger />);
-
-    fireEvent.click(screen.getByRole("button", { name: /Ranger dans des sous-groupes/ }));
-
-    expect(base.onRanger).toHaveBeenCalled();
+  it("liste non partagée : aucun bouton sur l'affiche", () => {
+    const { container } = render(<ListItemOverlay {...base} showVu={false} />);
+    expect(container).toBeEmptyDOMElement();
   });
 });
