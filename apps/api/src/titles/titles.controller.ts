@@ -7,6 +7,8 @@ import {
   NotFoundException,
   Param,
   Patch,
+  Post,
+  Body,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -14,10 +16,24 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TitlesService } from './titles.service';
 import { SearchTitlesDto } from './dto/search-titles.dto';
 import { ListTitlesFilterDto } from './dto/list-titles-filter.dto';
+import { TableInfoDto } from './dto/table-info.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/auth.service';
 
 @Controller('titles')
 export class TitlesController {
   constructor(private readonly titlesService: TitlesService) {}
+
+  /**
+   * Colonnes de la vue tableau des pages de titres : réalisation, ma note,
+   * durée ou nombre d'épisodes, pour les titres demandés (titres locaux).
+   */
+  @Post('table-info')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async tableInfo(@CurrentUser() user: AuthenticatedUser, @Body() body: TableInfoDto) {
+    return this.titlesService.getTableInfo(user.id, body.title_ids);
+  }
 
   @Get('search')
   async search(@Query() query: SearchTitlesDto) {

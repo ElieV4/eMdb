@@ -9,30 +9,28 @@
 
 "use client";
 
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useInfiniteWatches } from "@/hooks/api/useInfiniteWatches";
 import { useLists } from "@/hooks/api/useLists";
 import { useWatchedTitles } from "@/hooks/api/useWatchedTitles";
 import { useListMembership } from "@/hooks/api/useListMembership";
-import { useSelectionMode } from "@/hooks/useSelectionMode";
+import { useTitlesPage } from "@/hooks/useTitlesPage";
+import { useCreateWatch } from "@/hooks/api/useCreateWatch";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { PeriodFilter } from "@/components/common/PeriodFilter";
 import { DateCard } from "@/components/common/DateCard";
 import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
-import { BulkActionsBar } from "@/components/common/BulkActionsBar";
+import { BulkEditPanel } from "@/components/common/BulkEditPanel";
+import { EditMenuButton } from "@/components/common/EditMenuButton";
+import { TitlesToolbar, ToolbarIconButton } from "@/components/titles/TitlesToolbar";
+import { ListQuickAdd } from "@/components/lists/ListQuickAdd";
+import { normalize } from "@/lib/titlesTable";
 import { TitleQuickActionsMenu } from "@/components/titles/TitleQuickActionsMenu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import {
-  AlertCircle,
-  CalendarDays,
-  ListChecks,
-  Star,
-  Table2,
-} from "lucide-react";
+import { AlertCircle, Plus, Star } from "lucide-react";
 import { HistoryTable } from "@/components/history/HistoryTable";
 import { parseTitleFilters, buildListIdsByTitle } from "@/lib/titleFilters";
 import { groupByPeriod, Period } from "@/lib/periodGrouping";
@@ -53,7 +51,12 @@ function HistoryPageContent() {
   const filters = parseTitleFilters(searchParams);
   const period = (searchParams.get("period") as Period | null) || "semaine";
   // Vue : "par date" (défaut, cartes groupées par période) ou "tableau".
-  const isTable = searchParams.get("vue") === "tableau";
+  const page = useTitlesPage("history");
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const createWatch = useCreateWatch();
+  // Vue tableau : dans l'URL (?vue=tableau). « Modifier le contenu » se fait
+  // sur la vue par date (sélection sur les cartes).
+  const isTable = searchParams.get("vue") === "tableau" && !page.editing;
   const {
     data,
     isLoading,
@@ -69,15 +72,10 @@ function HistoryPageContent() {
   const { data: lists } = useLists(isAuthenticated);
   const listIdsByTitle = buildListIdsByTitle(lists);
   const { data: watchedTitles } = useWatchedTitles();
-  const { watchlistIds, favoriteIds, watchlistId, favorisId } =
-    useListMembership();
-  const {
-    selectionMode,
-    selectedIds,
-    toggleSelectionMode,
-    toggleSelected,
-    clearSelection,
-  } = useSelectionMode();
+  const { watchlistIds, favoriteIds } = useListMembership();
+  const selectionMode = page.selecting;
+  const selectedIds = page.selectedIds;
+  const toggleSelected = page.toggleSelected;
 
   // Charge la page suivante dès que la sentinelle en bas de liste entre
   // dans le viewport — l'historique complet se charge ainsi au fur et à
@@ -142,8 +140,17 @@ function HistoryPageContent() {
   // Filtre "Listes", "vu / tout / non vu" et "Date de visionnage" (menu
   // filtres, modification O) : appliqués côté client, les visionnages
   // n'étant filtrables côté serveur que par type.
+  const searchQuery = normalize(page.search.trim());
   const filteredWatches = allWatches.filter((watch) => {
     if (filters.watchedStatus === "non_vu") return false; // tout l'historique est déjà "vu"
+
+    if (searchQuery) {
+      const t = watch.titles ?? watch.episodes?.seasons.titles;
+      const text = [t?.titre_vf, t?.titre_vo, watch.episodes?.titre, new Date(watch.date_vue).toLocaleDateString("fr-FR")]
+        .filter(Boolean)
+        .join(" ");
+      if (!normalize(text).includes(searchQuery)) return false;
+    }
 
     if (filters.listIds.length > 0) {
       const watchLists = listIdsByTitle.get(watch.title_id) ?? [];
@@ -206,59 +213,64 @@ function HistoryPageContent() {
               Vos derniers visionnages
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div
-              className="flex gap-1 rounded-lg border p-1"
-              role="group"
-              aria-label="Vue de l'historique"
-            >
-              {[
-                { table: false, label: "Par date", Icon: CalendarDays },
-                { table: true, label: "Tableau", Icon: Table2 },
-              ].map(({ table, label, Icon }) => (
-                <button
-                  key={label}
-                  type="button"
-                  aria-pressed={isTable === table}
-                  onClick={() => setView(table)}
-                  className={
-                    isTable === table
-                      ? "inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-white"
-                      : "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
-                  }
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {label}
-                </button>
-              ))}
-            </div>
-            {!isTable && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={toggleSelectionMode}
-              >
-                <ListChecks className="mr-2 h-4 w-4" />
-                {selectionMode ? "Terminer" : "Modifier le contenu"}
-              </Button>
-            )}
-          </div>
         </div>
 
+        <TitlesToolbar
+          search={page.search}
+          onSearchChange={page.setSearch}
+          viewMode={isTable ? "tableau" : "affiches"}
+          onViewModeChange={(mode) => setView(mode === "tableau")}
+          affichesLabel="Vue par date"
+          actions={
+            <>
+              <ToolbarIconButton
+                label={quickAddOpen ? "Masquer l'ajout rapide" : "Ajout rapide"}
+                icon={<Plus className="h-4 w-4" />}
+                onClick={() => setQuickAddOpen((o) => !o)}
+                pressed={quickAddOpen}
+              />
+              <EditMenuButton onEditContent={page.toggleEditing} editing={page.editing} />
+            </>
+          }
+          tableControls={
+            isTable
+              ? {
+                  filtersOpen: page.filtersOpen,
+                  onToggleFilters: page.toggleFilters,
+                  columnsOpen: page.columnsOpen,
+                  onToggleColumns: page.toggleColumns,
+                }
+              : undefined
+          }
+        />
+
+        {page.editing && (
+          <BulkEditPanel
+            action={page.action}
+            onActionChange={page.setAction}
+            selected={selectedBulkItems}
+            selectableCount={filteredWatches.length}
+            onSelectAll={() => page.selectAll(filteredWatches.map((w) => w.id))}
+            onClearSelection={page.clearSelection}
+            allowDeleteHistory
+            onClose={page.stopEditing}
+          />
+        )}
+
+        {quickAddOpen && (
+          <ListQuickAdd
+            existingTitleIds={new Set()}
+            onAdd={(titleId) => createWatch.mutateAsync({ title_id: titleId })}
+            addLabel="Vu aujourd'hui"
+            doneLabel="Ajouté"
+            hint="Tapez au moins 2 caractères pour chercher un titre et l'ajouter à l'historique (vu aujourd'hui)."
+          />
+        )}
+
         {isTable ? (
-          <HistoryTable />
+          <HistoryTable search={page.search} filtersOpen={page.filtersOpen} columnsOpen={page.columnsOpen} />
         ) : (
           <>
-            {selectionMode && selectedBulkItems.length > 0 && (
-              <BulkActionsBar
-                items={selectedBulkItems}
-                watchlistId={watchlistId}
-                favorisId={favorisId}
-                allowDeleteHistory
-                onDone={clearSelection}
-              />
-            )}
 
             <PeriodFilter value={period} onChange={setPeriod} />
 

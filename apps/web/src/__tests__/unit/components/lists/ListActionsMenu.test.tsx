@@ -46,44 +46,82 @@ function renderButtons(capabilities: ListCapabilities, role: "owner" | "member",
 
 const button = (name: string) => screen.queryByRole("button", { name: new RegExp(name, "i") });
 
-describe("ListActionsMenu — listes partagées", () => {
-  it("créateur : toutes les actions, dont Partager, mais pas Quitter", () => {
-    renderButtons(
-      {
-        canAddItems: true,
-        canRemoveItems: true,
-        canEditItems: true,
-        canEditList: true,
-        canDeleteList: true,
-        canManageShares: true,
-      },
-      "owner",
-    );
+const owner: ListCapabilities = {
+  canAddItems: true,
+  canRemoveItems: true,
+  canEditItems: true,
+  canEditList: true,
+  canDeleteList: true,
+  canManageShares: true,
+};
 
-    expect(button("Partager")).toBeInTheDocument();
-    expect(button("Modifier la liste")).toBeInTheDocument();
-    expect(button("Modifier le contenu")).toBeInTheDocument();
-    // Supprimer : plus dans l'en-tête, mais dans le dialogue « Modifier la liste ».
+/** Ouvre le menu du bouton crayon et renvoie les libellés de ses entrées. */
+async function openEditMenu() {
+  fireEvent.click(button("Modifier la liste")!);
+  const items = await screen.findAllByRole("menuitem");
+  return items.map((i) => i.textContent?.trim());
+}
+
+describe("ListActionsMenu — en-tête de la page liste", () => {
+  it("boutons icône seule, libellé en aria-label (affiché au survol)", () => {
+    renderButtons(owner, "owner");
+
+    const pencil = button("Modifier la liste")!;
+    expect(pencil).toHaveAttribute("aria-label", "Modifier la liste");
+    expect(pencil.textContent).toBe("");
+    expect(pencil.className).toContain("rounded-full");
+    // Partager et Supprimer ne sont plus dans l'en-tête (dans « Configurer »).
+    expect(button("Partager")).not.toBeInTheDocument();
     expect(button("Supprimer la liste")).not.toBeInTheDocument();
     expect(button("Quitter la liste")).not.toBeInTheDocument();
   });
 
-  it("en-tête : boutons icône seule, libellé en aria-label (affiché au survol)", () => {
-    renderButtons({ ...none, canEditList: true, canManageShares: true }, "owner");
-
-    const share = button("Partager")!;
-    expect(share).toHaveAttribute("aria-label", "Partager");
-    expect(share.textContent).toBe("");
-    expect(share.className).toContain("rounded-full");
+  it("créateur d'une liste perso : le crayon propose Configurer et Modifier le contenu", async () => {
+    renderButtons(owner, "owner");
+    expect(await openEditMenu()).toEqual(["Configurer la liste", "Modifier le contenu"]);
   });
 
-  it("Supprimer la liste est proposé dans le dialogue Modifier la liste", () => {
-    renderButtons({ ...none, canEditList: true, canDeleteList: true }, "owner");
+  it("Configurer la liste : nom, partage et suppression dans un seul dialogue", async () => {
+    renderButtons(owner, "owner");
+    await openEditMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /Configurer la liste/ }));
 
-    fireEvent.click(button("Modifier la liste")!);
+    expect(screen.getByLabelText("Nom")).toHaveValue("Ciné-club");
+    expect(screen.getByText("Droits des membres")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Supprimer la liste/ }));
-
     expect(screen.getByText("Supprimer la liste ?")).toBeInTheDocument();
+  });
+
+  it("watchlist / favoris : seulement Modifier le contenu", async () => {
+    renderButtons(owner, "owner", "watchlist" as never);
+    expect(await openEditMenu()).toEqual(["Modifier le contenu"]);
+  });
+
+  it("membre en collaboratif : Configurer sans partage ni suppression", async () => {
+    renderButtons({ ...none, canEditItems: true, canEditList: true }, "member");
+    expect(button("Quitter la liste")).toBeInTheDocument();
+    await openEditMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /Configurer la liste/ }));
+
+    expect(screen.getByLabelText("Nom")).toBeInTheDocument();
+    expect(screen.queryByText("Droits des membres")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Supprimer la liste/ })).not.toBeInTheDocument();
+  });
+
+  it("membre en lecture : pas de Configurer, Quitter la liste", async () => {
+    renderButtons({ ...none }, "member");
+    expect(await openEditMenu()).toEqual(["Modifier le contenu"]);
+    expect(button("Quitter la liste")).toBeInTheDocument();
+  });
+
+  it("Modifier le contenu appelle onEditContent", async () => {
+    const onEditContent = jest.fn();
+    render(
+      <ListActionsMenu list={list} capabilities={owner} role="owner" variant="buttons" onEditContent={onEditContent} />,
+    );
+    await openEditMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /Modifier le contenu/ }));
+    expect(onEditContent).toHaveBeenCalled();
   });
 
   it("Ajout rapide : bouton d'en-tête qui bascule le module", () => {
@@ -100,42 +138,5 @@ describe("ListActionsMenu — listes partagées", () => {
 
     fireEvent.click(button("Ajout rapide")!);
     expect(onToggle).toHaveBeenCalled();
-  });
-
-  it("membre en lecture : seulement Quitter la liste", () => {
-    renderButtons({ ...none }, "member");
-
-    expect(button("Quitter la liste")).toBeInTheDocument();
-    expect(button("Partager")).not.toBeInTheDocument();
-    expect(button("Modifier la liste")).not.toBeInTheDocument();
-    expect(button("Modifier le contenu")).not.toBeInTheDocument();
-    expect(button("Supprimer la liste")).not.toBeInTheDocument();
-  });
-
-  it("membre en collaboratif : renommer et modifier le contenu, pas supprimer ni partager", () => {
-    renderButtons({ ...none, canEditItems: true, canEditList: true }, "member");
-
-    expect(button("Modifier la liste")).toBeInTheDocument();
-    expect(button("Modifier le contenu")).toBeInTheDocument();
-    expect(button("Supprimer la liste")).not.toBeInTheDocument();
-    expect(button("Partager")).not.toBeInTheDocument();
-  });
-
-  it("ne propose pas de partager une watchlist, même à son créateur", () => {
-    renderButtons(
-      {
-        canAddItems: true,
-        canRemoveItems: true,
-        canEditItems: true,
-        canEditList: true,
-        canDeleteList: true,
-        canManageShares: true,
-      },
-      "owner",
-      "watchlist" as never,
-    );
-
-    expect(button("Partager")).not.toBeInTheDocument();
-    expect(button("Modifier le contenu")).toBeInTheDocument();
   });
 });

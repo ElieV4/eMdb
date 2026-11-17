@@ -33,6 +33,8 @@ export type HistoryTableRow = {
     titre: string | null;
   } | null;
   dateSortie: string | null;
+  /** Durée en minutes (épisode pour un épisode, film sinon). */
+  duree?: number | null;
   genres: string[];
   studios: { id: string; nom: string }[];
   realisateurs: { id: string; nom: string }[];
@@ -67,10 +69,12 @@ export type DisplayRow = HistoryTableRow & {
 };
 
 export type ColumnId =
+  | "affiche"
   | "dateVue"
   | "titre"
   | "type"
   | "dateSortie"
+  | "duree"
   | "genres"
   | "studios"
   | "realisateurs"
@@ -113,6 +117,13 @@ export function episodeCode(
 
 export const COLUMNS: ColumnDef[] = [
   {
+    id: "affiche",
+    label: "Affiche",
+    filter: "text",
+    sortValue: () => null,
+    filterText: () => "",
+  },
+  {
     id: "dateVue",
     label: "Vu le",
     filter: "text",
@@ -148,6 +159,13 @@ export const COLUMNS: ColumnDef[] = [
     sortValue: (r) => time(r.dateSortie),
     filterText: (r) =>
       r.dateSortie ? new Date(r.dateSortie).toLocaleDateString("fr-FR") : "",
+  },
+  {
+    id: "duree",
+    label: "Durée",
+    filter: "number",
+    sortValue: (r) => r.duree ?? null,
+    filterText: (r) => (r.duree != null ? String(r.duree) : ""),
   },
   {
     id: "genres",
@@ -239,8 +257,27 @@ export const COLUMNS: ColumnDef[] = [
   },
 ];
 
-/** Colonnes visibles par défaut : titre, réalisation, sortie, ma note. */
-export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = ["titre", "realisateurs", "dateSortie", "notePerso"];
+/** Colonnes visibles par défaut. */
+export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
+  "affiche",
+  "titre",
+  "realisateurs",
+  "dateSortie",
+  "dateVue",
+  "duree",
+  "notePerso",
+];
+
+/** Ordre d'affichage des colonnes (les colonnes par défaut d'abord). */
+export const COLUMN_ORDER: ColumnId[] = [
+  ...DEFAULT_VISIBLE_COLUMNS,
+  ...COLUMNS.map((c) => c.id).filter((id) => !DEFAULT_VISIBLE_COLUMNS.includes(id)),
+];
+
+/** Texte de toutes les colonnes d'une ligne (recherche globale). */
+export function rowSearchText(row: DisplayRow): string {
+  return COLUMNS.map((c) => c.filterText(row)).join(" ");
+}
 
 export const DEFAULT_HIDDEN_COLUMNS: ColumnId[] = COLUMNS.map((c) => c.id).filter(
   (id) => !DEFAULT_VISIBLE_COLUMNS.includes(id),
@@ -339,7 +376,7 @@ export type ColumnFilter =
 
 export type SortState = { column: ColumnId; direction: "asc" | "desc" } | null;
 
-const normalize = (s: string) =>
+export const normalize = (s: string) =>
   s.toLocaleLowerCase("fr").normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 export function matchesFilters(

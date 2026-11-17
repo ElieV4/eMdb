@@ -169,6 +169,7 @@ describe('ListsService', () => {
           nom: 'Ma liste',
           type: 'watchlist',
           description: null,
+          emoji: null,
         },
       });
     });
@@ -211,6 +212,7 @@ describe('ListsService', () => {
           nom: 'Films préférés',
           type: 'custom',
           description: 'Mes films préférés de 2026',
+          emoji: null,
         },
       });
     });
@@ -426,6 +428,23 @@ describe('ListsService', () => {
       });
 
       expect(result.description).toBe('Nouvelle description');
+    });
+
+    it("emoji : enregistré, et effacé par une chaîne vide", async () => {
+      prismaServiceMock.user_lists.findUnique.mockResolvedValue(buildList({ user_id: userId }));
+      prismaServiceMock.user_lists.update.mockResolvedValue(buildList({}));
+
+      await service.updateList(listId, userId, { emoji: ' 🎾 ' });
+      expect(prismaServiceMock.user_lists.update).toHaveBeenLastCalledWith({
+        where: { id: listId },
+        data: { emoji: '🎾' },
+      });
+
+      await service.updateList(listId, userId, { emoji: '' });
+      expect(prismaServiceMock.user_lists.update).toHaveBeenLastCalledWith({
+        where: { id: listId },
+        data: { emoji: null },
+      });
     });
 
     it('lève Forbidden pour un membre en mode lecture', async () => {
@@ -748,7 +767,7 @@ describe('ListsService', () => {
 
       expect(prismaServiceMock.list_groups.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { list_id: listId, parent_id: 'g-sport', nom: 'Tennis', position: 2 },
+          data: { list_id: listId, parent_id: 'g-sport', nom: 'Tennis', emoji: null, position: 2 },
         }),
       );
     });
@@ -782,6 +801,18 @@ describe('ListsService', () => {
 
       expect(prismaServiceMock.list_groups.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'g-sport' }, data: { nom: 'Sports' } }),
+      );
+    });
+
+    it("change l'emoji d'un sous-groupe sans toucher à son nom", async () => {
+      mockOwnList();
+      prismaServiceMock.list_groups.findFirst.mockResolvedValue({ id: 'g-sport' });
+      prismaServiceMock.list_groups.update.mockResolvedValue({ id: 'g-sport', nom: 'Sport', emoji: '⚽' });
+
+      await service.renameGroup(listId, userId, 'g-sport', { emoji: '⚽' });
+
+      expect(prismaServiceMock.list_groups.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'g-sport' }, data: { emoji: '⚽' } }),
       );
     });
 

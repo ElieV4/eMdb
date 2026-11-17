@@ -8,6 +8,8 @@
 
 import { useState } from "react";
 import { FolderPlus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { withEmoji } from "@/components/common/EmojiPicker";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,12 +70,12 @@ export function ListGroupsBar({
 
   if (nodes.length === 0 && !canCreate) return null;
 
-  const handleNameSubmit = async (nom: string) => {
+  const handleNameSubmit = async (nom: string, emoji: string | null) => {
     if (!nameDialog) return;
     if (nameDialog.kind === "create") {
-      await createGroup.mutateAsync({ listId, nom, parentId: nameDialog.parent?.id });
+      await createGroup.mutateAsync({ listId, nom, parentId: nameDialog.parent?.id, emoji });
     } else {
-      await renameGroup.mutateAsync({ listId, groupId: nameDialog.group.id, nom });
+      await renameGroup.mutateAsync({ listId, groupId: nameDialog.group.id, nom, emoji });
     }
     setNameDialog(null);
   };
@@ -102,7 +104,7 @@ export function ListGroupsBar({
           return (
             <span key={node.id} className="inline-flex items-center">
               {chip(
-                `${node.depth > 0 ? "› ".repeat(node.depth) : ""}${node.nom}`,
+                `${node.depth > 0 ? "› ".repeat(node.depth) : ""}${withEmoji(node.nom, node.emoji)}`,
                 counts.get(node.id) ?? 0,
                 selected,
                 () => onSelect(selected ? null : node.id),
@@ -130,7 +132,7 @@ export function ListGroupsBar({
                     {canRename && (
                       <DropdownMenuItem onClick={() => setNameDialog({ kind: "rename", group: node })}>
                         <Pencil className="mr-2 h-4 w-4" />
-                        Renommer
+                        Renommer / emoji
                       </DropdownMenuItem>
                     )}
                     {canDelete && (
@@ -145,15 +147,23 @@ export function ListGroupsBar({
             </span>
           );
         })}
+        {/* Nouveau sous-groupe : tout à droite, icône seule, libellé au survol. */}
         {canCreate && (
-          <button
-            type="button"
-            onClick={() => setNameDialog({ kind: "create", parent: null })}
-            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
-          >
-            <FolderPlus className="h-3.5 w-3.5" />
-            Sous-groupe
-          </button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={() => setNameDialog({ kind: "create", parent: null })}
+                  aria-label="Ajouter un nouveau sous-groupe"
+                  className="ml-auto flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <FolderPlus className="h-4 w-4" />
+                </button>
+              }
+            />
+            <TooltipContent>Ajouter un nouveau sous-groupe</TooltipContent>
+          </Tooltip>
         )}
       </div>
 
@@ -168,6 +178,7 @@ export function ListGroupsBar({
               : "Nouveau sous-groupe"
         }
         initialName={nameDialog?.kind === "rename" ? nameDialog.group.nom : ""}
+        initialEmoji={nameDialog?.kind === "rename" ? nameDialog.group.emoji ?? null : null}
         submitLabel={nameDialog?.kind === "rename" ? "Renommer" : "Créer"}
         onSubmit={handleNameSubmit}
       />

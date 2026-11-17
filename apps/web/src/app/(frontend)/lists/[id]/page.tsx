@@ -27,19 +27,22 @@ import { ListReorder } from "@/components/lists/ListReorder";
 import { ListGroupsBar } from "@/components/lists/ListGroupsBar";
 import { ListQuickAdd } from "@/components/lists/ListQuickAdd";
 import { TitlesTable } from "@/components/titles/TitlesTable";
-import { ViewModeToggle } from "@/components/titles/ViewModeToggle";
-import { useViewMode } from "@/hooks/useViewMode";
+import { TitlesToolbar } from "@/components/titles/TitlesToolbar";
+import { BulkEditPanel } from "@/components/common/BulkEditPanel";
+import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
+import { useTitlesPage } from "@/hooks/useTitlesPage";
+import { withEmoji } from "@/components/common/EmojiPicker";
+import { rowMatchesSearch } from "@/lib/titlesTable";
 import { ListItemOverlay } from "@/components/lists/ListItemOverlay";
 import { ItemGroupsDialog } from "@/components/lists/ItemGroupsDialog";
 import { ItemCommentsDialog } from "@/components/lists/ItemCommentsDialog";
 import { useSetItemVu } from "@/hooks/api/useListGroups";
 import { itemInGroup } from "@/lib/listGroups";
-import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { BackButton } from "@/components/common/BackButton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Check } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import {
   parseTitleFilters,
   titleMatchesFilters,
@@ -82,11 +85,12 @@ function ListDetailPageContent() {
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
   const { data: allLists } = useLists(isAuthenticated);
-  const [editMode, setEditMode] = useState(false);
   const [rangerItemId, setRangerItemId] = useState<string | null>(null);
   const [commentsItemId, setCommentsItemId] = useState<string | null>(null);
   const setItemVu = useSetItemVu();
-  const [viewMode, setViewMode] = useViewMode("list");
+  const page = useTitlesPage("list");
+  const editMode = page.editing;
+  const reordering = page.editing && page.action === "reorder";
   // Module « Ajout rapide » : affiché par le bouton d'en-tête.
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
@@ -137,6 +141,7 @@ function ListDetailPageContent() {
     selectedGroupId && groups.some((g) => g.id === selectedGroupId) ? selectedGroupId : null;
   const items = list?.items ?? [];
   const filteredItems = items.filter((item) => {
+    if (page.search && !rowMatchesSearch({ title: titleToSearchResult(item) }, page.search)) return false;
     if (
       !titleMatchesFilters(
         toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
@@ -190,7 +195,7 @@ function ListDetailPageContent() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-2xl font-bold">
-                    {list.nom} ({items.length})
+                    {withEmoji(list.nom, list.emoji)} ({items.length})
                   </h1>
                   <span className="text-xs rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground">
                     {typeLabels[list.type] ?? list.type}
@@ -213,36 +218,64 @@ function ListDetailPageContent() {
                 )}
               </div>
 
-              {/* Boutons de gestion (modification S) : les trois actions
-                  pour une liste personnalisée, seulement "Modifier le
-                  contenu" pour Watchlist/Favoris (listes système, non
-                  renommables/non supprimables). En mode édition, remplacés
-                  par un simple bouton "Terminé". */}
-              {editMode ? (
-                <Button variant="outline" size="sm" onClick={() => setEditMode(false)}>
-                  <Check className="h-4 w-4" />
-                  Terminé
-                </Button>
-              ) : (
-                <ListActionsMenu
-                  list={list}
-                  capabilities={list.capabilities}
-                  role={list.role}
-                  variant="buttons"
-                  onEditContent={() => setEditMode(true)}
-                  quickAdd={{ open: quickAddOpen, onToggle: () => setQuickAddOpen((o) => !o) }}
-                  onDeleted={() => router.push("/lists")}
-                />
-              )}
             </div>
           ) : null}
         </div>
+
+        {list && !isLoading && !error && (
+          <TitlesToolbar
+            search={page.search}
+            onSearchChange={page.setSearch}
+            viewMode={page.viewMode}
+            onViewModeChange={page.setViewMode}
+            actions={
+              <ListActionsMenu
+                list={list}
+                capabilities={list.capabilities}
+                role={list.role}
+                variant="buttons"
+                onEditContent={page.toggleEditing}
+                editing={page.editing}
+                quickAdd={{ open: quickAddOpen, onToggle: () => setQuickAddOpen((o) => !o) }}
+                onDeleted={() => router.push("/lists")}
+              />
+            }
+            tableControls={
+              page.isTable
+                ? {
+                    filtersOpen: page.filtersOpen,
+                    onToggleFilters: page.toggleFilters,
+                    columnsOpen: page.columnsOpen,
+                    onToggleColumns: page.toggleColumns,
+                  }
+                : undefined
+            }
+          />
+        )}
+
+        {list && page.editing && (
+          <BulkEditPanel
+            action={page.action}
+            onActionChange={page.setAction}
+            selected={[...page.selectedIds].map((id) => ({ id, titleId: id }))}
+            selectableCount={filteredItems.length}
+            onSelectAll={() => page.selectAll(filteredItems.map((i) => i.id))}
+            onClearSelection={page.clearSelection}
+            activeList={{ id: list.id, nom: list.nom }}
+            canRemoveFromActive={list.capabilities.canRemoveItems}
+            canEditItems={canEditItems}
+            allowReorder
+            groups={groups}
+            groupIdsByTitle={new Map(items.map((i) => [i.id, i.groupIds ?? []]))}
+            onClose={page.stopEditing}
+          />
+        )}
 
         {quickAddOpen && list && list.capabilities.canAddItems && !editMode && !isLoading && !error && (
           <ListQuickAdd listId={list.id} existingTitleIds={new Set(items.map((i) => i.id))} />
         )}
 
-        {isWatchlist && !editMode && !isLoading && !error && items.length > 0 && (
+        {isWatchlist && !reordering && !isLoading && !error && items.length > 0 && (
           <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
             {[
               { value: "tous", label: "Tous" },
@@ -276,7 +309,7 @@ function ListDetailPageContent() {
           </div>
         )}
 
-        {list && !editMode && !isLoading && !error && (
+        {list && !reordering && !isLoading && !error && (
           <ListGroupsBar
             listId={list.id}
             groups={groups}
@@ -288,7 +321,7 @@ function ListDetailPageContent() {
           />
         )}
 
-        {isShared && !editMode && !isLoading && !error && items.length > 0 && (
+        {isShared && !reordering && !isLoading && !error && items.length > 0 && (
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
               {[
@@ -318,12 +351,6 @@ function ListDetailPageContent() {
           </div>
         )}
 
-        {!editMode && !isLoading && !error && items.length > 0 && (
-          <div className="flex justify-end">
-            <ViewModeToggle mode={viewMode} onChange={setViewMode} />
-          </div>
-        )}
-
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -343,17 +370,14 @@ function ListDetailPageContent() {
               ? "Cette liste est vide. Ajoutez des titres avec le bouton « + » (ajout rapide) ou depuis leur fiche."
               : "Cette liste est vide."}
           </p>
-        ) : editMode ? (
-          // Mode édition : glisser-déposer + retrait en un clic, sur la
+        ) : reordering ? (
+          // Réordonner : glisser-déposer + retrait en un clic, sur la
           // liste complète non filtrée (réordonner un sous-ensemble filtré
           // réattribuerait des positions incohérentes aux items masqués).
           <ListReorder
             listId={list?.id ?? ""}
             items={items.map(titleToSearchResult)}
             canRemove={list?.capabilities.canRemoveItems ?? false}
-            groups={groups}
-            groupIdsByTitle={new Map(items.map((i) => [i.id, i.groupIds ?? []]))}
-            canEditGroups={canEditItems}
           />
         ) : filteredItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -361,8 +385,12 @@ function ListDetailPageContent() {
               ? "Aucun titre rangé dans ce sous-groupe ne correspond aux filtres actifs."
               : "Aucun titre de cette liste ne correspond aux filtres actifs."}
           </p>
-        ) : viewMode === "tableau" ? (
+        ) : page.isTable ? (
           <TitlesTable
+            pageKey="list"
+            search={page.search}
+            filtersOpen={page.filtersOpen}
+            columnsOpen={page.columnsOpen}
             titles={filteredItems.map(titleToSearchResult)}
             flagsOf={(t) => ({
               watched: watchedTitles?.has(t.id),
@@ -448,6 +476,12 @@ function ListDetailPageContent() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {filteredItems.map((title) => (
               <div key={title.id} className="relative">
+                {page.selecting && (
+                  <SelectionCheckbox
+                    selected={page.selectedIds.has(title.id)}
+                    onToggle={() => page.toggleSelected(title.id)}
+                  />
+                )}
                 <TitleCard
                   title={titleToSearchResult(title)}
                   compact
@@ -456,6 +490,7 @@ function ListDetailPageContent() {
                   inFavorites={favoriteIds.has(title.id)}
                   watchlistStatus={title.statut}
                 />
+                {!page.selecting && (
                 <ListItemOverlay
                   titre={title.titre}
                   showVu={isShared}
@@ -470,6 +505,7 @@ function ListDetailPageContent() {
                   onComments={() => setCommentsItemId(title.id)}
                   commentCount={commentCountOf(title)}
                 />
+                )}
               </div>
             ))}
           </div>

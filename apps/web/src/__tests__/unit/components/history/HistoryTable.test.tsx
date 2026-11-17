@@ -65,11 +65,11 @@ jest.mock("@/hooks/api/useRemoveListItem", () => ({ useRemoveListItem: () => ({ 
 jest.mock("@/hooks/api/useLists", () => ({ useLists: () => ({ data: [] }) }));
 jest.mock("@/hooks/api/useSharedLists", () => ({ useSharedLists: () => ({ data: [] }) }));
 
-function renderTable() {
+function renderTable(props: { search?: string; filtersOpen?: boolean } = {}) {
   const client = new QueryClient();
   render(
     <QueryClientProvider client={client}>
-      <HistoryTable />
+      <HistoryTable filtersOpen {...props} />
     </QueryClientProvider>,
   );
 }
@@ -135,7 +135,7 @@ describe("HistoryTable", () => {
     expect(upsertRating).toHaveBeenCalledWith({ title_id: "t2", commentaire: "Drôle" }, expect.any(Object));
   });
 
-  it("colonnes par défaut : titre, réalisation, sortie, ma note", () => {
+  it("colonnes par défaut : affiche, titre, réalisation, sortie, vu le, durée, ma note", () => {
     window.localStorage.clear();
     renderTable();
 
@@ -143,9 +143,21 @@ describe("HistoryTable", () => {
       .getAllByRole("columnheader")
       .map((h) => h.textContent?.trim())
       .filter(Boolean);
-    expect(headers).toEqual(expect.arrayContaining(["Titre", "Réalisation", "Sortie", "Ma note"]));
-    for (const hidden of ["Vu le", "Studios", "Compagnie", "Support", "Commentaire", "Moyenne eMDB"]) {
+    expect(headers).toEqual(
+      expect.arrayContaining(["Affiche", "Titre", "Réalisation", "Sortie", "Vu le", "Durée", "Ma note"]),
+    );
+    for (const hidden of ["Studios", "Compagnie", "Support", "Commentaire", "Moyenne eMDB"]) {
       expect(headers).not.toContain(hidden);
     }
+  });
+
+  it("recherche globale sur toutes les colonnes", () => {
+    renderTable({ search: "allen" });
+    expect(bodyTitles()).toEqual(["Match Point", "Annie Hall"]);
+  });
+
+  it("filtres par colonne masqués tant que Trier / filtrer est fermé", () => {
+    renderTable({ filtersOpen: false });
+    expect(screen.queryByLabelText("Filtrer Commentaire")).not.toBeInTheDocument();
   });
 });
