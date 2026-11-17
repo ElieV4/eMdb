@@ -4,6 +4,11 @@
  * masquables, et modification sur place de la note, du contexte
  * (support / compagnie / émotions), du commentaire, de la date, des listes,
  * ainsi que la suppression d'un visionnage.
+ *
+ * Les valeurs modifiables sont des badges (bordure qui s'allume au survol,
+ * pointillés si vide) ; la note est suivie des emojis d'émotion. Les
+ * réalisateurs mènent à leur page. « Modifier le contenu » ajoute une
+ * colonne de cases à gauche (un visionnage par case).
  */
 
 "use client";
@@ -25,6 +30,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -87,6 +93,10 @@ import {
 } from "@/lib/watchContext";
 import { buildEntityUrl, cn } from "@/lib/utils";
 import { TitlePoster } from "@/components/titles/TitlePoster";
+import { actionBadgeClass } from "@/components/common/ActionBadge";
+import { SortControl } from "@/components/common/SortControl";
+import { RatingBadgeMenu } from "@/components/ratings/RatingBadgeMenu";
+import { useProgressiveRows } from "@/hooks/useProgressiveRows";
 import { formatDuration } from "@/lib/cardFormatting";
 
 // v2 : nouvelles colonnes par défaut (titre, réalisation, sortie, ma note) —
@@ -143,9 +153,23 @@ type HistoryTableProps = {
   filtersOpen?: boolean;
   /** « Colonnes » : choix des colonnes visibles. */
   columnsOpen?: boolean;
+  /** « Modifier le contenu » : cases de sélection (par visionnage) à gauche. */
+  selection?: {
+    selectedIds: Set<string>;
+    onToggle: (watchId: string) => void;
+    onSetAll: (watchIds: string[], selected: boolean) => void;
+  };
+  /** Lignes affichées (après recherche et filtres), pour les actions groupées de la page. */
+  onShownRowsChange?: (rows: DisplayRow[]) => void;
 };
 
-export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = false }: HistoryTableProps = {}) {
+export function HistoryTable({
+  search = "",
+  filtersOpen = false,
+  columnsOpen = false,
+  selection,
+  onShownRowsChange,
+}: HistoryTableProps = {}) {
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useHistoryTable();
   const { data: ownLists } = useLists();
@@ -179,9 +203,9 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
         : "La modification n'a pas pu être enregistrée.",
     );
 
-  const visibleColumns = COLUMN_ORDER.map((id) => COLUMNS.find((c) => c.id === id)!).filter(
-    (c) => !hidden.includes(c.id),
-  );
+  const visibleColumns = COLUMN_ORDER.map((id) =>
+    COLUMNS.find((c) => c.id === id)!,
+  ).filter((c) => !hidden.includes(c.id));
   const toggleColumn = (id: ColumnId) => {
     const next = hidden.includes(id)
       ? hidden.filter((h) => h !== id)
@@ -195,11 +219,31 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
     const query = normalize(search.trim());
     return sortRows(
       display.filter(
-        (r) => matchesFilters(r, filters) && (!query || normalize(rowSearchText(r)).includes(query)),
+        (r) =>
+          matchesFilters(r, filters) &&
+          (!query || normalize(rowSearchText(r)).includes(query)),
       ),
       sort,
     );
   }, [data, groupBySeries, filters, sort, search]);
+
+  useEffect(() => {
+    onShownRowsChange?.(rows);
+  }, [rows, onShownRowsChange]);
+
+  // 100 lignes d'abord, la suite au défilement.
+  const progressive = useProgressiveRows(
+    rows.length,
+    `${search}|${groupBySeries}|${JSON.stringify(filters)}|${JSON.stringify(sort)}`,
+  );
+  const renderedRows = rows.slice(0, progressive.limit);
+
+  // Cases de sélection : visionnages seuls (pas les lignes regroupées).
+  const selectableIds = rows.filter((r) => !r.grouped).map((r) => r.watchId);
+  const allSelected =
+    !!selection &&
+    selectableIds.length > 0 &&
+    selectableIds.every((id) => selection.selectedIds.has(id));
 
   // Listes dans lesquelles l'utilisateur peut ranger un titre : les siennes,
   // et les listes partagées avec lui en mode "ouvert".
@@ -340,6 +384,11 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
                 : buildEntityUrl("/titles", row.title.id, row.title.titre)
             }
             className="font-medium hover:underline"
+            title={
+              row.title.titreVo && row.title.titreVo !== row.title.titre
+                ? `Titre original : ${row.title.titreVo}`
+                : undefined
+            }
           >
             {row.title.titre}
             {row.episode && !row.grouped && (
@@ -356,10 +405,24 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
         return formatDate(row.dateSortie);
       case "genres":
         return row.genres.join(", ") || "—";
+      case "pays":
+        return (row.pays ?? []).join(", ") || "—";
       case "studios":
         return row.studios.map((s) => s.nom).join(", ") || "—";
       case "realisateurs":
-        return row.realisateurs.map((p) => p.nom).join(", ") || "—";
+        return row.realisateurs.length
+          ? row.realisateurs.map((p, i) => (
+              <span key={p.id}>
+                {i > 0 && ", "}
+                <Link
+                  href={buildEntityUrl("/people", p.id, p.nom)}
+                  className="hover:text-primary hover:underline"
+                >
+                  {p.nom}
+                </Link>
+              </span>
+            ))
+          : "—";
       case "noteImdb":
         return row.noteImdb?.toFixed(1) ?? "—";
       case "moyenneApp":
@@ -374,23 +437,12 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
         );
       case "notePerso":
         return (
-          <select
-            aria-label={`Ma note pour ${row.title?.titre ?? ""}`}
-            className={selectClass}
-            value={row.notePerso ?? ""}
-            onChange={(e) =>
-              e.target.value && setNote(row, Number(e.target.value))
-            }
-          >
-            <option value="" disabled>
-              —
-            </option>
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                {n}/10
-              </option>
-            ))}
-          </select>
+          <RatingBadgeMenu
+            value={row.notePerso}
+            emotions={row.emotion}
+            titleName={row.title?.titre ?? ""}
+            onChange={(note) => setNote(row, note)}
+          />
         );
       case "support":
       case "compagnie": {
@@ -406,7 +458,10 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
         return (
           <select
             aria-label={`${column.label} pour ${row.title?.titre ?? ""}`}
-            className={selectClass}
+            className={actionBadgeClass(
+              !row[column.id],
+              "h-6 cursor-pointer appearance-none bg-transparent",
+            )}
             value={row[column.id] ?? ""}
             onChange={(e) =>
               patchWatch(row, { [column.id]: e.target.value || null })
@@ -429,12 +484,13 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
               render={
                 <button
                   type="button"
-                  className="max-w-[12rem] truncate text-left hover:underline"
+                  className={actionBadgeClass(row.emotion.length === 0)}
                   aria-label={`Émotions pour ${row.title?.titre ?? ""}`}
+                  title={emotionLabels(row.emotion) ?? undefined}
                 >
-                  {emotionLabels(row.emotion) ?? (
-                    <span className="text-muted-foreground">—</span>
-                  )}
+                  <span className="truncate">
+                    {emotionLabels(row.emotion) ?? "Ajouter"}
+                  </span>
                 </button>
               }
             />
@@ -465,7 +521,10 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
         return (
           <button
             type="button"
-            className="group flex max-w-[16rem] items-start gap-1 text-left"
+            className={actionBadgeClass(
+              !row.commentaire,
+              "max-w-[16rem] text-left",
+            )}
             onClick={() => {
               setCommentRow(row);
               setCommentDraft(row.commentaire ?? "");
@@ -473,11 +532,8 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
             aria-label={`Modifier le commentaire pour ${row.title?.titre ?? ""}`}
             title={row.commentaire ?? undefined}
           >
-            {row.commentaire ? (
-              <span className="line-clamp-2">{row.commentaire}</span>
-            ) : (
-              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground opacity-50 group-hover:opacity-100" />
-            )}
+            <MessageSquare className="h-3 w-3 shrink-0" />
+            <span className="truncate">{row.commentaire || "Commenter"}</span>
           </button>
         );
       case "listes": {
@@ -488,28 +544,32 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
               render={
                 <button
                   type="button"
-                  className="max-w-[12rem] truncate text-left hover:underline"
+                  className={actionBadgeClass(row.listes.length === 0)}
                   aria-label={`Listes contenant ${row.title?.titre ?? ""}`}
+                  title={row.listes.map((l) => l.nom).join(", ") || undefined}
                 >
-                  {row.listes.map((l) => l.nom).join(", ") || (
-                    <span className="text-muted-foreground">—</span>
-                  )}
+                  <span className="truncate">
+                    {row.listes.map((l) => l.nom).join(", ") || "Ajouter"}
+                  </span>
                 </button>
               }
             />
             <DropdownMenuContent align="start">
-              <DropdownMenuLabel>
-                {row.episode ? "Listes (la série)" : "Listes"}
-              </DropdownMenuLabel>
-              {editableLists.map((l) => (
-                <DropdownMenuCheckboxItem
-                  key={l.id}
-                  checked={ids.has(l.id)}
-                  onCheckedChange={() => toggleList(row, l.id, ids.has(l.id))}
-                >
-                  {l.nom}
-                </DropdownMenuCheckboxItem>
-              ))}
+              {/* Le libellé doit être dans un groupe (Base UI). */}
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>
+                  {row.episode ? "Listes (la série)" : "Listes"}
+                </DropdownMenuLabel>
+                {editableLists.map((l) => (
+                  <DropdownMenuCheckboxItem
+                    key={l.id}
+                    checked={ids.has(l.id)}
+                    onCheckedChange={() => toggleList(row, l.id, ids.has(l.id))}
+                  >
+                    {l.nom}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -628,9 +688,14 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
     <div className="space-y-3">
       {columnsOpen && (
         <fieldset className="flex flex-wrap gap-x-4 gap-y-2 rounded-lg border p-3">
-          <legend className="px-1 text-xs text-muted-foreground">Colonnes affichées</legend>
+          <legend className="px-1 text-xs text-muted-foreground">
+            Colonnes affichées
+          </legend>
           {COLUMNS.map((c) => (
-            <label key={c.id} className="inline-flex items-center gap-1.5 text-sm">
+            <label
+              key={c.id}
+              className="inline-flex items-center gap-1.5 text-sm"
+            >
               <input
                 type="checkbox"
                 className="h-4 w-4 accent-primary"
@@ -671,6 +736,17 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
         </span>
       </div>
 
+      {filtersOpen && (
+        <SortControl
+          options={COLUMNS.filter((c) => c.id !== "affiche").map((c) => ({
+            id: c.id,
+            label: c.label,
+          }))}
+          sort={sort}
+          onChange={(next) => setSort(next as SortState)}
+        />
+      )}
+
       {actionError && (
         <p role="alert" className="text-sm text-destructive">
           {actionError}
@@ -683,6 +759,19 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
         <table className="w-full text-sm">
           <thead className="border-b text-left text-xs text-muted-foreground">
             <tr>
+              {selection && (
+                <th scope="col" className="w-8 px-2 py-2">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    aria-label="Tout sélectionner"
+                    checked={allSelected}
+                    onChange={() =>
+                      selection.onSetAll(selectableIds, !allSelected)
+                    }
+                  />
+                </th>
+              )}
               {visibleColumns.map((c) => {
                 const active = sort?.column === c.id;
                 const Icon = !active
@@ -722,6 +811,7 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
             </tr>
             {filtersOpen && (
               <tr>
+                {selection && <th />}
                 {visibleColumns.map((c) => (
                   <th key={c.id} className="px-2 pb-2 font-normal">
                     {c.id === "affiche" ? null : renderFilter(c)}
@@ -735,7 +825,7 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={visibleColumns.length + 1}
+                  colSpan={visibleColumns.length + 1 + (selection ? 1 : 0)}
                   className="px-2 py-6 text-center text-muted-foreground"
                 >
                   {data?.rows.length
@@ -744,11 +834,29 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
+              renderedRows.map((row) => (
                 <tr
                   key={row.key}
-                  className="border-b align-top hover:bg-muted/20"
+                  className={cn(
+                    "border-b align-top hover:bg-muted/20",
+                    selection?.selectedIds.has(row.watchId) &&
+                      !row.grouped &&
+                      "bg-primary/10",
+                  )}
                 >
+                  {selection && (
+                    <td className="w-8 px-2 py-1.5">
+                      {!row.grouped && (
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-primary"
+                          aria-label={`Sélectionner ${row.title?.titre ?? ""} du ${formatDate(row.dateVue, true)}`}
+                          checked={selection.selectedIds.has(row.watchId)}
+                          onChange={() => selection.onToggle(row.watchId)}
+                        />
+                      )}
+                    </td>
+                  )}
                   {visibleColumns.map((c) => (
                     <td key={c.id} className="px-2 py-1.5">
                       {renderCell(c, row)}
@@ -772,6 +880,17 @@ export function HistoryTable({ search = "", filtersOpen = false, columnsOpen = f
           </tbody>
         </table>
       </div>
+      {progressive.hasMore && (
+        <div ref={progressive.sentinelRef} className="flex justify-center py-3">
+          <button
+            type="button"
+            onClick={progressive.showMore}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Afficher plus ({renderedRows.length} lignes sur {rows.length})
+          </button>
+        </div>
+      )}
 
       <Dialog
         open={commentRow !== null}

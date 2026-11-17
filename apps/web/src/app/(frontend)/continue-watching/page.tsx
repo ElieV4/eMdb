@@ -151,6 +151,7 @@ function ContinueWatchingPageContent() {
           <TitlesTable
             pageKey="continue-watching"
             search={page.search}
+            selection={page.tableSelection}
             filtersOpen={page.filtersOpen}
             columnsOpen={page.columnsOpen}
             titles={filteredItems.map((entry) => ({

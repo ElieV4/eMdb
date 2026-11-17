@@ -20,6 +20,7 @@ export function useUpsertRating() {
       queryClient.invalidateQueries({ queryKey: ["user-ratings"] });
       queryClient.invalidateQueries({ queryKey: ["title-ratings-summary"] });
       queryClient.invalidateQueries({ queryKey: ["my-title-rating"] });
+      queryClient.invalidateQueries({ queryKey: ["titles-table-info"] });
     },
   });
 }

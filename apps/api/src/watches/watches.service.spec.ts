@@ -41,6 +41,7 @@ const prismaServiceMock = {
   },
   title_genres: { findMany: jest.fn() },
   title_studios: { findMany: jest.fn() },
+  title_countries: { findMany: jest.fn() },
   credits: { findMany: jest.fn() },
   user_lists: {
     findFirst: jest.fn(),
@@ -359,6 +360,9 @@ describe('WatchesService', () => {
       prismaServiceMock.title_studios.findMany.mockResolvedValue([
         { title_id: 'film-1', studios: { id: 's1', nom: 'BBC Films' } },
       ]);
+      prismaServiceMock.title_countries.findMany.mockResolvedValue([
+        { title_id: 'film-1', countries: { nom: 'Royaume-Uni' } },
+      ]);
       prismaServiceMock.credits.findMany.mockResolvedValue([
         { title_id: 'film-1', people: { id: 'p1', nom: 'Woody Allen' } },
       ]);
@@ -384,6 +388,7 @@ describe('WatchesService', () => {
         title: { id: 'film-1', titre: 'Match Point', type: 'film' },
         episode: null,
         genres: ['Drame'],
+        pays: ['Royaume-Uni'],
         studios: [{ id: 's1', nom: 'BBC Films' }],
         realisateurs: [{ id: 'p1', nom: 'Woody Allen' }],
         noteImdb: 7.6,

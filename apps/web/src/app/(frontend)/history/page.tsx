@@ -17,6 +17,7 @@ import { useLists } from "@/hooks/api/useLists";
 import { useWatchedTitles } from "@/hooks/api/useWatchedTitles";
 import { useListMembership } from "@/hooks/api/useListMembership";
 import { useTitlesPage } from "@/hooks/useTitlesPage";
+import type { DisplayRow } from "@/lib/historyTable";
 import { useCreateWatch } from "@/hooks/api/useCreateWatch";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { PeriodFilter } from "@/components/common/PeriodFilter";
@@ -24,7 +25,10 @@ import { DateCard } from "@/components/common/DateCard";
 import { SelectionCheckbox } from "@/components/common/SelectionCheckbox";
 import { BulkEditPanel } from "@/components/common/BulkEditPanel";
 import { EditMenuButton } from "@/components/common/EditMenuButton";
-import { TitlesToolbar, ToolbarIconButton } from "@/components/titles/TitlesToolbar";
+import {
+  TitlesToolbar,
+  ToolbarIconButton,
+} from "@/components/titles/TitlesToolbar";
 import { ListQuickAdd } from "@/components/lists/ListQuickAdd";
 import { normalize } from "@/lib/titlesTable";
 import { emotionEmojis, emotionLabels } from "@/lib/watchContext";
@@ -55,9 +59,12 @@ function HistoryPageContent() {
   const page = useTitlesPage("history");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const createWatch = useCreateWatch();
-  // Vue tableau : dans l'URL (?vue=tableau). « Modifier le contenu » se fait
-  // sur la vue par date (sélection sur les cartes).
-  const isTable = searchParams.get("vue") === "tableau" && !page.editing;
+  // Vue tableau : dans l'URL (?vue=tableau), conservée en « Modifier le
+  // contenu » (cases à gauche du tableau).
+  const isTable = searchParams.get("vue") === "tableau";
+  // Lignes affichées par le tableau (après recherche et filtres) : base des
+  // actions groupées en vue tableau.
+  const [tableRows, setTableRows] = useState<DisplayRow[]>([]);
   const {
     data,
     isLoading,
@@ -147,7 +154,12 @@ function HistoryPageContent() {
 
     if (searchQuery) {
       const t = watch.titles ?? watch.episodes?.seasons.titles;
-      const text = [t?.titre_vf, t?.titre_vo, watch.episodes?.titre, new Date(watch.date_vue).toLocaleDateString("fr-FR")]
+      const text = [
+        t?.titre_vf,
+        t?.titre_vo,
+        watch.episodes?.titre,
+        new Date(watch.date_vue).toLocaleDateString("fr-FR"),
+      ]
         .filter(Boolean)
         .join(" ");
       if (!normalize(text).includes(searchQuery)) return false;
@@ -188,19 +200,33 @@ function HistoryPageContent() {
   const resolveWatchTitle = (watch: UserWatch) =>
     watch.titles ?? watch.episodes?.seasons.titles;
 
-  const selectedBulkItems = filteredWatches
-    .filter((watch) => selectedIds.has(watch.id))
-    .map((watch) => {
-      const resolvedTitle = resolveWatchTitle(watch);
-      if (!resolvedTitle) return null;
-      return {
-        id: watch.id,
-        titleId: resolvedTitle.id,
-        type: resolvedTitle.type as "film" | "serie",
-        watchId: watch.id,
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
+  const tableBulkItems = tableRows
+    .filter((row) => !row.grouped && row.title && selectedIds.has(row.watchId))
+    .map((row) => ({
+      id: row.watchId,
+      titleId: row.title!.id,
+      type: row.title!.type,
+      watchId: row.watchId,
+    }));
+  const tableSelectableIds = tableRows
+    .filter((r) => !r.grouped)
+    .map((r) => r.watchId);
+
+  const selectedBulkItems = isTable
+    ? tableBulkItems
+    : filteredWatches
+        .filter((watch) => selectedIds.has(watch.id))
+        .map((watch) => {
+          const resolvedTitle = resolveWatchTitle(watch);
+          if (!resolvedTitle) return null;
+          return {
+            id: watch.id,
+            titleId: resolvedTitle.id,
+            type: resolvedTitle.type as "film" | "serie",
+            watchId: watch.id,
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
@@ -230,7 +256,10 @@ function HistoryPageContent() {
                 onClick={() => setQuickAddOpen((o) => !o)}
                 pressed={quickAddOpen}
               />
-              <EditMenuButton onEditContent={page.toggleEditing} editing={page.editing} />
+              <EditMenuButton
+                onEditContent={page.toggleEditing}
+                editing={page.editing}
+              />
             </>
           }
           tableControls={
@@ -250,8 +279,14 @@ function HistoryPageContent() {
             action={page.action}
             onActionChange={page.setAction}
             selected={selectedBulkItems}
-            selectableCount={filteredWatches.length}
-            onSelectAll={() => page.selectAll(filteredWatches.map((w) => w.id))}
+            selectableCount={
+              isTable ? tableSelectableIds.length : filteredWatches.length
+            }
+            onSelectAll={() =>
+              page.selectAll(
+                isTable ? tableSelectableIds : filteredWatches.map((w) => w.id),
+              )
+            }
             onClearSelection={page.clearSelection}
             allowDeleteHistory
             onClose={page.stopEditing}
@@ -269,10 +304,15 @@ function HistoryPageContent() {
         )}
 
         {isTable ? (
-          <HistoryTable search={page.search} filtersOpen={page.filtersOpen} columnsOpen={page.columnsOpen} />
+          <HistoryTable
+            search={page.search}
+            filtersOpen={page.filtersOpen}
+            columnsOpen={page.columnsOpen}
+            selection={page.tableSelection}
+            onShownRowsChange={setTableRows}
+          />
         ) : (
           <>
-
             <PeriodFilter value={period} onChange={setPeriod} />
 
             {isLoading ? (
@@ -343,7 +383,13 @@ function HistoryPageContent() {
                                 </span>
                               )}
                               {emotions && (
-                                <span title={emotionLabels(watch.emotion) ?? undefined}>{emotions}</span>
+                                <span
+                                  title={
+                                    emotionLabels(watch.emotion) ?? undefined
+                                  }
+                                >
+                                  {emotions}
+                                </span>
                               )}
                             </span>
                           ) : null;

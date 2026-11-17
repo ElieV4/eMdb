@@ -28,6 +28,9 @@ jest.mock("@/hooks/api/useTitlesTableInfo", () => ({
         duree: 124,
         nombreEpisodes: null,
         dateSortie: null,
+        titreVf: "Match Point (VF)",
+        genres: ["Drame", "Thriller"],
+        pays: [{ code: "GB", nom: "Royaume-Uni" }],
       },
       "22222222-2222-2222-2222-222222222222": {
         realisateurs: [{ id: "p1", nom: "Woody Allen" }],
@@ -39,6 +42,13 @@ jest.mock("@/hooks/api/useTitlesTableInfo", () => ({
     },
   }),
 }));
+jest.mock("@/hooks/api/useTitleEmotions", () => ({
+  useTitleEmotions: () => ({ data: { "11111111-1111-1111-1111-111111111111": ["peur", "choc"] } }),
+}));
+const upsertRating = jest.fn();
+jest.mock("@/hooks/api/useUpsertRating", () => ({
+  useUpsertRating: () => ({ mutate: upsertRating }),
+}));
 
 const titles: TitleSearchResult[] = [
   { id: ID_A, titre: "Match Point", type: "film", dateSortie: "2005-10-26", note: 7.6, local: true },
@@ -49,6 +59,7 @@ const titles: TitleSearchResult[] = [
 const bodyTitles = () =>
   within(screen.getAllByRole("rowgroup")[1])
     .getAllByRole("link")
+    .filter((a) => a.getAttribute("href")?.startsWith("/titles"))
     .map((a) => a.textContent)
     .filter(Boolean);
 
@@ -60,7 +71,7 @@ describe("TitlesTable", () => {
 
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
     expect(headers).toEqual(["Affiche", "Titre", "Réalisation", "Sortie", "Durée / épisodes", "Ma note", "Actions"]);
-    expect(screen.getAllByText("Woody Allen")).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "Woody Allen" })).toHaveLength(2);
     expect(screen.getByText("201 ép.")).toBeInTheDocument();
     expect(screen.getByText("2h 04 min")).toBeInTheDocument();
   });
@@ -94,6 +105,77 @@ describe("TitlesTable", () => {
 
     render(<TitlesTable titles={titles} pageKey="test" />);
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent?.trim())).toContain("Note IMDb");
+  });
+
+  it("réalisateur cliquable, titre français en infobulle, note en badge suivie des émotions", () => {
+    render(<TitlesTable titles={titles} pageKey="test" />);
+
+    expect(screen.getAllByRole("link", { name: "Woody Allen" })[0].getAttribute("href")).toMatch(/^\/people\/p1/);
+    expect(screen.getByRole("link", { name: "Match Point" })).toHaveAttribute(
+      "title",
+      "Titre français : Match Point (VF)",
+    );
+    expect(screen.getByRole("button", { name: "Ma note pour Match Point : 8/10" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Émotions : 😱 Peur, 🤯 Choc")).toHaveTextContent("😱🤯");
+    // Pas encore noté : badge « Noter ».
+    expect(screen.getByRole("button", { name: "Ma note pour The Office" })).toHaveTextContent("Noter");
+  });
+
+  it("colonnes ajoutables : genres, pays, émotions", () => {
+    render(<TitlesTable titles={titles} pageKey="test" columnsOpen />);
+    for (const name of ["Genres", "Pays", "Émotions"]) {
+      fireEvent.click(screen.getByRole("checkbox", { name }));
+    }
+    expect(screen.getByText("Drame, Thriller")).toBeInTheDocument();
+    expect(screen.getByText("Royaume-Uni")).toBeInTheDocument();
+    // Dans « Ma note » (par défaut) et dans la colonne « Émotions ».
+    expect(screen.getAllByTitle("😱 Peur, 🤯 Choc")).toHaveLength(2);
+  });
+
+  it("Trier / filtrer : choix de la colonne et du sens du tri", () => {
+    render(<TitlesTable titles={titles} pageKey="test" filtersOpen />);
+
+    fireEvent.change(screen.getByLabelText("Trier par"), { target: { value: "titre" } });
+    expect(bodyTitles()).toEqual(["Annie Hall", "Match Point", "The Office"]);
+    fireEvent.click(screen.getByRole("button", { name: "Décroissant" }));
+    expect(bodyTitles()).toEqual(["The Office", "Match Point", "Annie Hall"]);
+  });
+
+  it("modifier le contenu : colonne de cases à gauche, case « tout »", () => {
+    const onToggle = jest.fn();
+    const onSetAll = jest.fn();
+    render(
+      <TitlesTable
+        titles={titles}
+        pageKey="test"
+        selection={{ selectedIds: new Set([ID_A]), onToggle, onSetAll }}
+      />,
+    );
+
+    expect(screen.getAllByRole("columnheader")[0]).toContainElement(
+      screen.getByRole("checkbox", { name: "Tout sélectionner" }),
+    );
+    expect(screen.getByRole("checkbox", { name: "Sélectionner Match Point" })).toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Sélectionner Annie Hall" }));
+    expect(onToggle).toHaveBeenCalledWith(ID_B);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Tout sélectionner" }));
+    expect(onSetAll).toHaveBeenCalledWith([ID_A, ID_B, ID_C], true);
+  });
+
+  it("affiche 100 lignes, puis la suite à la demande", () => {
+    const many: TitleSearchResult[] = Array.from({ length: 150 }, (_, i) => ({
+      id: `tmdb-${i}`,
+      titre: `Titre ${i}`,
+      type: "film",
+      local: false,
+      tmdbId: i,
+    }));
+    render(<TitlesTable titles={many} pageKey="test" />);
+
+    expect(bodyTitles()).toHaveLength(100);
+    fireEvent.click(screen.getByRole("button", { name: /Afficher plus \(100 lignes sur 150\)/ }));
+    expect(bodyTitles()).toHaveLength(150);
+    expect(screen.queryByRole("button", { name: /Afficher plus/ })).not.toBeInTheDocument();
   });
 
   it("colonnes propres à la page", () => {

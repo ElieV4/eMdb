@@ -77,6 +77,7 @@ function renderTable(props: { search?: string; filtersOpen?: boolean } = {}) {
 const bodyTitles = () =>
   within(screen.getAllByRole("rowgroup")[1])
     .getAllByRole("link")
+    .filter((a) => !a.getAttribute("href")?.startsWith("/people"))
     .map((a) => a.textContent);
 
 describe("HistoryTable", () => {
@@ -92,7 +93,9 @@ describe("HistoryTable", () => {
     renderTable();
 
     expect(bodyTitles()).toEqual(["Match Point", "Annie Hall"]);
-    expect(screen.getAllByText("Woody Allen", { selector: "td" })).toHaveLength(2);
+    const directors = screen.getAllByRole("link", { name: "Woody Allen" });
+    expect(directors).toHaveLength(2);
+    expect(directors[0].getAttribute("href")).toMatch(/^\/people\//);
     expect(screen.getAllByText("7.3")).toHaveLength(2);
   });
 
@@ -118,7 +121,8 @@ describe("HistoryTable", () => {
   it("modifie la note et le support sur place", () => {
     renderTable();
 
-    fireEvent.change(screen.getByLabelText("Ma note pour Annie Hall"), { target: { value: "9" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Ma note pour Annie Hall/ }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "9/10" }));
     expect(upsertRating).toHaveBeenCalledWith({ title_id: "t2", note_perso: 9 }, expect.any(Object));
 
     fireEvent.change(screen.getByLabelText("Support pour Annie Hall"), { target: { value: "tv" } });

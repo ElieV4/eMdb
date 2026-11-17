@@ -52,6 +52,7 @@ import {
 import { Title, TitleSearchResult } from "@/lib/types/api";
 import { SHARE_MODE_LABELS } from "@/lib/shareModes";
 import { cn } from "@/lib/utils";
+import { actionBadgeClass } from "@/components/common/ActionBadge";
 
 function titleToSearchResult(title: Title): TitleSearchResult {
   return {
@@ -110,7 +111,11 @@ function ListDetailPageContent() {
     if (value === null) params.delete(key);
     else params.set(key, value);
     const qs = params.toString();
-    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+    window.history.replaceState(
+      null,
+      "",
+      qs ? `?${qs}` : window.location.pathname,
+    );
   };
 
   if (isAuthLoading) {
@@ -138,18 +143,31 @@ function ListDetailPageContent() {
   const isShared = isMember || (list?.member_count ?? 0) > 0;
   const groups = list?.groups ?? [];
   const activeGroupId =
-    selectedGroupId && groups.some((g) => g.id === selectedGroupId) ? selectedGroupId : null;
+    selectedGroupId && groups.some((g) => g.id === selectedGroupId)
+      ? selectedGroupId
+      : null;
   const items = list?.items ?? [];
   const filteredItems = items.filter((item) => {
-    if (page.search && !rowMatchesSearch({ title: titleToSearchResult(item) }, page.search)) return false;
+    if (
+      page.search &&
+      !rowMatchesSearch({ title: titleToSearchResult(item) }, page.search)
+    )
+      return false;
     if (
       !titleMatchesFilters(
-        toFilterableTitle(item, { watchedTitleIds: watchedTitles, listIdsByTitle }),
+        toFilterableTitle(item, {
+          watchedTitleIds: watchedTitles,
+          listIdsByTitle,
+        }),
         filters,
       )
     )
       return false;
-    if (activeGroupId && !itemInGroup(item.groupIds ?? [], groups, activeGroupId)) return false;
+    if (
+      activeGroupId &&
+      !itemInGroup(item.groupIds ?? [], groups, activeGroupId)
+    )
+      return false;
     if (isShared && vuFilter === "vus" && !item.vu) return false;
     if (isShared && vuFilter === "non_vus" && item.vu) return false;
     if (!isWatchlist || progressionFilter === "tous") return true;
@@ -160,7 +178,10 @@ function ListDetailPageContent() {
   });
 
   const groupCounts = new Map(
-    groups.map((g) => [g.id, items.filter((i) => itemInGroup(i.groupIds ?? [], groups, g.id)).length]),
+    groups.map((g) => [
+      g.id,
+      items.filter((i) => itemInGroup(i.groupIds ?? [], groups, g.id)).length,
+    ]),
   );
   const vuCount = items.filter((i) => i.vu).length;
   const rangerItem = items.find((i) => i.id === rangerItemId) ?? null;
@@ -172,7 +193,24 @@ function ListDetailPageContent() {
       .map((g) => g.nom)
       .join(", ");
   const commentCountOf = (item?: (typeof items)[number]) =>
-    item ? (item.commentCount ?? 0) + (item.memberComments?.length ?? 0) + (item.myComment ? 1 : 0) : 0;
+    item
+      ? (item.commentCount ?? 0) +
+        (item.memberComments?.length ?? 0) +
+        (item.myComment ? 1 : 0)
+      : 0;
+  /**
+   * Vue tableau : commentaires en valeurs (le mien, puis ceux des membres
+   * qui les partagent) ; le fil de la liste est signalé à part.
+   */
+  const commentTextsOf = (item?: (typeof items)[number]) =>
+    item
+      ? [
+          ...(item.myComment ? [item.myComment] : []),
+          ...(item.memberComments ?? []).map(
+            (c) => `${c.pseudo} : ${c.commentaire}`,
+          ),
+        ]
+      : [];
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
@@ -217,7 +255,6 @@ function ListDetailPageContent() {
                   </p>
                 )}
               </div>
-
             </div>
           ) : null}
         </div>
@@ -236,7 +273,10 @@ function ListDetailPageContent() {
                 variant="buttons"
                 onEditContent={page.toggleEditing}
                 editing={page.editing}
-                quickAdd={{ open: quickAddOpen, onToggle: () => setQuickAddOpen((o) => !o) }}
+                quickAdd={{
+                  open: quickAddOpen,
+                  onToggle: () => setQuickAddOpen((o) => !o),
+                }}
                 onDeleted={() => router.push("/lists")}
               />
             }
@@ -266,48 +306,66 @@ function ListDetailPageContent() {
             canEditItems={canEditItems}
             allowReorder
             groups={groups}
-            groupIdsByTitle={new Map(items.map((i) => [i.id, i.groupIds ?? []]))}
+            groupIdsByTitle={
+              new Map(items.map((i) => [i.id, i.groupIds ?? []]))
+            }
             onClose={page.stopEditing}
           />
         )}
 
-        {quickAddOpen && list && list.capabilities.canAddItems && !editMode && !isLoading && !error && (
-          <ListQuickAdd listId={list.id} existingTitleIds={new Set(items.map((i) => i.id))} />
-        )}
+        {quickAddOpen &&
+          list &&
+          list.capabilities.canAddItems &&
+          !editMode &&
+          !isLoading &&
+          !error && (
+            <ListQuickAdd
+              listId={list.id}
+              existingTitleIds={new Set(items.map((i) => i.id))}
+            />
+          )}
 
-        {isWatchlist && !reordering && !isLoading && !error && items.length > 0 && (
-          <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
-            {[
-              { value: "tous", label: "Tous" },
-              { value: "a_jour", label: "À jour" },
-              { value: "en_cours", label: "En cours" },
-              { value: "abandonnee", label: "Abandonnée" },
-            ].map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  if (option.value === "tous") {
-                    params.delete("progression");
-                  } else {
-                    params.set("progression", option.value);
-                  }
-                  const qs = params.toString();
-                  window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
-                }}
-                className={cn(
-                  "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                  progressionFilter === option.value
-                    ? "bg-primary text-white"
-                    : "text-muted-foreground hover:bg-muted",
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {isWatchlist &&
+          !reordering &&
+          !isLoading &&
+          !error &&
+          items.length > 0 && (
+            <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
+              {[
+                { value: "tous", label: "Tous" },
+                { value: "a_jour", label: "À jour" },
+                { value: "en_cours", label: "En cours" },
+                { value: "abandonnee", label: "Abandonnée" },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    if (option.value === "tous") {
+                      params.delete("progression");
+                    } else {
+                      params.set("progression", option.value);
+                    }
+                    const qs = params.toString();
+                    window.history.replaceState(
+                      null,
+                      "",
+                      qs ? `?${qs}` : window.location.pathname,
+                    );
+                  }}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    progressionFilter === option.value
+                      ? "bg-primary text-white"
+                      : "text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
 
         {list && !reordering && !isLoading && !error && (
           <ListGroupsBar
@@ -321,35 +379,45 @@ function ListDetailPageContent() {
           />
         )}
 
-        {isShared && !reordering && !isLoading && !error && items.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
-              {[
-                { value: "tous", label: "Tous" },
-                { value: "vus", label: "Vus" },
-                { value: "non_vus", label: "Pas vus" },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  aria-pressed={vuFilter === option.value}
-                  onClick={() => setParam("vu", option.value === "tous" ? null : option.value)}
-                  className={cn(
-                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                    vuFilter === option.value
-                      ? "bg-primary text-white"
-                      : "text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  {option.label}
-                </button>
-              ))}
+        {isShared &&
+          !reordering &&
+          !isLoading &&
+          !error &&
+          items.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
+                {[
+                  { value: "tous", label: "Tous" },
+                  { value: "vus", label: "Vus" },
+                  { value: "non_vus", label: "Pas vus" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={vuFilter === option.value}
+                    onClick={() =>
+                      setParam(
+                        "vu",
+                        option.value === "tous" ? null : option.value,
+                      )
+                    }
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                      vuFilter === option.value
+                        ? "bg-primary text-white"
+                        : "text-muted-foreground hover:bg-muted",
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {vuCount}/{items.length} vu{vuCount > 1 ? "s" : ""} dans la
+                liste
+              </span>
             </div>
-            <span className="text-xs text-muted-foreground">
-              {vuCount}/{items.length} vu{vuCount > 1 ? "s" : ""} dans la liste
-            </span>
-          </div>
-        )}
+          )}
 
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -389,6 +457,7 @@ function ListDetailPageContent() {
           <TitlesTable
             pageKey="list"
             search={page.search}
+            selection={page.tableSelection}
             filtersOpen={page.filtersOpen}
             columnsOpen={page.columnsOpen}
             titles={filteredItems.map(titleToSearchResult)}
@@ -412,18 +481,26 @@ function ListDetailPageContent() {
                           <button
                             type="button"
                             onClick={() =>
-                              setItemVu.mutate({ listId: list.id, titleId: item.id, vu: !item.vu })
+                              setItemVu.mutate({
+                                listId: list.id,
+                                titleId: item.id,
+                                vu: !item.vu,
+                              })
                             }
-                            className={cn(
-                              "rounded-full border px-2 py-0.5 text-xs",
-                              item.vu ? "border-emerald-600 text-emerald-500" : "text-muted-foreground",
+                            className={actionBadgeClass(
+                              !item.vu,
+                              item.vu
+                                ? "border-emerald-600 text-emerald-500"
+                                : undefined,
                             )}
                             aria-label={`${item.vu ? "Marquer comme pas vu" : "Marquer comme vu"} dans la liste : ${item.titre}`}
                           >
                             {item.vu ? "Vu" : "Pas vu"}
                           </button>
                         ) : (
-                          <span className="text-xs text-muted-foreground">{item.vu ? "Vu" : "Pas vu"}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {item.vu ? "Vu" : "Pas vu"}
+                          </span>
                         );
                       },
                     },
@@ -435,7 +512,10 @@ function ListDetailPageContent() {
                       id: "groupes",
                       label: "Sous-groupes",
                       sortValue: (t: TitleSearchResult) =>
-                        groupNames(filteredItems.find((i) => i.id === t.id)?.groupIds ?? []) || null,
+                        groupNames(
+                          filteredItems.find((i) => i.id === t.id)?.groupIds ??
+                            [],
+                        ) || null,
                       render: (t: TitleSearchResult) => {
                         const item = filteredItems.find((i) => i.id === t.id);
                         const names = groupNames(item?.groupIds ?? []);
@@ -443,13 +523,18 @@ function ListDetailPageContent() {
                           <button
                             type="button"
                             onClick={() => setRangerItemId(t.id)}
-                            className="text-left text-xs text-muted-foreground hover:text-foreground"
+                            className={actionBadgeClass(!names, "text-left")}
                             aria-label={`Ranger dans des sous-groupes : ${t.titre}`}
+                            title={names || undefined}
                           >
-                            {names || "Ranger…"}
+                            <span className="truncate">
+                              {names || "Ranger…"}
+                            </span>
                           </button>
                         ) : (
-                          <span className="text-xs text-muted-foreground">{names || "—"}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {names || "—"}
+                          </span>
                         );
                       },
                     },
@@ -458,17 +543,45 @@ function ListDetailPageContent() {
               {
                 id: "commentaires",
                 label: "Commentaires",
-                sortValue: (t: TitleSearchResult) => commentCountOf(filteredItems.find((i) => i.id === t.id)),
-                render: (t: TitleSearchResult) => (
-                  <button
-                    type="button"
-                    onClick={() => setCommentsItemId(t.id)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    aria-label={`Commentaires : ${t.titre}`}
-                  >
-                    {commentCountOf(filteredItems.find((i) => i.id === t.id)) || "Écrire"}
-                  </button>
-                ),
+                sortValue: (t: TitleSearchResult) =>
+                  commentTextsOf(filteredItems.find((i) => i.id === t.id))
+                    .join(" ")
+                    .toLocaleLowerCase("fr") || null,
+                render: (t: TitleSearchResult) => {
+                  const item = filteredItems.find((i) => i.id === t.id);
+                  const texts = commentTextsOf(item);
+                  const thread = item?.commentCount ?? 0;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setCommentsItemId(t.id)}
+                      className={actionBadgeClass(
+                        texts.length === 0 && thread === 0,
+                        "max-w-[18rem] text-left",
+                      )}
+                      aria-label={`Commentaires : ${t.titre}`}
+                      title={texts.join("\n") || undefined}
+                    >
+                      <span className="truncate">
+                        {texts[0] ??
+                          (thread > 0 ? "Fil de discussion" : "Commenter")}
+                      </span>
+                      {texts.length > 1 && (
+                        <span className="shrink-0 text-muted-foreground">
+                          +{texts.length - 1}
+                        </span>
+                      )}
+                      {thread > 0 && (
+                        <span
+                          className="shrink-0 text-muted-foreground"
+                          aria-label={`${thread} dans le fil`}
+                        >
+                          · {thread} 💬
+                        </span>
+                      )}
+                    </button>
+                  );
+                },
               },
             ]}
           />
@@ -491,20 +604,25 @@ function ListDetailPageContent() {
                   watchlistStatus={title.statut}
                 />
                 {!page.selecting && (
-                <ListItemOverlay
-                  titre={title.titre}
-                  showVu={isShared}
-                  vu={title.vu}
-                  vuBy={title.vuBy}
-                  canEdit={canEditItems}
-                  onToggleVu={() =>
-                    list && setItemVu.mutate({ listId: list.id, titleId: title.id, vu: !title.vu })
-                  }
-                  showRanger={canEditItems && groups.length > 0}
-                  onRanger={() => setRangerItemId(title.id)}
-                  onComments={() => setCommentsItemId(title.id)}
-                  commentCount={commentCountOf(title)}
-                />
+                  <ListItemOverlay
+                    titre={title.titre}
+                    showVu={isShared}
+                    vu={title.vu}
+                    vuBy={title.vuBy}
+                    canEdit={canEditItems}
+                    onToggleVu={() =>
+                      list &&
+                      setItemVu.mutate({
+                        listId: list.id,
+                        titleId: title.id,
+                        vu: !title.vu,
+                      })
+                    }
+                    showRanger={canEditItems && groups.length > 0}
+                    onRanger={() => setRangerItemId(title.id)}
+                    onComments={() => setCommentsItemId(title.id)}
+                    commentCount={commentCountOf(title)}
+                  />
                 )}
               </div>
             ))}
@@ -538,7 +656,11 @@ function ListDetailPageContent() {
             groups={groups}
             item={
               rangerItem
-                ? { id: rangerItem.id, titre: rangerItem.titre, groupIds: rangerItem.groupIds ?? [] }
+                ? {
+                    id: rangerItem.id,
+                    titre: rangerItem.titre,
+                    groupIds: rangerItem.groupIds ?? [],
+                  }
                 : null
             }
           />

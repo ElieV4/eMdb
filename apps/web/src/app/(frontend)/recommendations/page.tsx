@@ -177,6 +177,7 @@ function RecommendationsPageContent() {
             <TitlesTable
               pageKey="recommendations"
               search={page.search}
+              selection={page.tableSelection}
               filtersOpen={page.filtersOpen}
               columnsOpen={page.columnsOpen}
               titles={filteredRecommendations.map(titleToSearchResult)}
