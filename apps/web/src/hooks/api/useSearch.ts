@@ -58,6 +58,19 @@ export type UnifiedSearchResult = {
 };
 
 // ============================================
+// Réponse paginée de l'API
+// ============================================
+
+/**
+ * `/titles/search` et `/people/search` renvoient `{ items, total }` (cf.
+ * useInfiniteSearch). Accepte aussi un tableau nu par compatibilité.
+ */
+type SearchResponse<T> = T[] | { items: T[]; total?: number };
+export function searchItems<T>(data: SearchResponse<T>): T[] {
+  return Array.isArray(data) ? data : data?.items ?? [];
+}
+
+// ============================================
 // Transformation backend → frontend
 // ============================================
 
@@ -122,11 +135,11 @@ export function useSearch(params: UnifiedSearchParams) {
       searchParams.set("page", page.toString());
       searchParams.set("limit", limit.toString());
 
-      const data = await apiFetch<BackendTitleSearchResult[]>(
+      const data = await apiFetch<SearchResponse<BackendTitleSearchResult>>(
         `/titles/search?${searchParams.toString()}`,
       );
 
-      const items = data.map(mapBackendTitleToSearchResult);
+      const items = searchItems(data).map(mapBackendTitleToSearchResult);
 
       return {
         items,
@@ -150,11 +163,11 @@ export function useSearch(params: UnifiedSearchParams) {
       searchParams.set("page", page.toString());
       searchParams.set("limit", limit.toString());
 
-      const data = await apiFetch<BackendPersonSearchResult[]>(
+      const data = await apiFetch<SearchResponse<BackendPersonSearchResult>>(
         `/people/search?${searchParams.toString()}`,
       );
 
-      const items = data
+      const items = searchItems(data)
         .filter((item) => item.local)
         .map(mapBackendPersonToSearchResult);
 
@@ -251,8 +264,10 @@ export function useDebouncedTitleSearch(
     queryKey: ["search", "titles-quick", debouncedQuery, limit],
     queryFn: async (): Promise<TitleSearchResult[]> => {
       const searchParams = new URLSearchParams({ q: debouncedQuery, page: "1", limit: String(limit) });
-      const data = await apiFetch<BackendTitleSearchResult[]>(`/titles/search?${searchParams.toString()}`);
-      return data.map(mapBackendTitleToSearchResult);
+      const data = await apiFetch<SearchResponse<BackendTitleSearchResult>>(
+        `/titles/search?${searchParams.toString()}`,
+      );
+      return searchItems(data).map(mapBackendTitleToSearchResult);
     },
     staleTime: 5 * 60 * 1000,
     enabled: debouncedQuery.length >= 2,

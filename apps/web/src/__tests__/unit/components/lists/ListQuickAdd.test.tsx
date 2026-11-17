@@ -113,3 +113,17 @@ describe("ListQuickAdd", () => {
     expect(screen.getByText(/Aucun titre trouvé pour « zzzz »/)).toBeInTheDocument();
   });
 });
+
+describe("searchItems", () => {
+  // La vraie réponse de /titles/search est { items, total } : c'est ce qui
+  // manquait (le module n'affichait jamais aucun résultat en production).
+  const { searchItems } = jest.requireActual("@/hooks/api/useSearch");
+
+  it("lit la réponse paginée { items, total } de l'API", () => {
+    expect(searchItems({ items: [{ tmdb_id: 116 }], total: 1 })).toEqual([{ tmdb_id: 116 }]);
+  });
+
+  it("accepte aussi un tableau nu", () => {
+    expect(searchItems([{ tmdb_id: 116 }])).toEqual([{ tmdb_id: 116 }]);
+  });
+});

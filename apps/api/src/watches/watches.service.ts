@@ -579,6 +579,14 @@ export class WatchesService {
    */
   async getHistoryTable(userId: string) {
     const HISTORY_TABLE_LIMIT = 5000;
+    // Titres "porteurs" distincts : le film, ou la série de l'épisode.
+    const titleIdsOf = (
+      ws: Array<{ titles: { id: string } | null; episodes: { seasons: { titles: { id: string } } } | null }>,
+    ) => [
+      ...new Set(
+        ws.map((w) => (w.titles ?? w.episodes?.seasons.titles ?? null)?.id).filter((id): id is string => !!id),
+      ),
+    ];
     const titleSelect = {
       id: true,
       titre_vo: true,
@@ -589,8 +597,15 @@ export class WatchesService {
       affiche_url: true,
     } as const;
 
-    const watches = await this.prisma.forUser(userId, (tx) =>
-      tx.user_watches.findMany({
+    // Une seule transaction pour tout ce qui passe par la RLS de
+    // l'utilisateur (visionnages, notes, listes), requêtes enchaînées : deux
+    // transactions en parallèle peuvent se bloquer sur un pool de connexions
+    // réduit (pooler Supabase), et le volume dépasse les délais par défaut
+    // de Prisma (maxWait 2 s, timeout 5 s) pour un gros historique.
+    const { watches, myRatings, lists } = await this.prisma.forUser(
+      userId,
+      async (tx) => {
+        const watches = await tx.user_watches.findMany({
         where: { user_id: userId },
         orderBy: { date_vue: 'desc' },
         take: HISTORY_TABLE_LIMIT + 1,
@@ -613,19 +628,45 @@ export class WatchesService {
             },
           },
         },
-      }),
+        });
+        const kept = watches.slice(0, HISTORY_TABLE_LIMIT);
+        const titleIds = titleIdsOf(kept);
+        const hasEpisodes = kept.some((w) => w.episode_id);
+        if (titleIds.length === 0) return { watches, myRatings: [], lists: [] };
+
+        // Notes et commentaires perso, par titre et par épisode. Pas de liste
+        // d'ids d'épisodes (plusieurs milliers pour un gros historique) : les
+        // notes d'épisodes de l'utilisateur sont peu nombreuses, on les prend
+        // toutes et la correspondance se fait par épisode plus bas.
+        const myRatings = await tx.user_ratings.findMany({
+          where: {
+            user_id: userId,
+            OR: [{ title_id: { in: titleIds } }, ...(hasEpisodes ? [{ episode_id: { not: null } }] : [])],
+          },
+          select: { title_id: true, episode_id: true, note_perso: true, commentaire: true },
+        });
+        // Listes visibles par l'utilisateur (les siennes et celles
+        // partagées avec lui, RLS) qui contiennent ces titres.
+        const lists = await tx.list_items.findMany({
+          where: { title_id: { in: titleIds } },
+          select: { title_id: true, user_lists: { select: { id: true, nom: true, type: true } } },
+        });
+        return { watches, myRatings, lists };
+      },
+      { maxWait: 10_000, timeout: 30_000 },
     );
     const truncated = watches.length > HISTORY_TABLE_LIMIT;
     const rows = truncated ? watches.slice(0, HISTORY_TABLE_LIMIT) : watches;
 
     // Titre "porteur" de la ligne : le film, ou la série de l'épisode.
     const titleOf = (w: (typeof rows)[number]) => w.titles ?? w.episodes?.seasons.titles ?? null;
-    const titleIds = [...new Set(rows.map((w) => titleOf(w)?.id).filter((id): id is string => !!id))];
-    const episodeIds = [...new Set(rows.map((w) => w.episode_id).filter((id): id is string => !!id))];
+    const titleIds = titleIdsOf(rows);
 
-    const [genres, studios, directors, myRatings, lists] =
+    // Données de catalogue, hors RLS : pas de transaction, le pool de
+    // connexions les sert à son rythme.
+    const [genres, studios, directors] =
       titleIds.length === 0
-        ? [[], [], [], [], []]
+        ? [[], [], []]
         : await Promise.all([
             this.prisma.title_genres.findMany({
               where: { title_id: { in: titleIds } },
@@ -639,26 +680,6 @@ export class WatchesService {
               where: { title_id: { in: titleIds }, episode_id: null, roles: { code: 'realisateur' } },
               select: { title_id: true, people: { select: { id: true, nom: true } } },
             }),
-            this.prisma.forUser(userId, (tx) =>
-              tx.user_ratings.findMany({
-                where: {
-                  user_id: userId,
-                  OR: [
-                    { title_id: { in: titleIds } },
-                    ...(episodeIds.length > 0 ? [{ episode_id: { in: episodeIds } }] : []),
-                  ],
-                },
-                select: { title_id: true, episode_id: true, note_perso: true, commentaire: true },
-              }),
-            ),
-            // Listes visibles par l'utilisateur (les siennes et celles
-            // partagées avec lui, RLS) qui contiennent ces titres.
-            this.prisma.forUser(userId, (tx) =>
-              tx.list_items.findMany({
-                where: { title_id: { in: titleIds } },
-                select: { title_id: true, user_lists: { select: { id: true, nom: true, type: true } } },
-              }),
-            ),
           ]);
 
     // Moyenne des notes des utilisateurs de l'app (lignes avec une note
@@ -674,6 +695,7 @@ export class WatchesService {
               _avg: { note_perso: true },
               _count: { note_perso: true },
             }),
+            { maxWait: 10_000, timeout: 30_000 },
           );
 
     const group = <T, V>(items: T[], key: (i: T) => string | null, value: (i: T) => V) => {
