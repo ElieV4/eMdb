@@ -7,8 +7,8 @@
  * header sur accueil/watchlist/listes/historique) aux titres affichés.
  *
  * Sous-groupes (?groupe=<id>) : filtre sur un sous-groupe, descendants
- * inclus. Liste partagée : suivi "vu" commun à tous les membres, avec filtre
- * ?vu=vus|non_vus et compteur.
+ * inclus. Liste partagée : suivi "vu" commun à tous les membres, avec
+ * compteur (filtrable par la colonne « Vu dans la liste » de la vue tableau).
  */
 
 "use client";
@@ -16,7 +16,7 @@
 import { Suspense, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Check, FolderTree, MessageSquare, Undo2 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useList } from "@/hooks/api/useList";
 import { useLists } from "@/hooks/api/useLists";
@@ -106,7 +106,6 @@ function ListDetailPageContent() {
   // favoris, qui n'ont pas de notion de statut de progression.
   const progressionFilter = searchParams.get("progression") ?? "tous";
   const selectedGroupId = searchParams.get("groupe");
-  const vuFilter = searchParams.get("vu") ?? "tous";
 
   const setParam = (key: string, value: string | null) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -177,8 +176,6 @@ function ListDetailPageContent() {
       !itemInGroup(item.groupIds ?? [], groups, activeGroupId)
     )
       return false;
-    if (isShared && vuFilter === "vus" && !item.vu) return false;
-    if (isShared && vuFilter === "non_vus" && item.vu) return false;
     if (!isWatchlist || progressionFilter === "tous") return true;
     // Les films n'ont pas de statut de progression — retirés quand un
     // filtre de progression est actif (cohérent avec /watchlist).
@@ -203,6 +200,55 @@ function ListDetailPageContent() {
       .filter((g) => ids.includes(g.id))
       .map((g) => g.nom)
       .join(", ");
+  const toggleItemVu = (item: (typeof items)[number]) =>
+    list &&
+    setItemVu.mutate({ listId: list.id, titleId: item.id, vu: !item.vu });
+  /** Entrées du menu « ⋮ » propres à la liste (affiche et ligne du tableau). */
+  const itemMenuItems = (
+    item: (typeof items)[number] | undefined,
+    { withVu, withComments }: { withVu: boolean; withComments: boolean },
+  ) => {
+    if (!item) return [];
+    const count = commentCountOf(item);
+    return [
+      ...(withVu && isShared && canEditItems
+        ? [
+            {
+              key: "vu-liste",
+              label: item.vu
+                ? "Marquer comme pas vu dans la liste"
+                : "Marquer comme vu dans la liste",
+              icon: item.vu ? (
+                <Undo2 className="mr-2 h-4 w-4" />
+              ) : (
+                <Check className="mr-2 h-4 w-4" />
+              ),
+              onSelect: () => toggleItemVu(item),
+            },
+          ]
+        : []),
+      ...(canEditItems && groups.length > 0
+        ? [
+            {
+              key: "ranger",
+              label: "Ranger dans des sous-groupes",
+              icon: <FolderTree className="mr-2 h-4 w-4" />,
+              onSelect: () => setRangerItemId(item.id),
+            },
+          ]
+        : []),
+      ...(withComments
+        ? [
+            {
+              key: "commentaires",
+              label: `Commentaires${count > 0 ? ` (${count})` : ""}`,
+              icon: <MessageSquare className="mr-2 h-4 w-4" />,
+              onSelect: () => setCommentsItemId(item.id),
+            },
+          ]
+        : []),
+    ];
+  };
   const commentCountOf = (item?: (typeof items)[number]) =>
     item
       ? (item.commentCount ?? 0) +
@@ -403,33 +449,6 @@ function ListDetailPageContent() {
           !error &&
           items.length > 0 && (
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
-                {[
-                  { value: "tous", label: "Tous" },
-                  { value: "vus", label: "Vus" },
-                  { value: "non_vus", label: "Pas vus" },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-pressed={vuFilter === option.value}
-                    onClick={() =>
-                      setParam(
-                        "vu",
-                        option.value === "tous" ? null : option.value,
-                      )
-                    }
-                    className={cn(
-                      "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                      vuFilter === option.value
-                        ? "bg-primary text-white"
-                        : "text-muted-foreground hover:bg-muted",
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
               <span className="text-xs text-muted-foreground">
                 {vuCount}/{items.length} vu{vuCount > 1 ? "s" : ""} dans la
                 liste
@@ -478,6 +497,12 @@ function ListDetailPageContent() {
             selection={page.tableSelection}
             columnsOpen={page.columnsOpen}
             titles={filteredItems.map(titleToSearchResult)}
+            rowMenuItems={(t) =>
+              itemMenuItems(
+                filteredItems.find((i) => i.id === t.id),
+                { withVu: true, withComments: false },
+              )
+            }
             flagsOf={(t) => ({
               watched: watchedTitles?.has(t.id),
               inWatchlist: watchlistIds.has(t.id),
@@ -619,6 +644,10 @@ function ListDetailPageContent() {
                   inWatchlist={watchlistIds.has(title.id)}
                   inFavorites={favoriteIds.has(title.id)}
                   watchlistStatus={title.statut}
+                  menuItems={itemMenuItems(title, {
+                    withVu: false,
+                    withComments: true,
+                  })}
                 />
                 {!page.selecting && (
                   <ListItemOverlay
@@ -627,18 +656,7 @@ function ListDetailPageContent() {
                     vu={title.vu}
                     vuBy={title.vuBy}
                     canEdit={canEditItems}
-                    onToggleVu={() =>
-                      list &&
-                      setItemVu.mutate({
-                        listId: list.id,
-                        titleId: title.id,
-                        vu: !title.vu,
-                      })
-                    }
-                    showRanger={canEditItems && groups.length > 0}
-                    onRanger={() => setRangerItemId(title.id)}
-                    onComments={() => setCommentsItemId(title.id)}
-                    commentCount={commentCountOf(title)}
+                    onToggleVu={() => toggleItemVu(title)}
                   />
                 )}
               </div>

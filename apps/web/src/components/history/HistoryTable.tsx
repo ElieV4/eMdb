@@ -98,6 +98,9 @@ import { actionBadgeClass } from "@/components/common/ActionBadge";
 import { ColumnFilterPopover } from "@/components/common/ColumnFilterPopover";
 import { RatingBadgeMenu } from "@/components/ratings/RatingBadgeMenu";
 import { useProgressiveRows } from "@/hooks/useProgressiveRows";
+import { useColumnOrder } from "@/hooks/useColumnOrder";
+import { useColumnWidths } from "@/hooks/useColumnWidths";
+import { ColumnsPanel } from "@/components/common/ColumnsPanel";
 import { formatDuration } from "@/lib/cardFormatting";
 
 // v2 : nouvelles colonnes par défaut (titre, réalisation, sortie, ma note) —
@@ -201,9 +204,16 @@ export function HistoryTable({
         : "La modification n'a pas pu être enregistrée.",
     );
 
-  const visibleColumns = COLUMN_ORDER.map((id) =>
-    COLUMNS.find((c) => c.id === id)!,
-  ).filter((c) => !hidden.includes(c.id));
+  // Ordre des colonnes : glisser-déposer des en-têtes ou flèches du panneau.
+  const columnOrder = useColumnOrder(
+    "emdb.historyTable.columnOrder",
+    COLUMN_ORDER,
+  );
+  const orderedColumns = columnOrder
+    .arrange(COLUMN_ORDER)
+    .map((id) => COLUMNS.find((c) => c.id === id)!);
+  const visibleColumns = orderedColumns.filter((c) => !hidden.includes(c.id));
+  const columnWidths = useColumnWidths("emdb.historyTable.columnWidths");
   const toggleColumn = (id: ColumnId) => {
     const next = hidden.includes(id)
       ? hidden.filter((h) => h !== id)
@@ -622,26 +632,13 @@ export function HistoryTable({
   return (
     <div className="space-y-3">
       {columnsOpen && (
-        <fieldset className="flex flex-wrap gap-x-4 gap-y-2 rounded-lg border p-3">
-          <legend className="px-1 text-xs text-muted-foreground">
-            Colonnes affichées
-          </legend>
-          {COLUMNS.map((c) => (
-            <label
-              key={c.id}
-              className="inline-flex items-center gap-1.5 text-sm"
-            >
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-primary"
-                checked={!hidden.includes(c.id)}
-                disabled={c.id === "titre"}
-                onChange={() => toggleColumn(c.id)}
-              />
-              {c.label}
-            </label>
-          ))}
-        </fieldset>
+        <ColumnsPanel
+          columns={orderedColumns.map((c) => ({ id: c.id, label: c.label }))}
+          isVisible={(id) => !hidden.includes(id as ColumnId)}
+          onToggle={(id) => toggleColumn(id as ColumnId)}
+          onShift={(id, delta) => columnOrder.shift(id, delta)}
+          onResetOrder={columnOrder.isCustom ? columnOrder.reset : undefined}
+        />
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -705,7 +702,9 @@ export function HistoryTable({
                   <th
                     key={c.id}
                     scope="col"
-                    className="whitespace-nowrap px-2 py-2 font-medium"
+                    {...columnOrder.headerProps(c.id)}
+                    style={columnWidths.styleOf(c.id)}
+                    className="relative cursor-grab whitespace-nowrap px-2 py-2 font-medium data-[drop-target]:bg-primary/10"
                     aria-sort={
                       active
                         ? sort?.direction === "asc"
@@ -714,6 +713,7 @@ export function HistoryTable({
                         : "none"
                     }
                   >
+                    <span {...columnWidths.handleProps(c.id, c.label)} />
                     {c.id === "affiche" ? (
                       <span className="sr-only">{c.label}</span>
                     ) : (
@@ -779,7 +779,11 @@ export function HistoryTable({
                     </td>
                   )}
                   {visibleColumns.map((c) => (
-                    <td key={c.id} className="px-2 py-1.5">
+                    <td
+                      key={c.id}
+                      style={columnWidths.styleOf(c.id)}
+                      className="px-2 py-1.5"
+                    >
                       {renderCell(c, row)}
                     </td>
                   ))}
