@@ -15,14 +15,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmojiPicker } from "@/components/common/EmojiPicker";
 
 type GroupNameDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   initialName: string;
+  /** Emoji actuel (renommage) ; absent = aucun. */
+  initialEmoji?: string | null;
   submitLabel: string;
-  onSubmit: (nom: string) => Promise<void>;
+  onSubmit: (nom: string, emoji: string | null) => Promise<void>;
 };
 
 export function GroupNameDialog({
@@ -30,19 +33,22 @@ export function GroupNameDialog({
   onOpenChange,
   title,
   initialName,
+  initialEmoji = null,
   submitLabel,
   onSubmit,
 }: GroupNameDialogProps) {
   const [nom, setNom] = useState(initialName);
+  const [emoji, setEmoji] = useState<string | null>(initialEmoji);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
     if (open) {
       setNom(initialName);
+      setEmoji(initialEmoji);
       setError("");
     }
-  }, [open, initialName]);
+  }, [open, initialName, initialEmoji]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +56,7 @@ export function GroupNameDialog({
     setPending(true);
     setError("");
     try {
-      await onSubmit(nom.trim());
+      await onSubmit(nom.trim(), emoji);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur.");
     } finally {
@@ -67,13 +73,16 @@ export function GroupNameDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="group-name">Nom</Label>
-            <Input
-              id="group-name"
-              value={nom}
-              onChange={(e) => setNom(e.target.value)}
-              maxLength={100}
-              autoFocus
-            />
+            <div className="flex items-center gap-2">
+              <EmojiPicker value={emoji} onChange={setEmoji} label="Emoji du sous-groupe" />
+              <Input
+                id="group-name"
+                value={nom}
+                onChange={(e) => setNom(e.target.value)}
+                maxLength={100}
+                autoFocus
+              />
+            </div>
           </div>
           {error && (
             <p role="alert" className="text-sm text-destructive">

@@ -116,6 +116,12 @@ Supabase expose le schéma `public` en REST (`/rest/v1/<table>`) aux rôles `ano
 
 ---
 
+## 😀 Emoji des listes et groupes (migration `list_emojis`)
+
+`user_lists.emoji` et `list_groups.emoji` : facultatifs, affichés devant le nom. Bornés à 16 caractères par une contrainte CHECK (un emoji peut compter plusieurs points de code : drapeaux, familles, variantes de couleur). Côté API, une chaîne vide efface l'emoji. Mêmes droits que le nom : `list:update` pour la liste, `item:update` pour un groupe.
+
+---
+
 ## 🎬 Unicité des credits (migration `credits_unique_nulls_not_distinct`)
 
 `credits` est unique sur `(title_id, person_id, role_id, episode_id)`. Pour les credits d'un titre entier, `episode_id` est NULL ; avec un index unique classique, Postgres considère deux NULL comme différents, donc l'index ne bloquait rien. Chaque import ou actualisation TMDB réinsérait tout le casting et l'équipe : en production, 125 346 des 191 210 lignes étaient des doublons (27 024 groupes), ce qui faisait apparaître un réalisateur plusieurs fois.

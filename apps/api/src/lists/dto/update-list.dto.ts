@@ -15,4 +15,10 @@ export class UpdateListDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  /** Emoji affiché devant le nom (facultatif ; chaîne vide ou null = aucun). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  emoji?: string | null;
 }

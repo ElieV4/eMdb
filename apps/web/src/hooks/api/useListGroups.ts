@@ -17,10 +17,20 @@ function useInvalidateList() {
 export function useCreateGroup() {
   const invalidate = useInvalidateList();
   return useMutation({
-    mutationFn: ({ listId, nom, parentId }: { listId: string; nom: string; parentId?: string }) =>
+    mutationFn: ({
+      listId,
+      nom,
+      parentId,
+      emoji,
+    }: {
+      listId: string;
+      nom: string;
+      parentId?: string;
+      emoji?: string | null;
+    }) =>
       apiFetch(`/lists/${listId}/groups`, {
         method: "POST",
-        body: { nom, ...(parentId ? { parent_id: parentId } : {}) },
+        body: { nom, ...(parentId ? { parent_id: parentId } : {}), ...(emoji ? { emoji } : {}) },
       }),
     onSuccess: (_, { listId }) => invalidate(listId),
   });
@@ -29,8 +39,21 @@ export function useCreateGroup() {
 export function useRenameGroup() {
   const invalidate = useInvalidateList();
   return useMutation({
-    mutationFn: ({ listId, groupId, nom }: { listId: string; groupId: string; nom: string }) =>
-      apiFetch(`/lists/${listId}/groups/${groupId}`, { method: "PATCH", body: { nom } }),
+    mutationFn: ({
+      listId,
+      groupId,
+      nom,
+      emoji,
+    }: {
+      listId: string;
+      groupId: string;
+      nom?: string;
+      emoji?: string | null;
+    }) =>
+      apiFetch(`/lists/${listId}/groups/${groupId}`, {
+        method: "PATCH",
+        body: { ...(nom !== undefined ? { nom } : {}), ...(emoji !== undefined ? { emoji: emoji ?? "" } : {}) },
+      }),
     onSuccess: (_, { listId }) => invalidate(listId),
   });
 }

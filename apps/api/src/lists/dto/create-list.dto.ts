@@ -27,4 +27,10 @@ export class CreateListDto {
   @IsOptional()
   @IsIn(SHARE_MODES)
   share_mode?: ShareMode;
+
+  /** Emoji affiché devant le nom (facultatif ; chaîne vide ou null = aucun). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  emoji?: string | null;
 }
