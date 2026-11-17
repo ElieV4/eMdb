@@ -17,7 +17,7 @@ import {
 // Types backend (snake_case) pour la recherche
 // ============================================
 
-type BackendTitleSearchResult = {
+export type BackendTitleSearchResult = {
   tmdb_id: number;
   titre_vo: string;
   titre_vf: string | null;
@@ -61,7 +61,7 @@ export type UnifiedSearchResult = {
 // Transformation backend → frontend
 // ============================================
 
-function mapBackendTitleToSearchResult(
+export function mapBackendTitleToSearchResult(
   item: BackendTitleSearchResult,
 ): TitleSearchResult {
   const id = item.local_id ?? String(item.tmdb_id);
@@ -224,4 +224,39 @@ export function useDebouncedSearch(
     setQuery: setInternalQuery,
     debouncedQuery,
   };
+}
+
+// ============================================
+// Hook : recherche de titres seule, avec debounce (ajout rapide d'une liste)
+// ============================================
+
+/**
+ * Recherche de titres (films et séries) avec debounce, sans la requête
+ * personnes de `useSearch`. Ne part pas sous 2 caractères.
+ */
+export function useDebouncedTitleSearch(
+  query: string,
+  { debounceMs = 350, limit = 20 }: { debounceMs?: number; limit?: number } = {},
+) {
+  const [debouncedQuery, setDebouncedQuery] = useState(query.trim());
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), debounceMs);
+    return () => clearTimeout(timer);
+  }, [query, debounceMs]);
+
+  const result = useQuery({
+    // Clé distincte de useSearch (forme de données différente), sous "search"
+    // pour profiter de l'invalidation après import (useGetOrImportTitle).
+    queryKey: ["search", "titles-quick", debouncedQuery, limit],
+    queryFn: async (): Promise<TitleSearchResult[]> => {
+      const searchParams = new URLSearchParams({ q: debouncedQuery, page: "1", limit: String(limit) });
+      const data = await apiFetch<BackendTitleSearchResult[]>(`/titles/search?${searchParams.toString()}`);
+      return data.map(mapBackendTitleToSearchResult);
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: debouncedQuery.length >= 2,
+  });
+
+  return { ...result, debouncedQuery, isDebouncing: query.trim() !== debouncedQuery };
 }

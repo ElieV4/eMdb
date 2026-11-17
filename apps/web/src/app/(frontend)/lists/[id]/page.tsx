@@ -25,6 +25,7 @@ import { TitleCard } from "@/components/titles/TitleCard";
 import { ListActionsMenu } from "@/components/lists/ListActionsMenu";
 import { ListReorder } from "@/components/lists/ListReorder";
 import { ListGroupsBar } from "@/components/lists/ListGroupsBar";
+import { ListQuickAdd } from "@/components/lists/ListQuickAdd";
 import { ListItemOverlay } from "@/components/lists/ListItemOverlay";
 import { ItemGroupsDialog } from "@/components/lists/ItemGroupsDialog";
 import { ItemCommentsDialog } from "@/components/lists/ItemCommentsDialog";
@@ -223,6 +224,10 @@ function ListDetailPageContent() {
           ) : null}
         </div>
 
+        {list && list.capabilities.canAddItems && !editMode && !isLoading && !error && (
+          <ListQuickAdd listId={list.id} existingTitleIds={new Set(items.map((i) => i.id))} />
+        )}
+
         {isWatchlist && !editMode && !isLoading && !error && items.length > 0 && (
           <div className="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
             {[
@@ -315,7 +320,7 @@ function ListDetailPageContent() {
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {list?.capabilities.canAddItems
-              ? "Cette liste est vide. Ajoutez des titres depuis leur fiche."
+              ? "Cette liste est vide. Ajoutez des titres avec l'ajout rapide ci-dessus ou depuis leur fiche."
               : "Cette liste est vide."}
           </p>
         ) : editMode ? (
