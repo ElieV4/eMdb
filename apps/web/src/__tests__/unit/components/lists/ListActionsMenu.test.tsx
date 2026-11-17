@@ -3,7 +3,7 @@
  * des droits (capabilities) de l'utilisateur sur une liste partagée.
  */
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { ListActionsMenu } from "@/components/lists/ListActionsMenu";
 import { ListCapabilities } from "@/lib/types/api";
 
@@ -63,8 +63,43 @@ describe("ListActionsMenu — listes partagées", () => {
     expect(button("Partager")).toBeInTheDocument();
     expect(button("Modifier la liste")).toBeInTheDocument();
     expect(button("Modifier le contenu")).toBeInTheDocument();
-    expect(button("Supprimer la liste")).toBeInTheDocument();
+    // Supprimer : plus dans l'en-tête, mais dans le dialogue « Modifier la liste ».
+    expect(button("Supprimer la liste")).not.toBeInTheDocument();
     expect(button("Quitter la liste")).not.toBeInTheDocument();
+  });
+
+  it("en-tête : boutons icône seule, libellé en aria-label (affiché au survol)", () => {
+    renderButtons({ ...none, canEditList: true, canManageShares: true }, "owner");
+
+    const share = button("Partager")!;
+    expect(share).toHaveAttribute("aria-label", "Partager");
+    expect(share.textContent).toBe("");
+    expect(share.className).toContain("rounded-full");
+  });
+
+  it("Supprimer la liste est proposé dans le dialogue Modifier la liste", () => {
+    renderButtons({ ...none, canEditList: true, canDeleteList: true }, "owner");
+
+    fireEvent.click(button("Modifier la liste")!);
+    fireEvent.click(screen.getByRole("button", { name: /Supprimer la liste/ }));
+
+    expect(screen.getByText("Supprimer la liste ?")).toBeInTheDocument();
+  });
+
+  it("Ajout rapide : bouton d'en-tête qui bascule le module", () => {
+    const onToggle = jest.fn();
+    render(
+      <ListActionsMenu
+        list={list}
+        capabilities={{ ...none, canAddItems: true }}
+        role="owner"
+        variant="buttons"
+        quickAdd={{ open: false, onToggle }}
+      />,
+    );
+
+    fireEvent.click(button("Ajout rapide")!);
+    expect(onToggle).toHaveBeenCalled();
   });
 
   it("membre en lecture : seulement Quitter la liste", () => {
