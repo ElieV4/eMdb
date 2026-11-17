@@ -1,7 +1,9 @@
 /**
  * Module "Ajout rapide" d'une liste : barre de recherche intégrée et
  * résultats sur une seule ligne défilante (même présentation que le module
- * "Titres recommandés"), avec un bouton d'ajout par affiche.
+ * "Titres recommandés" de la page titre : mêmes cartes `TitleCard` compactes,
+ * à la taille d'affiche réglée dans les paramètres), avec un bouton
+ * « Ajouter » sous chaque carte.
  *
  * Un résultat TMDB pas encore en base est importé à la volée avant l'ajout
  * (même mécanisme que le menu d'actions rapides des cartes). Les titres déjà
@@ -18,7 +20,10 @@ import { Check, Loader2, Plus, Search, X } from "lucide-react";
 import { useDebouncedTitleSearch } from "@/hooks/api/useSearch";
 import { useAddListItem } from "@/hooks/api/useAddListItem";
 import { useGetOrImportTitle } from "@/hooks/api/useGetOrImportTitle";
-import { TitlePoster } from "@/components/titles/TitlePoster";
+import { TitleCard } from "@/components/titles/TitleCard";
+import { Button } from "@/components/ui/button";
+import { useWatchedTitles, useListMembership } from "@/hooks/api";
+import { usePosterScale } from "@/hooks/usePosterScale";
 import { Input } from "@/components/ui/input";
 import { TitleSearchResult } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
@@ -43,6 +48,10 @@ export function ListQuickAdd({ listId, existingTitleIds, className }: ListQuickA
   const { data: results, isFetching, isDebouncing, debouncedQuery } = useDebouncedTitleSearch(query);
   const addListItem = useAddListItem();
   const getOrImportTitle = useGetOrImportTitle();
+  const { data: watchedTitles } = useWatchedTitles();
+  const { watchlistIds, favoriteIds } = useListMembership();
+  // Même largeur que les cartes compactes de TitleCard (150 px × réglage).
+  const cardWidth = Math.round(150 * usePosterScale());
 
   const searching = query.trim().length >= MIN_QUERY_LENGTH;
   const loading = searching && (isDebouncing || isFetching) && !results;
@@ -71,7 +80,7 @@ export function ListQuickAdd({ listId, existingTitleIds, className }: ListQuickA
   };
 
   return (
-    <section className={cn("space-y-3 rounded-lg border p-4", className)} aria-label="Ajout rapide">
+    <section className={cn("space-y-4", className)} aria-label="Ajout rapide">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Ajout rapide</h2>
         <div className="relative w-full sm:w-80">
@@ -106,7 +115,7 @@ export function ListQuickAdd({ listId, existingTitleIds, className }: ListQuickA
       ) : loading ? (
         <div className="flex gap-4 overflow-hidden pb-2" aria-busy="true">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] w-32 shrink-0 animate-pulse rounded-lg bg-muted" />
+            <div key={i} className="aspect-[2/3] shrink-0 animate-pulse rounded-lg bg-muted" style={{ width: cardWidth }} />
           ))}
         </div>
       ) : results && results.length > 0 ? (
@@ -116,37 +125,33 @@ export function ListQuickAdd({ listId, existingTitleIds, className }: ListQuickA
             const inList = isInList(title);
             const pending = pendingKey === key;
             return (
-              <li key={key} className="w-32 shrink-0 space-y-1.5">
-                <div className="relative">
-                  <TitlePoster src={title.afficheUrl} alt={title.titre} title={title.titre} type={title.type} />
-                  <button
-                    type="button"
-                    onClick={() => handleAdd(title)}
-                    disabled={inList || pendingKey !== null}
-                    aria-label={inList ? `${title.titre} est dans la liste` : `Ajouter ${title.titre} à la liste`}
-                    className={cn(
-                      "absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full shadow transition-colors",
-                      inList
-                        ? "bg-emerald-600 text-white"
-                        : "bg-primary text-white hover:bg-primary/90 disabled:opacity-60",
-                    )}
-                  >
-                    {pending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : inList ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Plus className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-                <p className="line-clamp-2 text-sm font-medium leading-tight" title={title.titre}>
-                  {title.titre}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {title.type === "serie" ? "Série" : "Film"}
-                  {inList && " · Dans la liste"}
-                </p>
+              <li key={key} className="shrink-0 space-y-2" style={{ width: cardWidth }}>
+                <TitleCard
+                  title={title}
+                  compact
+                  showType={false}
+                  watched={title.local ? watchedTitles?.has(title.id) : undefined}
+                  inWatchlist={title.local ? watchlistIds.has(title.id) : undefined}
+                  inFavorites={title.local ? favoriteIds.has(title.id) : undefined}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={inList ? "secondary" : "outline"}
+                  className="w-full"
+                  onClick={() => handleAdd(title)}
+                  disabled={inList || pendingKey !== null}
+                  aria-label={inList ? `${title.titre} est dans la liste` : `Ajouter ${title.titre} à la liste`}
+                >
+                  {pending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : inList ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  {inList ? "Dans la liste" : "Ajouter"}
+                </Button>
               </li>
             );
           })}

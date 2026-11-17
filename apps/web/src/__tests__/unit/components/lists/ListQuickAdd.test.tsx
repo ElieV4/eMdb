@@ -25,9 +25,14 @@ jest.mock("@/hooks/api/useAddListItem", () => ({
 jest.mock("@/hooks/api/useGetOrImportTitle", () => ({
   useGetOrImportTitle: () => ({ mutateAsync: getOrImportTitle }),
 }));
-jest.mock("@/components/titles/TitlePoster", () => ({
-  TitlePoster: ({ alt }: { alt: string }) => <div data-testid="poster">{alt}</div>,
+jest.mock("@/components/titles/TitleCard", () => ({
+  TitleCard: ({ title }: { title: { titre: string } }) => <div data-testid="card">{title.titre}</div>,
 }));
+jest.mock("@/hooks/api", () => ({
+  useWatchedTitles: () => ({ data: new Set() }),
+  useListMembership: () => ({ watchlistIds: new Set(), favoriteIds: new Set() }),
+}));
+jest.mock("@/hooks/usePosterScale", () => ({ usePosterScale: () => 1 }));
 
 const local = (id: string, titre: string): TitleSearchResult => ({
   id,
