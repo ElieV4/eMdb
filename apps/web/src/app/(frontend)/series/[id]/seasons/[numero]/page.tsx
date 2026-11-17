@@ -56,11 +56,7 @@ export default function SeasonDetailPage({
 
   const { titre, date_sortie, synopsis, episodes } = season;
   const year = date_sortie ? new Date(date_sortie).getFullYear() : null;
-  const titleHref = buildEntityUrl(
-    "/titles",
-    id,
-    title?.titre_vf || title?.titre_vo,
-  );
+  const titleHref = buildEntityUrl("/titles", id, title?.titre_vf || title?.titre_vo);
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">

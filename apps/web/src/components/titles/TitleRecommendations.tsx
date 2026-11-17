@@ -51,8 +51,8 @@ export function TitleRecommendations({
     note: rec.note_imdb ?? null,
     genreIds: undefined,
     countryIds: undefined,
-    listIds: rec.id ? (listIdsByTitle.get(rec.id) ?? []) : [],
-    watched: rec.id ? (watchedTitles?.has(rec.id) ?? false) : false,
+    listIds: rec.id ? listIdsByTitle.get(rec.id) ?? [] : [],
+    watched: rec.id ? watchedTitles?.has(rec.id) ?? false : false,
   });
 
   const filtered = (recommendations ?? []).filter((rec) =>

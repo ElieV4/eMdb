@@ -51,9 +51,7 @@ export default function TitleDetailPage({
   const { data: serieProgress } = useSerieProgress(id, {
     enabled: isAuthenticated && title?.type === "serie",
   });
-  const progressBySeason = new Map(
-    (serieProgress ?? []).map((p) => [p.saison, p]),
-  );
+  const progressBySeason = new Map((serieProgress ?? []).map((p) => [p.saison, p]));
 
   const refreshTitle = useRefreshTitle(id);
 
@@ -101,14 +99,8 @@ export default function TitleDetailPage({
               onRefresh={() => refreshTitle.mutate()}
               isPending={refreshTitle.isPending}
               isError={refreshTitle.isError}
-              label={
-                isCreditsPartial
-                  ? "Charger toute la distribution"
-                  : "Actualiser"
-              }
-              pendingLabel={
-                isCreditsPartial ? "Chargement..." : "Actualisation..."
-              }
+              label={isCreditsPartial ? "Charger toute la distribution" : "Actualiser"}
+              pendingLabel={isCreditsPartial ? "Chargement..." : "Actualisation..."}
             />
           </div>
           {isCreditsLoading ? (

@@ -120,10 +120,7 @@ export function DateCard({
             </span>
           )}
         </div>
-        <p
-          className="mt-1.5 text-sm font-medium line-clamp-1 group-hover:text-primary"
-          title={title}
-        >
+        <p className="mt-1.5 text-sm font-medium line-clamp-1 group-hover:text-primary" title={title}>
           {title}
         </p>
         {subtitle && (
@@ -135,10 +132,7 @@ export function DateCard({
           </p>
         )}
         {comment && (
-          <p
-            className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2"
-            title={comment}
-          >
+          <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2" title={comment}>
             « {comment} »
           </p>
         )}

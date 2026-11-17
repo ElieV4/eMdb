@@ -25,12 +25,7 @@ type EditMenuButtonProps = {
   className?: string;
 };
 
-export function EditMenuButton({
-  onConfigure,
-  onEditContent,
-  editing = false,
-  className,
-}: EditMenuButtonProps) {
+export function EditMenuButton({ onConfigure, onEditContent, editing = false, className }: EditMenuButtonProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -73,11 +68,7 @@ export function EditMenuButton({
             onEditContent();
           }}
         >
-          {editing ? (
-            <X className="mr-2 h-4 w-4" />
-          ) : (
-            <ListChecks className="mr-2 h-4 w-4" />
-          )}
+          {editing ? <X className="mr-2 h-4 w-4" /> : <ListChecks className="mr-2 h-4 w-4" />}
           {editing ? "Terminer la modification" : "Modifier le contenu"}
         </DropdownMenuItem>
       </DropdownMenuContent>

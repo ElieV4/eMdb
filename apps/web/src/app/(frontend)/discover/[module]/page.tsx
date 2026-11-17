@@ -8,16 +8,9 @@
 "use client";
 
 import { notFound } from "next/navigation";
-import {
-  DiscoverModuleSection,
-  DISCOVER_MODULES,
-} from "@/components/discover/DiscoverModuleSection";
+import { DiscoverModuleSection, DISCOVER_MODULES } from "@/components/discover/DiscoverModuleSection";
 
-export default function DiscoverModulePage({
-  params,
-}: {
-  params: { module: string };
-}) {
+export default function DiscoverModulePage({ params }: { params: { module: string } }) {
   const mod = DISCOVER_MODULES.find((m) => m.key === params.module);
   if (!mod) notFound();
 

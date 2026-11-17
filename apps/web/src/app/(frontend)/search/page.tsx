@@ -39,8 +39,7 @@ function SearchPageContent() {
   // via une prop searchParams figée au montage) pour rester réactifs quand le
   // header change le filtre `type` sans démonter la page (bug #33).
   const urlQuery = searchParams.get("query") || "";
-  const activeTab =
-    (searchParams.get("type") as SearchType | "tout" | null) || "tout";
+  const activeTab = (searchParams.get("type") as SearchType | "tout" | null) || "tout";
 
   // État local pour le champ de recherche (contrôlé, pour une saisie fluide)
   const [query, setQuery] = useState(urlQuery);
@@ -93,12 +92,7 @@ function SearchPageContent() {
     hasNextPage: hasNextPeople,
     isFetchingNextPage: isFetchingNextPeople,
   } = useInfinitePeopleSearch(
-    query &&
-      activeTab !== "film" &&
-      activeTab !== "serie" &&
-      activeTab !== "studio"
-      ? query
-      : "",
+    query && activeTab !== "film" && activeTab !== "serie" && activeTab !== "studio" ? query : "",
   );
 
   const {
@@ -131,10 +125,7 @@ function SearchPageContent() {
   const rawTitlesData = titlesPages?.pages.flatMap((p) => p.items) ?? [];
   const titlesData = rawTitlesData.filter((title) =>
     titleMatchesFilters(
-      toFilterableTitle(title, {
-        watchedTitleIds: watchedTitles,
-        listIdsByTitle,
-      }),
+      toFilterableTitle(title, { watchedTitleIds: watchedTitles, listIdsByTitle }),
       filters,
     ),
   );
@@ -149,27 +140,15 @@ function SearchPageContent() {
   const titlesTotal = titlesPages?.pages.at(-1)?.total ?? rawTitlesData.length;
   const peopleTotal = peoplePages?.pages.at(-1)?.total ?? peopleData.length;
   const studiosTotal = studiosPages?.pages.at(-1)?.total ?? studiosData.length;
-  const totalItems = isStudioTab
-    ? studiosTotal
-    : isPeopleTab
-      ? peopleTotal
-      : titlesTotal;
+  const totalItems = isStudioTab ? studiosTotal : isPeopleTab ? peopleTotal : titlesTotal;
 
-  const hasNextPage = isStudioTab
-    ? hasNextStudios
-    : isPeopleTab
-      ? hasNextPeople
-      : hasNextTitles;
+  const hasNextPage = isStudioTab ? hasNextStudios : isPeopleTab ? hasNextPeople : hasNextTitles;
   const isFetchingNextPage = isStudioTab
     ? isFetchingNextStudios
     : isPeopleTab
       ? isFetchingNextPeople
       : isFetchingNextTitles;
-  const fetchNextPage = isStudioTab
-    ? fetchNextStudios
-    : isPeopleTab
-      ? fetchNextPeople
-      : fetchNextTitles;
+  const fetchNextPage = isStudioTab ? fetchNextStudios : isPeopleTab ? fetchNextPeople : fetchNextTitles;
 
   // Charge la page suivante dès que la sentinelle en bas de grille entre
   // dans le viewport.
@@ -223,6 +202,7 @@ function SearchPageContent() {
               />
             </div>
           </form>
+
         </div>
 
         {/* Résultats */}
@@ -255,10 +235,7 @@ function SearchPageContent() {
                 {totalItems} résultat{totalItems > 1 ? "s" : ""}
               </p>
 
-              {!isPeopleTab &&
-              !isStudioTab &&
-              titlesData.length === 0 &&
-              hasActiveTitleFilters(filters) ? (
+              {!isPeopleTab && !isStudioTab && titlesData.length === 0 && hasActiveTitleFilters(filters) ? (
                 <p className="text-sm text-muted-foreground">
                   Aucun résultat chargé ne correspond aux filtres actifs.
                 </p>
@@ -272,33 +249,35 @@ function SearchPageContent() {
                       : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
                   )}
                 >
-                  {activeTab === "personne"
-                    ? peopleData.map((person) => (
-                        <PersonCard key={person.id} person={person} compact />
-                      ))
-                    : activeTab === "studio"
-                      ? studiosData.map((studio) => (
-                          <StudioCard
-                            key={studio.id}
-                            studio={{
-                              id: studio.id,
-                              tmdbId: studio.tmdb_id,
-                              nom: studio.nom,
-                              logoUrl: studio.logo_url,
-                            }}
-                            compact
-                          />
-                        ))
-                      : titlesData.map((title) => (
-                          <TitleCard
-                            key={title.id}
-                            title={title}
-                            compact
-                            watched={watchedTitles?.has(title.id)}
-                            inWatchlist={watchlistIds.has(title.id)}
-                            inFavorites={favoriteIds.has(title.id)}
-                          />
-                        ))}
+                  {activeTab === "personne" ? (
+                    peopleData.map((person) => (
+                      <PersonCard key={person.id} person={person} compact />
+                    ))
+                  ) : activeTab === "studio" ? (
+                    studiosData.map((studio) => (
+                      <StudioCard
+                        key={studio.id}
+                        studio={{
+                          id: studio.id,
+                          tmdbId: studio.tmdb_id,
+                          nom: studio.nom,
+                          logoUrl: studio.logo_url,
+                        }}
+                        compact
+                      />
+                    ))
+                  ) : (
+                    titlesData.map((title) => (
+                      <TitleCard
+                        key={title.id}
+                        title={title}
+                        compact
+                        watched={watchedTitles?.has(title.id)}
+                        inWatchlist={watchlistIds.has(title.id)}
+                        inFavorites={favoriteIds.has(title.id)}
+                      />
+                    ))
+                  )}
                 </div>
               )}
 

@@ -96,11 +96,7 @@ export function TitleCard({
         local={local}
         watched={watched}
         className="absolute z-20"
-        style={{
-          top: `${posterWidth * 1.5}px`,
-          right: "8px",
-          transform: "translateY(-50%)",
-        }}
+        style={{ top: `${posterWidth * 1.5}px`, right: "8px", transform: "translateY(-50%)" }}
       />
       <Link
         href={href}
@@ -126,26 +122,17 @@ export function TitleCard({
 
         {/* Padding proportionnel à la taille d'affiche réglée (page paramètres) :
             un poster plus petit avec le même padding fixe paraissait mal proportionné. */}
-        <div
-          className="bg-background"
-          style={{ padding: `${Math.round(12 * posterScale)}px` }}
-        >
+        <div className="bg-background" style={{ padding: `${Math.round(12 * posterScale)}px` }}>
           <div className="space-y-1">
             {/* Titre — mêmes classes que DateCard/ContinueWatchingCard (uniformisation
                 typographique demandée par l'utilisateur, référence : cartes épisode du calendrier) */}
-            <h3
-              className="text-sm font-medium line-clamp-1 group-hover:text-primary"
-              title={displayTitle}
-            >
+            <h3 className="text-sm font-medium line-clamp-1 group-hover:text-primary" title={displayTitle}>
               {displayTitle}
             </h3>
 
             {/* Titre original si différent */}
             {titreOriginal && titreOriginal !== titre && !compact && (
-              <p
-                className="text-xs text-muted-foreground line-clamp-1"
-                title={titre}
-              >
+              <p className="text-xs text-muted-foreground line-clamp-1" title={titre}>
                 {titre}
               </p>
             )}
@@ -236,39 +223,33 @@ export function TitleCardHorizontal({
         />
 
         <div className="flex-1 min-w-0">
-          <h3
-            className="text-sm font-medium line-clamp-1 group-hover:text-primary"
-            title={titre}
-          >
-            {titre}
-          </h3>
-          {titreOriginal && titreOriginal !== titre && (
-            <p
-              className="text-xs text-muted-foreground line-clamp-1"
-              title={titreOriginal}
-            >
-              {titreOriginal}
-            </p>
-          )}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {year && <span>{year}</span>}
-            {note && (
-              <span className="flex items-center gap-0.5 text-amber-400">
-                <Star className="h-3 w-3 fill-current" />
-                {Number(note).toFixed(1)}
-              </span>
-            )}
-            <span
-              className={cn(
-                "px-1.5 py-0.5 text-xs font-medium rounded-full",
-                type === "film"
-                  ? "bg-primary/10 text-primary-foreground"
-                  : "bg-secondary/10 text-secondary-foreground",
-              )}
-            >
-              {type === "film" ? "Film" : "Série"}
+        <h3 className="text-sm font-medium line-clamp-1 group-hover:text-primary" title={titre}>
+          {titre}
+        </h3>
+        {titreOriginal && titreOriginal !== titre && (
+          <p className="text-xs text-muted-foreground line-clamp-1" title={titreOriginal}>
+            {titreOriginal}
+          </p>
+        )}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {year && <span>{year}</span>}
+          {note && (
+            <span className="flex items-center gap-0.5 text-amber-400">
+              <Star className="h-3 w-3 fill-current" />
+              {Number(note).toFixed(1)}
             </span>
-          </div>
+          )}
+          <span
+            className={cn(
+              "px-1.5 py-0.5 text-xs font-medium rounded-full",
+              type === "film"
+                ? "bg-primary/10 text-primary-foreground"
+                : "bg-secondary/10 text-secondary-foreground",
+            )}
+          >
+            {type === "film" ? "Film" : "Série"}
+          </span>
+        </div>
         </div>
       </Link>
     </div>

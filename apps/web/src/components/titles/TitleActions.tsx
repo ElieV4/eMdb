@@ -31,15 +31,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Check,
-  Heart,
-  ListPlus,
-  History,
-  Loader2,
-  Archive,
-  ArchiveRestore,
-} from "lucide-react";
+import { Check, Heart, ListPlus, History, Loader2, Archive, ArchiveRestore } from "lucide-react";
 import { WatchButton } from "@/components/watches/WatchButton";
 import { HistoryDialog } from "@/components/watches/HistoryDialog";
 import { FollowButton } from "@/components/watches/FollowButton";
@@ -66,12 +58,7 @@ type TitleActionsProps = {
   className?: string;
 };
 
-export function TitleActions({
-  titleId,
-  type,
-  releaseDate,
-  className,
-}: TitleActionsProps) {
+export function TitleActions({ titleId, type, releaseDate, className }: TitleActionsProps) {
   const { isAuthenticated } = useAuthStore();
   const { data: follows } = useFollows();
   const { data: userLists } = useUserLists(titleId);
@@ -111,9 +98,7 @@ export function TitleActions({
   const favoriteList = userLists?.find((l) => l.type === "favoris");
   const watchlist = userLists?.find((l) => l.type === "watchlist");
   const customLists = userLists?.filter((l) => l.type === "custom") ?? [];
-  const listsContainingTitle = (userLists ?? []).filter(
-    (l) => l.contains_title,
-  ).length;
+  const listsContainingTitle = (userLists ?? []).filter((l) => l.contains_title).length;
 
   const isInList = (listId: string) => {
     const list = userLists?.find((l) => l.id === listId);
@@ -186,119 +171,108 @@ export function TitleActions({
           />
         )}
         {type === "serie" && (
-          <FollowButton
-            titleId={titleId}
-            initialFollowed={isFollowed}
-            compact
-          />
+          <FollowButton titleId={titleId} initialFollowed={isFollowed} compact />
         )}
 
         {/* Menu burger */}
         <div className="relative inline-block">
-          <DropdownMenu>
-            {/* `render` fusionne le déclencheur du menu sur CE bouton au lieu
+        <DropdownMenu>
+          {/* `render` fusionne le déclencheur du menu sur CE bouton au lieu
               d'imbriquer un <button> dans un autre <button> (HTML invalide qui
               empêchait le clic d'ouvrir le menu, bug #45). */}
-            <DropdownMenuTrigger
-              render={
-                <Button variant="outline" size="icon" aria-label="Listes">
-                  <ListPlus className="h-4 w-4" />
-                </Button>
-              }
-            />
-            {/* Étiquette rouge : nombre de listes contenant ce titre — sibling
+          <DropdownMenuTrigger
+            render={
+              <Button variant="outline" size="icon" aria-label="Listes">
+                <ListPlus className="h-4 w-4" />
+              </Button>
+            }
+          />
+          {/* Étiquette rouge : nombre de listes contenant ce titre — sibling
               du bouton, positionnée en absolu (même contrainte que le menu
               actions rapides, un badge ne peut pas être imbriqué dans le
               <button> ci-dessus proprement sans casser sa mise en page). */}
-            {listsContainingTitle > 0 && (
-              <span
-                className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white"
-                aria-label={`Dans ${listsContainingTitle} liste${listsContainingTitle > 1 ? "s" : ""}`}
-              >
-                {listsContainingTitle}
-              </span>
-            )}
-            <DropdownMenuContent align="end" className="w-56">
-              {/* Watchlist */}
-              {watchlist && (
-                <DropdownMenuItem
-                  onClick={() => handleToggleList(watchlist.id)}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      isInList(watchlist.id) && "text-primary",
-                    )}
-                  />
-                  Watchlist
-                </DropdownMenuItem>
-              )}
-              {/* Abandonner / reprendre une série de la watchlist */}
-              {type === "serie" && watchlist && (
-                <DropdownMenuItem onClick={handleToggleAbandon}>
-                  {watchlistStatus === "abandonnee" ? (
-                    <>
-                      <ArchiveRestore className="mr-2 h-4 w-4" />
-                      Reprendre la série
-                    </>
-                  ) : (
-                    <>
-                      <Archive className="mr-2 h-4 w-4" />
-                      Abandonner la série
-                    </>
+          {listsContainingTitle > 0 && (
+            <span
+              className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white"
+              aria-label={`Dans ${listsContainingTitle} liste${listsContainingTitle > 1 ? "s" : ""}`}
+            >
+              {listsContainingTitle}
+            </span>
+          )}
+          <DropdownMenuContent align="end" className="w-56">
+            {/* Watchlist */}
+            {watchlist && (
+              <DropdownMenuItem onClick={() => handleToggleList(watchlist.id)}>
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    isInList(watchlist.id) && "text-primary",
                   )}
-                </DropdownMenuItem>
-              )}
-              {/* Favoris */}
-              {favoriteList && (
-                <DropdownMenuItem
-                  onClick={() => handleToggleList(favoriteList.id)}
-                >
-                  <Heart
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      isInList(favoriteList.id) && "text-red-500 fill-red-500",
-                    )}
-                  />
-                  Favoris
-                </DropdownMenuItem>
-              )}
-              {/* Listes personnalisées */}
-              {customLists.map((list) => (
-                <DropdownMenuItem
-                  key={list.id}
-                  onClick={() => handleToggleList(list.id)}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      isInList(list.id) && "text-primary",
-                    )}
-                  />
-                  <span className="truncate">{list.nom}</span>
-                  {list.shared && list.owner && (
-                    <span className="ml-auto pl-2 text-xs text-muted-foreground shrink-0">
-                      {list.owner.pseudo}
-                    </span>
-                  )}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setShowCreateList(true)}>
-                <ListPlus className="mr-2 h-4 w-4" />
-                Nouvelle liste
+                />
+                Watchlist
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+            {/* Abandonner / reprendre une série de la watchlist */}
+            {type === "serie" && watchlist && (
+              <DropdownMenuItem onClick={handleToggleAbandon}>
+                {watchlistStatus === "abandonnee" ? (
+                  <>
+                    <ArchiveRestore className="mr-2 h-4 w-4" />
+                    Reprendre la série
+                  </>
+                ) : (
+                  <>
+                    <Archive className="mr-2 h-4 w-4" />
+                    Abandonner la série
+                  </>
+                )}
+              </DropdownMenuItem>
+            )}
+            {/* Favoris */}
+            {favoriteList && (
+              <DropdownMenuItem
+                onClick={() => handleToggleList(favoriteList.id)}
+              >
+                <Heart
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    isInList(favoriteList.id) && "text-red-500 fill-red-500",
+                  )}
+                />
+                Favoris
+              </DropdownMenuItem>
+            )}
+            {/* Listes personnalisées */}
+            {customLists.map((list) => (
+              <DropdownMenuItem
+                key={list.id}
+                onClick={() => handleToggleList(list.id)}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    isInList(list.id) && "text-primary",
+                  )}
+                />
+                <span className="truncate">{list.nom}</span>
+                {list.shared && list.owner && (
+                  <span className="ml-auto pl-2 text-xs text-muted-foreground shrink-0">
+                    {list.owner.pseudo}
+                  </span>
+                )}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setShowCreateList(true)}>
+              <ListPlus className="mr-2 h-4 w-4" />
+              Nouvelle liste
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         </div>
 
         {/* Historique */}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Historique"
-          onClick={() => setHistoryOpen(true)}
-        >
+        <Button variant="ghost" size="icon" aria-label="Historique" onClick={() => setHistoryOpen(true)}>
           <History className="h-4 w-4" />
         </Button>
       </div>
@@ -336,9 +310,7 @@ export function TitleActions({
         onOpenChange={setHistoryOpen}
         watches={watches}
         onDelete={handleUnwatch}
-        onUpdateContext={(watchId, patch) =>
-          updateWatchContext.mutate({ watchId, data: patch })
-        }
+        onUpdateContext={(watchId, patch) => updateWatchContext.mutate({ watchId, data: patch })}
       />
 
       {/* Dialog création liste */}

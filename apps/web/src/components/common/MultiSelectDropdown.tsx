@@ -49,10 +49,7 @@ export function MultiSelectDropdown({
           </span>
           <ChevronDown className="h-3.5 w-3.5" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          className="max-h-72 w-64 overflow-y-auto"
-        >
+        <DropdownMenuContent align="start" className="max-h-72 w-64 overflow-y-auto">
           <DropdownMenuItem
             onClick={onSelectAll}
             disabled={!options || options.length === 0}

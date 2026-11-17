@@ -50,10 +50,7 @@ import { WatchDateMenuItems } from "@/components/watches/WatchDateMenuItems";
 import { WatchDatePickerDialog } from "@/components/watches/WatchDatePickerDialog";
 import { HistoryDialog } from "@/components/watches/HistoryDialog";
 import { useListMembership } from "@/hooks/api/useListMembership";
-import {
-  useUpdateListItemStatus,
-  WatchlistItemStatus,
-} from "@/hooks/api/useUpdateListItemStatus";
+import { useUpdateListItemStatus, WatchlistItemStatus } from "@/hooks/api/useUpdateListItemStatus";
 import { useAddItem } from "@/hooks/api/useAddItem";
 import { useRemoveItem } from "@/hooks/api/useRemoveItem";
 import { useCreateWatch } from "@/hooks/api/useCreateWatch";
@@ -132,9 +129,7 @@ export function TitleQuickActionsMenu({
   // récupérer pour chaque affiche tant que l'utilisateur ne le demande pas.
   // Un titre non-local n'a par définition aucun historique.
   const { data: historyData } = useWatches(
-    isEpisode
-      ? { episode_id: episodeId, limit: 50 }
-      : { title_id: titleId, limit: 50 },
+    isEpisode ? { episode_id: episodeId, limit: 50 } : { title_id: titleId, limit: 50 },
     { enabled: historyOpen && !needsImport && !!(titleId || episodeId) },
   );
   const historyWatches = historyData?.items ?? [];
@@ -174,16 +169,9 @@ export function TitleQuickActionsMenu({
     const resolvedId = await resolveTitleId();
     if (!resolvedId) return;
     if (!inWatchlist) {
-      await addItem.mutateAsync({
-        listId: watchlistId,
-        data: { title_id: resolvedId },
-      });
+      await addItem.mutateAsync({ listId: watchlistId, data: { title_id: resolvedId } });
     }
-    updateItemStatus.mutate({
-      listId: watchlistId,
-      titleId: resolvedId,
-      statut,
-    });
+    updateItemStatus.mutate({ listId: watchlistId, titleId: resolvedId, statut });
   };
 
   const finish = () => setOpen(false);
@@ -243,10 +231,7 @@ export function TitleQuickActionsMenu({
         />
         <DropdownMenuContent align="end" onClick={(e) => e.preventDefault()}>
           {!isEpisode && watchlistId && (
-            <DropdownMenuItem
-              onClick={toggleWatchlist}
-              className="cursor-pointer"
-            >
+            <DropdownMenuItem onClick={toggleWatchlist} className="cursor-pointer">
               {inWatchlist ? (
                 <>
                   <BookmarkMinus className="mr-2 h-4 w-4" />
@@ -261,10 +246,7 @@ export function TitleQuickActionsMenu({
             </DropdownMenuItem>
           )}
           {!isEpisode && favorisId && (
-            <DropdownMenuItem
-              onClick={toggleFavorite}
-              className="cursor-pointer"
-            >
+            <DropdownMenuItem onClick={toggleFavorite} className="cursor-pointer">
               {inFavorites ? (
                 <>
                   <HeartOff className="mr-2 h-4 w-4" />
@@ -278,38 +260,32 @@ export function TitleQuickActionsMenu({
               )}
             </DropdownMenuItem>
           )}
-          {!isEpisode && (watchlistId || favorisId) && (
-            <DropdownMenuSeparator />
-          )}
+          {(!isEpisode && (watchlistId || favorisId)) && <DropdownMenuSeparator />}
 
           {/* Abandonner / reprendre une série de la watchlist */}
           {!isEpisode &&
             type === "serie" &&
             (inWatchlist || allowAbandonWithoutWatchlist) &&
             watchlistId && (
-              <DropdownMenuItem
-                onClick={() =>
-                  setWatchlistStatus(
-                    watchlistStatus === "abandonnee"
-                      ? "en_cours"
-                      : "abandonnee",
-                  )
-                }
-                className="cursor-pointer"
-              >
-                {watchlistStatus === "abandonnee" ? (
-                  <>
-                    <ArchiveRestore className="mr-2 h-4 w-4" />
-                    Reprendre la série
-                  </>
-                ) : (
-                  <>
-                    <Archive className="mr-2 h-4 w-4" />
-                    Abandonner la série
-                  </>
-                )}
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem
+              onClick={() =>
+                setWatchlistStatus(watchlistStatus === "abandonnee" ? "en_cours" : "abandonnee")
+              }
+              className="cursor-pointer"
+            >
+              {watchlistStatus === "abandonnee" ? (
+                <>
+                  <ArchiveRestore className="mr-2 h-4 w-4" />
+                  Reprendre la série
+                </>
+              ) : (
+                <>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Abandonner la série
+                </>
+              )}
+            </DropdownMenuItem>
+          )}
 
           {watched ? (
             <DropdownMenuItem
@@ -360,9 +336,7 @@ export function TitleQuickActionsMenu({
         onOpenChange={setHistoryOpen}
         watches={historyWatches}
         onDelete={(watchId) => deleteWatch.mutate(watchId)}
-        onUpdateContext={(watchId, patch) =>
-          updateWatchContext.mutate({ watchId, data: patch })
-        }
+        onUpdateContext={(watchId, patch) => updateWatchContext.mutate({ watchId, data: patch })}
       />
 
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
@@ -370,16 +344,13 @@ export function TitleQuickActionsMenu({
           <AlertDialogHeader>
             <AlertDialogTitle>Annuler le visionnage ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tous les visionnages enregistrés pour{" "}
-              {isEpisode ? "cet épisode" : "ce titre"} seront supprimés.
+              Tous les visionnages enregistrés pour {isEpisode ? "cet épisode" : "ce titre"}{" "}
+              seront supprimés.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={handleConfirmDeleteAll}
-            >
+            <AlertDialogAction variant="destructive" onClick={handleConfirmDeleteAll}>
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>

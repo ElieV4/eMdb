@@ -23,12 +23,7 @@ export function CardSlider({
   className,
 }: CardSliderProps) {
   return (
-    <div
-      className={cn(
-        "flex items-stretch gap-4 overflow-x-auto pb-2 scrollbar-hide",
-        className,
-      )}
-    >
+    <div className={cn("flex items-stretch gap-4 overflow-x-auto pb-2 scrollbar-hide", className)}>
       {children}
       {moreHref && (
         <Link

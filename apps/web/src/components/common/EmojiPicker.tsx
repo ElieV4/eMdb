@@ -15,54 +15,12 @@ import {
 import { cn } from "@/lib/utils";
 
 export const COMMON_EMOJIS = [
-  "🎬",
-  "🍿",
-  "📺",
-  "🎞️",
-  "⭐",
-  "❤️",
-  "🔥",
-  "👍",
-  "😂",
-  "😱",
-  "😢",
-  "🥰",
-  "🤯",
-  "😴",
-  "👻",
-  "💀",
-  "🚀",
-  "🛸",
-  "🧙",
-  "🦸",
-  "🕵️",
-  "🤖",
-  "🐉",
-  "🧟",
-  "⚽",
-  "🎾",
-  "🏀",
-  "🥊",
-  "🏎️",
-  "🎵",
-  "🎨",
-  "📚",
-  "🌍",
-  "🗽",
-  "🗼",
-  "🏝️",
-  "🎄",
-  "🎃",
-  "👶",
-  "👨‍👩‍👧",
-  "🍝",
-  "🍷",
-  "☕",
-  "💰",
-  "⚔️",
-  "🔫",
-  "🏆",
-  "✅",
+  "🎬", "🍿", "📺", "🎞️", "⭐", "❤️", "🔥", "👍",
+  "😂", "😱", "😢", "🥰", "🤯", "😴", "👻", "💀",
+  "🚀", "🛸", "🧙", "🦸", "🕵️", "🤖", "🐉", "🧟",
+  "⚽", "🎾", "🏀", "🥊", "🏎️", "🎵", "🎨", "📚",
+  "🌍", "🗽", "🗼", "🏝️", "🎄", "🎃", "👶", "👨‍👩‍👧",
+  "🍝", "🍷", "☕", "💰", "⚔️", "🔫", "🏆", "✅",
 ];
 
 type EmojiPickerProps = {
@@ -73,12 +31,7 @@ type EmojiPickerProps = {
   className?: string;
 };
 
-export function EmojiPicker({
-  value,
-  onChange,
-  label = "Choisir un emoji",
-  className,
-}: EmojiPickerProps) {
+export function EmojiPicker({ value, onChange, label = "Choisir un emoji", className }: EmojiPickerProps) {
   const [open, setOpen] = useState(false);
   const [custom, setCustom] = useState("");
 
@@ -105,11 +58,7 @@ export function EmojiPicker({
         }
       />
       <DropdownMenuContent align="start" className="w-72 p-2">
-        <div
-          role="listbox"
-          aria-label="Emojis"
-          className="grid grid-cols-8 gap-1"
-        >
+        <div role="listbox" aria-label="Emojis" className="grid grid-cols-8 gap-1">
           {COMMON_EMOJIS.map((emoji) => (
             <button
               key={emoji}

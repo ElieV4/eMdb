@@ -14,11 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function FollowedPeoplePage() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
-  const {
-    data: people,
-    isLoading,
-    isError,
-  } = useFollowedPeople(isAuthenticated);
+  const { data: people, isLoading, isError } = useFollowedPeople(isAuthenticated);
 
   if (isAuthLoading) {
     return (

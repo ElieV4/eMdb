@@ -9,7 +9,7 @@
 
 "use client";
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -31,10 +31,7 @@ import { RatingTitleSummary, UserRating } from "@/lib/types/api";
 
 function toFilterable(
   title: RatingTitleSummary,
-  context: {
-    watchedTitleIds?: Set<string>;
-    listIdsByTitle: Map<string, string[]>;
-  },
+  context: { watchedTitleIds?: Set<string>; listIdsByTitle: Map<string, string[]> },
 ): FilterableTitle {
   return {
     id: title.id,
@@ -61,14 +58,8 @@ function RatingsPageContent() {
 
   const listIdsByTitle = buildListIdsByTitle(
     [
-      {
-        id: "watchlist",
-        items: [...watchlistIds].map((titleId) => ({ titleId })),
-      },
-      {
-        id: "favoris",
-        items: [...favoriteIds].map((titleId) => ({ titleId })),
-      },
+      { id: "watchlist", items: [...watchlistIds].map((titleId) => ({ titleId })) },
+      { id: "favoris", items: [...favoriteIds].map((titleId) => ({ titleId })) },
     ].filter((l) => l.items.length > 0),
   );
 
@@ -76,10 +67,7 @@ function RatingsPageContent() {
   const filteredItems = items.filter((rating: UserRating) => {
     if (!rating.title) return true; // note sur un épisode : pas de titre à filtrer
     return titleMatchesFilters(
-      toFilterable(rating.title, {
-        watchedTitleIds: watchedTitles,
-        listIdsByTitle,
-      }),
+      toFilterable(rating.title, { watchedTitleIds: watchedTitles, listIdsByTitle }),
       filters,
     );
   });

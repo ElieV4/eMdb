@@ -10,20 +10,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Type,
-  Image as ImageIcon,
-  Upload,
-  Trash2,
-  Globe,
-  MessageSquareText,
-} from "lucide-react";
-import {
-  useSettingsStore,
-  SizePreference,
-  WatchContextPopupMode,
-} from "@/store/settingsStore";
+import { ArrowLeft, Type, Image as ImageIcon, Upload, Trash2, Globe, MessageSquareText } from "lucide-react";
+import { useSettingsStore, SizePreference, WatchContextPopupMode } from "@/store/settingsStore";
 import { useDeleteAccount } from "@/hooks/api/useDeleteAccount";
 import { useAuthStore } from "@/store/authStore";
 import { clearAuthCookie, clearRefreshCookie } from "@/lib/auth/authCookie";
@@ -80,10 +68,7 @@ function SizeSelector({
   );
 }
 
-const WATCH_CONTEXT_POPUP_OPTIONS: {
-  value: WatchContextPopupMode;
-  label: string;
-}[] = [
+const WATCH_CONTEXT_POPUP_OPTIONS: { value: WatchContextPopupMode; label: string }[] = [
   { value: "aucun", label: "Aucun" },
   { value: "film", label: "Films" },
   { value: "episode", label: "Épisodes" },
@@ -189,10 +174,7 @@ export default function SettingsPage() {
             Propose de renseigner support/compagnie/émotion juste après avoir
             marqué un titre comme vu.
           </p>
-          <WatchContextPopupSelector
-            value={watchContextPopup}
-            onChange={setWatchContextPopup}
-          />
+          <WatchContextPopupSelector value={watchContextPopup} onChange={setWatchContextPopup} />
         </section>
 
         <section className="space-y-3">
@@ -218,8 +200,8 @@ export default function SettingsPage() {
             Sites de streaming libre
           </h2>
           <p className="text-sm text-muted-foreground">
-            Sites consultés pour trouver des liens gratuits sur les fiches
-            film/série. Partagés entre tous les comptes.
+            Sites consultés pour trouver des liens gratuits sur les fiches film/série.
+            Partagés entre tous les comptes.
           </p>
           <FreeWatchSitesSection />
         </section>
@@ -234,9 +216,9 @@ export default function SettingsPage() {
             Zone de danger
           </h2>
           <p className="text-sm text-muted-foreground">
-            Supprime définitivement votre compte et toutes les données associées
-            (visionnages, notes, listes, favoris, séries suivies). Cette action
-            est irréversible.
+            Supprime définitivement votre compte et toutes les données
+            associées (visionnages, notes, listes, favoris, séries suivies).
+            Cette action est irréversible.
           </p>
           <Button
             type="button"
@@ -252,12 +234,11 @@ export default function SettingsPage() {
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Supprimer définitivement le compte ?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Supprimer définitivement le compte ?</AlertDialogTitle>
             <AlertDialogDescription>
               Toutes vos données (visionnages, notes, listes, favoris, séries
-              suivies) seront supprimées sans possibilité de retour en arrière.
+              suivies) seront supprimées sans possibilité de retour en
+              arrière.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -269,9 +250,7 @@ export default function SettingsPage() {
               onClick={handleDeleteAccount}
               disabled={deleteAccount.isPending}
             >
-              {deleteAccount.isPending
-                ? "Suppression..."
-                : "Supprimer définitivement"}
+              {deleteAccount.isPending ? "Suppression..." : "Supprimer définitivement"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

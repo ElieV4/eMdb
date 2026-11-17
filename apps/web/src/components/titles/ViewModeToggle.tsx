@@ -6,11 +6,7 @@
 "use client";
 
 import { LayoutGrid, Table2 } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ViewMode } from "@/hooks/useViewMode";
 import { cn } from "@/lib/utils";
 
@@ -22,23 +18,13 @@ type ViewModeToggleProps = {
   className?: string;
 };
 
-export function ViewModeToggle({
-  mode,
-  onChange,
-  affichesLabel = "Vue affiches",
-  className,
-}: ViewModeToggleProps) {
-  const options: { value: ViewMode; label: string; icon: typeof LayoutGrid }[] =
-    [
-      { value: "affiches", label: affichesLabel, icon: LayoutGrid },
-      { value: "tableau", label: "Vue tableau", icon: Table2 },
-    ];
+export function ViewModeToggle({ mode, onChange, affichesLabel = "Vue affiches", className }: ViewModeToggleProps) {
+  const options: { value: ViewMode; label: string; icon: typeof LayoutGrid }[] = [
+    { value: "affiches", label: affichesLabel, icon: LayoutGrid },
+    { value: "tableau", label: "Vue tableau", icon: Table2 },
+  ];
   return (
-    <div
-      role="group"
-      aria-label="Mode d'affichage"
-      className={cn("inline-flex gap-0.5 rounded-full border p-0.5", className)}
-    >
+    <div role="group" aria-label="Mode d'affichage" className={cn("inline-flex gap-0.5 rounded-full border p-0.5", className)}>
       {options.map(({ value, label, icon: Icon }) => (
         <Tooltip key={value}>
           <TooltipTrigger
@@ -50,9 +36,7 @@ export function ViewModeToggle({
                 onClick={() => onChange(value)}
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
-                  mode === value
-                    ? "bg-primary text-white"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  mode === value ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
                 <Icon className="h-4 w-4" />

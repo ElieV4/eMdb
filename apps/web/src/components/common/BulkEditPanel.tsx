@@ -77,9 +77,7 @@ export function BulkEditPanel({
 }: BulkEditPanelProps) {
   const [targetId, setTargetId] = useState("");
   const [pending, setPending] = useState(false);
-  const [result, setResult] = useState<{ ok: number; failed: number } | null>(
-    null,
-  );
+  const [result, setResult] = useState<{ ok: number; failed: number } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const addItem = useAddItem();
@@ -100,9 +98,7 @@ export function BulkEditPanel({
     ...(ownLists ?? []).map((l) => ({ id: l.id, nom: l.nom })),
     ...(sharedLists ?? [])
       .filter((s) =>
-        action === "removeFromList"
-          ? s.capabilities.canRemoveItems
-          : s.capabilities.canAddItems,
+        action === "removeFromList" ? s.capabilities.canRemoveItems : s.capabilities.canAddItems,
       )
       .map((s) => ({ id: s.list.id, nom: `${s.list.nom} (partagée)` })),
   ].filter((l) => l.id !== ctx.activeList?.id);
@@ -122,12 +118,7 @@ export function BulkEditPanel({
         if (item.local !== false) return item.titleId;
         if (!item.tmdbId || !item.type) return null;
         try {
-          return (
-            await getOrImportTitle.mutateAsync({
-              tmdbId: item.tmdbId,
-              type: item.type,
-            })
-          ).id;
+          return (await getOrImportTitle.mutateAsync({ tmdbId: item.tmdbId, type: item.type })).id;
         } catch {
           return null;
         }
@@ -139,64 +130,32 @@ export function BulkEditPanel({
   const run = async () => {
     if (!action) return;
     setPending(true);
-    const titleIds = selected.some((i) => i.local === false)
-      ? await resolveTitleIds()
-      : uniqueTitleIds(selected);
+    const titleIds = selected.some((i) => i.local === false) ? await resolveTitleIds() : uniqueTitleIds(selected);
     let tasks: (() => Promise<unknown>)[] = [];
     switch (action) {
       case "markWatched":
-        tasks = titleIds.map(
-          (titleId) => () => createWatch.mutateAsync({ title_id: titleId }),
-        );
+        tasks = titleIds.map((titleId) => () => createWatch.mutateAsync({ title_id: titleId }));
         break;
       case "removeFromActive":
         if (!ctx.activeList) break;
-        tasks = titleIds.map(
-          (titleId) => () =>
-            removeItem.mutateAsync({ listId: ctx.activeList!.id, titleId }),
-        );
+        tasks = titleIds.map((titleId) => () => removeItem.mutateAsync({ listId: ctx.activeList!.id, titleId }));
         break;
       case "addToList":
-        tasks = titleIds.map(
-          (titleId) => () =>
-            addItem.mutateAsync({
-              listId: targetId,
-              data: { title_id: titleId },
-            }),
-        );
+        tasks = titleIds.map((titleId) => () => addItem.mutateAsync({ listId: targetId, data: { title_id: titleId } }));
         break;
       case "removeFromList":
-        tasks = titleIds.map(
-          (titleId) => () =>
-            removeItem.mutateAsync({ listId: targetId, titleId }),
-        );
+        tasks = titleIds.map((titleId) => () => removeItem.mutateAsync({ listId: targetId, titleId }));
         break;
       case "addToGroup":
       case "removeFromGroup":
         if (!ctx.activeList || !groupIdsByTitle) break;
-        tasks = groupUpdates(
-          titleIds,
-          groupIdsByTitle,
-          targetId,
-          action === "addToGroup" ? "add" : "remove",
-        ).map(
-          (u) => () =>
-            setItemGroups.mutateAsync({
-              listId: ctx.activeList!.id,
-              titleId: u.titleId,
-              groupIds: u.groupIds,
-            }),
+        tasks = groupUpdates(titleIds, groupIdsByTitle, targetId, action === "addToGroup" ? "add" : "remove").map(
+          (u) => () => setItemGroups.mutateAsync({ listId: ctx.activeList!.id, titleId: u.titleId, groupIds: u.groupIds }),
         );
         break;
       case "deleteHistory": {
-        const watchIds = [
-          ...new Set(
-            selected.map((i) => i.watchId).filter((id): id is string => !!id),
-          ),
-        ];
-        tasks = watchIds.map(
-          (watchId) => () => deleteWatch.mutateAsync(watchId),
-        );
+        const watchIds = [...new Set(selected.map((i) => i.watchId).filter((id): id is string => !!id))];
+        tasks = watchIds.map((watchId) => () => deleteWatch.mutateAsync(watchId));
         break;
       }
       case "reorder":
@@ -210,12 +169,7 @@ export function BulkEditPanel({
   };
 
   const needsTarget = target !== null && !targetId;
-  const canValidate =
-    !!action &&
-    action !== "reorder" &&
-    selected.length > 0 &&
-    !needsTarget &&
-    !pending;
+  const canValidate = !!action && action !== "reorder" && selected.length > 0 && !needsTarget && !pending;
 
   return (
     <section
@@ -229,9 +183,7 @@ export function BulkEditPanel({
         <select
           id="bulk-action"
           value={action ?? ""}
-          onChange={(e) =>
-            chooseAction((e.target.value || null) as BulkActionId | null)
-          }
+          onChange={(e) => chooseAction((e.target.value || null) as BulkActionId | null)}
           className="h-8 rounded-md border bg-background px-2 text-sm"
         >
           <option value="">Choisir une action…</option>
@@ -276,13 +228,7 @@ export function BulkEditPanel({
           </select>
         )}
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="ml-auto"
-          onClick={onClose}
-        >
+        <Button type="button" variant="ghost" size="sm" className="ml-auto" onClick={onClose}>
           <X className="h-4 w-4" />
           Terminer
         </Button>
@@ -291,26 +237,15 @@ export function BulkEditPanel({
       {action && action !== "reorder" && (
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm">
-            <strong>{selected.length}</strong> sélectionné
-            {selected.length > 1 ? "s" : ""}
+            <strong>{selected.length}</strong> sélectionné{selected.length > 1 ? "s" : ""}
           </span>
-          {onSelectAll &&
-            selectableCount !== undefined &&
-            selected.length < selectableCount && (
-              <button
-                type="button"
-                onClick={onSelectAll}
-                className="text-xs text-primary hover:underline"
-              >
-                Tout sélectionner ({selectableCount})
-              </button>
-            )}
+          {onSelectAll && selectableCount !== undefined && selected.length < selectableCount && (
+            <button type="button" onClick={onSelectAll} className="text-xs text-primary hover:underline">
+              Tout sélectionner ({selectableCount})
+            </button>
+          )}
           {selected.length > 0 && (
-            <button
-              type="button"
-              onClick={onClearSelection}
-              className="text-xs text-muted-foreground hover:underline"
-            >
+            <button type="button" onClick={onClearSelection} className="text-xs text-muted-foreground hover:underline">
               Tout désélectionner
             </button>
           )}
@@ -319,15 +254,9 @@ export function BulkEditPanel({
             size="sm"
             className="ml-auto"
             disabled={!canValidate}
-            onClick={() =>
-              action === "deleteHistory" ? setConfirmOpen(true) : run()
-            }
+            onClick={() => (action === "deleteHistory" ? setConfirmOpen(true) : run())}
           >
-            {pending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4" />
-            )}
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             Valider
           </Button>
         </div>
@@ -335,47 +264,32 @@ export function BulkEditPanel({
 
       {action === "reorder" && (
         <p className="text-sm text-muted-foreground">
-          Glissez-déposez les affiches pour changer l&apos;ordre ; il est
-          enregistré à chaque déplacement.
+          Glissez-déposez les affiches pour changer l&apos;ordre ; il est enregistré à chaque déplacement.
         </p>
       )}
       {!action && (
         <p className="text-sm text-muted-foreground">
-          Choisissez une action, puis sélectionnez les titres concernés et
-          validez.
+          Choisissez une action, puis sélectionnez les titres concernés et validez.
         </p>
       )}
       {action && needsTarget && (
         <p className="text-sm text-muted-foreground">
-          Choisissez {target === "list" ? "la liste" : "le groupe"} concerné
-          {target === "list" ? "e" : ""}.
+          Choisissez {target === "list" ? "la liste" : "le groupe"} concerné{target === "list" ? "e" : ""}.
         </p>
       )}
       {result && (
-        <p
-          role="status"
-          className={cn(
-            "text-sm",
-            result.failed ? "text-destructive" : "text-muted-foreground",
-          )}
-        >
-          {result.ok} titre{result.ok > 1 ? "s" : ""} modifié
-          {result.ok > 1 ? "s" : ""}
-          {result.failed > 0 &&
-            ` · ${result.failed} échec${result.failed > 1 ? "s" : ""}`}
-          .
+        <p role="status" className={cn("text-sm", result.failed ? "text-destructive" : "text-muted-foreground")}>
+          {result.ok} titre{result.ok > 1 ? "s" : ""} modifié{result.ok > 1 ? "s" : ""}
+          {result.failed > 0 && ` · ${result.failed} échec${result.failed > 1 ? "s" : ""}`}.
         </p>
       )}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Supprimer de l&apos;historique ?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Supprimer de l&apos;historique ?</AlertDialogTitle>
             <AlertDialogDescription>
-              {selected.length} visionnage{selected.length > 1 ? "s" : ""}{" "}
-              seront définitivement supprimés.
+              {selected.length} visionnage{selected.length > 1 ? "s" : ""} seront définitivement supprimés.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

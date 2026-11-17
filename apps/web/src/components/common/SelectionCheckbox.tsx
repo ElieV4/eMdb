@@ -15,11 +15,7 @@ type SelectionCheckboxProps = {
   className?: string;
 };
 
-export function SelectionCheckbox({
-  selected,
-  onToggle,
-  className,
-}: SelectionCheckboxProps) {
+export function SelectionCheckbox({ selected, onToggle, className }: SelectionCheckboxProps) {
   return (
     <button
       type="button"

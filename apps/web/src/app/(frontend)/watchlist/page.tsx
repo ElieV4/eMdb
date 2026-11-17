@@ -32,9 +32,7 @@ function WatchlistRedirect() {
     return (
       <div className="container mx-auto max-w-7xl px-4 py-8">
         <h1 className="text-2xl font-bold">Watchlist</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Connectez-vous pour voir votre watchlist.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Connectez-vous pour voir votre watchlist.</p>
       </div>
     );
   }
@@ -43,9 +41,7 @@ function WatchlistRedirect() {
     return (
       <div className="container mx-auto max-w-7xl px-4 py-8">
         <h1 className="text-2xl font-bold">Watchlist</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Watchlist introuvable.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Watchlist introuvable.</p>
       </div>
     );
   }

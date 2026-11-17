@@ -14,8 +14,7 @@ interface TitleInfoProps {
 }
 
 export function TitleInfo({ title, className }: TitleInfoProps) {
-  const { statut, is_animation, title_genres, title_countries, title_studios } =
-    title;
+  const { statut, is_animation, title_genres, title_countries, title_studios } = title;
 
   return (
     <div className={cn("space-y-4", className)}>
