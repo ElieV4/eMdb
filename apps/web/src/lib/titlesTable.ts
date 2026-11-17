@@ -6,6 +6,7 @@
 
 import type { ReactNode } from "react";
 import { TitleSearchResult } from "@/lib/types/api";
+import { emotionLabels } from "@/lib/watchContext";
 
 export type TitleRowFlags = {
   watched?: boolean;
@@ -19,10 +20,21 @@ export type TitleExtraInfo = {
   notePerso: number | null;
   duree: number | null;
   nombreEpisodes: number | null;
+  /** Titre français, s'il est connu (infobulle du titre). */
+  titreVf?: string | null;
+  genres?: string[];
+  pays?: { code: string; nom: string }[];
 };
 
-/** Ligne du tableau : le titre et ses données complémentaires. */
-export type TitleRow = { title: TitleSearchResult; info?: TitleExtraInfo };
+/**
+ * Ligne du tableau : le titre, ses données complémentaires et les émotions
+ * de l'utilisateur pour ce titre.
+ */
+export type TitleRow = {
+  title: TitleSearchResult;
+  info?: TitleExtraInfo;
+  emotions?: string[];
+};
 
 /** Colonne propre à une page (ex. prochain épisode, vu dans la liste). */
 export type ExtraColumn = {
@@ -44,7 +56,10 @@ export type BaseColumnId =
   | "notePerso"
   | "type"
   | "noteImdb"
-  | "statut";
+  | "statut"
+  | "genres"
+  | "pays"
+  | "emotions";
 
 export type BaseColumn = {
   id: BaseColumnId;
@@ -69,19 +84,42 @@ export function releaseYear(title: TitleSearchResult): number | null {
 export function lengthValue(row: TitleRow): number | null {
   const { title, info } = row;
   return title.type === "film"
-    ? title.duree ?? info?.duree ?? null
-    : title.nombreEpisodes ?? info?.nombreEpisodes ?? null;
+    ? (title.duree ?? info?.duree ?? null)
+    : (title.nombreEpisodes ?? info?.nombreEpisodes ?? null);
 }
 
-const directors = (row: TitleRow) => (row.info?.realisateurs ?? []).map((d) => d.nom).join(", ");
+const directors = (row: TitleRow) =>
+  (row.info?.realisateurs ?? []).map((d) => d.nom).join(", ");
+
+export const genreNames = (row: TitleRow): string[] =>
+  row.info?.genres ?? (row.title.genres ?? []).map((g) => g.nom);
+export const countryNames = (row: TitleRow): string[] =>
+  (row.info?.pays ?? row.title.pays ?? []).map((c) => c.nom);
+const lowerOrNull = (s: string) => s.toLocaleLowerCase("fr") || null;
+
+/** Titre français à afficher en infobulle, s'il diffère du titre affiché. */
+export function frenchTitleHint(row: TitleRow): string | null {
+  const vf = row.info?.titreVf?.trim();
+  return vf && vf !== row.title.titre ? vf : null;
+}
 
 export const BASE_COLUMNS: BaseColumn[] = [
-  { id: "affiche", label: "Affiche", sortValue: null, text: () => "", filter: null, defaultVisible: true },
+  {
+    id: "affiche",
+    label: "Affiche",
+    sortValue: null,
+    text: () => "",
+    filter: null,
+    defaultVisible: true,
+  },
   {
     id: "titre",
     label: "Titre",
     sortValue: (r) => r.title.titre.toLocaleLowerCase("fr"),
-    text: (r) => [r.title.titre, r.title.titreOriginal].filter(Boolean).join(" "),
+    text: (r) =>
+      [r.title.titre, r.title.titreOriginal, r.info?.titreVf]
+        .filter(Boolean)
+        .join(" "),
     filter: "text",
     defaultVisible: true,
   },
@@ -133,21 +171,54 @@ export const BASE_COLUMNS: BaseColumn[] = [
     filter: "number",
     defaultVisible: false,
   },
-  { id: "statut", label: "Statut", sortValue: null, text: () => "", filter: null, defaultVisible: false },
+  {
+    id: "statut",
+    label: "Statut",
+    sortValue: null,
+    text: () => "",
+    filter: null,
+    defaultVisible: false,
+  },
+  {
+    id: "genres",
+    label: "Genres",
+    sortValue: (r) => lowerOrNull(genreNames(r).join(", ")),
+    text: (r) => genreNames(r).join(", "),
+    filter: "text",
+    defaultVisible: false,
+  },
+  {
+    id: "pays",
+    label: "Pays",
+    sortValue: (r) => lowerOrNull(countryNames(r).join(", ")),
+    text: (r) => countryNames(r).join(", "),
+    filter: "text",
+    defaultVisible: false,
+  },
+  {
+    id: "emotions",
+    label: "Émotions",
+    sortValue: (r) => lowerOrNull(emotionLabels(r.emotions) ?? ""),
+    text: (r) => emotionLabels(r.emotions) ?? "",
+    filter: "text",
+    defaultVisible: false,
+  },
 ];
 
 export const normalize = (s: string) =>
   s.toLocaleLowerCase("fr").normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /** Recherche globale : titre, titre original, réalisation, année, genres, colonnes de la page. */
-export function rowMatchesSearch(row: TitleRow, query: string, extraText = ""): boolean {
+export function rowMatchesSearch(
+  row: TitleRow,
+  query: string,
+  extraText = "",
+): boolean {
   const q = normalize(query.trim());
   if (!q) return true;
-  const haystack = [
-    ...BASE_COLUMNS.map((c) => c.text(row)),
-    ...(row.title.genres ?? []).map((g) => g.nom),
-    extraText,
-  ].join(" ");
+  const haystack = [...BASE_COLUMNS.map((c) => c.text(row)), extraText].join(
+    " ",
+  );
   return normalize(haystack).includes(q);
 }
 
@@ -173,7 +244,8 @@ export function matchesColumnFilter(
 
 /** Cycle du tri au clic sur un en-tête : croissant → décroissant → aucun. */
 export function nextSort(current: SortState, column: string): SortState {
-  if (!current || current.column !== column) return { column, direction: "asc" };
+  if (!current || current.column !== column)
+    return { column, direction: "asc" };
   if (current.direction === "asc") return { column, direction: "desc" };
   return null;
 }
@@ -195,7 +267,8 @@ export function sortRows<T>(
     if (va === null && vb === null) return 0;
     if (va === null) return 1;
     if (vb === null) return -1;
-    if (typeof va === "number" && typeof vb === "number") return (va - vb) * factor;
+    if (typeof va === "number" && typeof vb === "number")
+      return (va - vb) * factor;
     return String(va).localeCompare(String(vb), "fr") * factor;
   });
 }

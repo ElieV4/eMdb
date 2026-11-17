@@ -702,9 +702,9 @@ export class WatchesService {
 
     // Données de catalogue, hors RLS : pas de transaction, le pool de
     // connexions les sert à son rythme.
-    const [genres, studios, directors] =
+    const [genres, studios, directors, countries] =
       titleIds.length === 0
-        ? [[], [], []]
+        ? [[], [], [], []]
         : await Promise.all([
             this.prisma.title_genres.findMany({
               where: { title_id: { in: titleIds } },
@@ -717,6 +717,10 @@ export class WatchesService {
             this.prisma.credits.findMany({
               where: { title_id: { in: titleIds }, episode_id: null, roles: { code: 'realisateur' } },
               select: { title_id: true, people: { select: { id: true, nom: true } } },
+            }),
+            this.prisma.title_countries.findMany({
+              where: { title_id: { in: titleIds } },
+              select: { title_id: true, countries: { select: { nom: true } } },
             }),
           ]);
 
@@ -753,6 +757,9 @@ export class WatchesService {
     ];
     const genresBy = new Map(
       [...group(genres, (g) => g.title_id, (g) => g.genres.nom)].map(([k, v]) => [k, [...new Set(v)]]),
+    );
+    const paysBy = new Map(
+      [...group(countries, (c) => c.title_id, (c) => c.countries.nom)].map(([k, v]) => [k, [...new Set(v)]]),
     );
     const studiosBy = new Map(
       [...group(studios, (s) => s.title_id, (s) => s.studios)].map(([k, v]) => [k, uniqueBy(v, (x) => x.id)]),
@@ -806,6 +813,7 @@ export class WatchesService {
           // Durée : celle de l'épisode pour un épisode, du film sinon.
           duree: w.episodes ? w.episodes.duree_minutes ?? null : title?.duree_minutes ?? null,
           genres: (tid && genresBy.get(tid)) || [],
+          pays: (tid && paysBy.get(tid)) || [],
           studios: (tid && studiosBy.get(tid)) || [],
           realisateurs: (tid && directorsBy.get(tid)) || [],
           noteImdb: noteOf(title?.note_imdb),

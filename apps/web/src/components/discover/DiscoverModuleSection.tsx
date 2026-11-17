@@ -176,6 +176,7 @@ export function DiscoverModuleSection({
         <TitlesTable
           pageKey={`discover-${moduleKey}`}
           search={page.search}
+          selection={page.tableSelection}
           filtersOpen={page.filtersOpen}
           columnsOpen={page.columnsOpen}
           titles={filtered}

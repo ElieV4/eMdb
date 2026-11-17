@@ -63,7 +63,8 @@ export class TitlesService {
 
   /**
    * Données de la vue tableau pour une série de titres locaux : réalisateurs
-   * (dédoublonnés), ma note, durée, nombre d'épisodes et date de sortie.
+   * (dédoublonnés), ma note, durée, nombre d'épisodes, date de sortie, titre
+   * français, genres et pays.
    * Quelques requêtes groupées, pas une par titre.
    */
   async getTableInfo(userId: string, titleIds: string[]) {
@@ -76,8 +77,11 @@ export class TitlesService {
         select: {
           id: true,
           type: true,
+          titre_vf: true,
           date_sortie: true,
           duree_minutes: true,
+          title_genres: { select: { genres: { select: { nom: true } } } },
+          title_countries: { select: { countries: { select: { code: true, nom: true } } } },
           seasons: { where: { numero: { not: 0 } }, select: { _count: { select: { episodes: true } } } },
         },
       }),
@@ -114,6 +118,9 @@ export class TitlesService {
           nombreEpisodes:
             t.type === 'serie' ? t.seasons.reduce((sum, s) => sum + s._count.episodes, 0) : null,
           dateSortie: t.date_sortie ? t.date_sortie.toISOString() : null,
+          titreVf: t.titre_vf ?? null,
+          genres: t.title_genres.map((g) => g.genres.nom).sort((a, b) => a.localeCompare(b, 'fr')),
+          pays: t.title_countries.map((c) => c.countries),
         },
       ]),
     );

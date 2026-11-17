@@ -36,6 +36,8 @@ export type HistoryTableRow = {
   /** Durée en minutes (épisode pour un épisode, film sinon). */
   duree?: number | null;
   genres: string[];
+  /** Pays de production (absent des réponses d'avant l'ajout de la colonne). */
+  pays?: string[];
   studios: { id: string; nom: string }[];
   realisateurs: { id: string; nom: string }[];
   noteImdb: number | null;
@@ -76,6 +78,7 @@ export type ColumnId =
   | "dateSortie"
   | "duree"
   | "genres"
+  | "pays"
   | "studios"
   | "realisateurs"
   | "noteImdb"
@@ -175,6 +178,13 @@ export const COLUMNS: ColumnDef[] = [
     filterText: (r) => r.genres.join(", "),
   },
   {
+    id: "pays",
+    label: "Pays",
+    filter: "text",
+    sortValue: (r) => (r.pays ?? []).join(", ").toLocaleLowerCase("fr") || null,
+    filterText: (r) => (r.pays ?? []).join(", "),
+  },
+  {
     id: "studios",
     label: "Studios",
     filter: "text",
@@ -271,7 +281,9 @@ export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
 /** Ordre d'affichage des colonnes (les colonnes par défaut d'abord). */
 export const COLUMN_ORDER: ColumnId[] = [
   ...DEFAULT_VISIBLE_COLUMNS,
-  ...COLUMNS.map((c) => c.id).filter((id) => !DEFAULT_VISIBLE_COLUMNS.includes(id)),
+  ...COLUMNS.map((c) => c.id).filter(
+    (id) => !DEFAULT_VISIBLE_COLUMNS.includes(id),
+  ),
 ];
 
 /** Texte de toutes les colonnes d'une ligne (recherche globale). */
@@ -279,9 +291,9 @@ export function rowSearchText(row: DisplayRow): string {
   return COLUMNS.map((c) => c.filterText(row)).join(" ");
 }
 
-export const DEFAULT_HIDDEN_COLUMNS: ColumnId[] = COLUMNS.map((c) => c.id).filter(
-  (id) => !DEFAULT_VISIBLE_COLUMNS.includes(id),
-);
+export const DEFAULT_HIDDEN_COLUMNS: ColumnId[] = COLUMNS.map(
+  (c) => c.id,
+).filter((id) => !DEFAULT_VISIBLE_COLUMNS.includes(id));
 
 // --- Regroupement par série -------------------------------------------------
 

@@ -3,8 +3,9 @@
  * tableau, mémorisée par page), panneaux « Trier / filtrer » et
  * « Colonnes », mode « Modifier le contenu » (action choisie + sélection).
  *
- * En mode « Modifier le contenu », la page s'affiche en affiches : la
- * sélection se fait sur les cartes.
+ * En mode « Modifier le contenu », la vue choisie est conservée : cases sur
+ * les cartes en affiches, colonne de cases à gauche en tableau. Seul
+ * « Réordonner » (glisser-déposer) repasse en affiches.
  */
 
 import { useCallback, useState } from "react";
@@ -29,7 +30,21 @@ export function useTitlesPage(pageKey: string) {
       return next;
     });
   }, []);
-  const selectAll = useCallback((ids: string[]) => setSelectedIds(new Set(ids)), []);
+  const selectAll = useCallback(
+    (ids: string[]) => setSelectedIds(new Set(ids)),
+    [],
+  );
+  /** Coche ou décoche un ensemble d'éléments (case « tout » du tableau). */
+  const setAllSelected = useCallback((ids: string[], selected: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (selected) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }, []);
 
   const toggleEditing = useCallback(() => {
     setEditing((e) => !e);
@@ -42,7 +57,8 @@ export function useTitlesPage(pageKey: string) {
     setSelectedIds(new Set());
   }, []);
 
-  const effectiveView = editing ? "affiches" : viewMode;
+  const effectiveView = editing && action === "reorder" ? "affiches" : viewMode;
+  const selecting = editing && action !== null && action !== "reorder";
 
   return {
     search,
@@ -60,10 +76,15 @@ export function useTitlesPage(pageKey: string) {
     action,
     setAction,
     /** Cases de sélection visibles sur les cartes. */
-    selecting: editing && action !== null && action !== "reorder",
+    selecting,
     selectedIds,
     toggleSelected,
     clearSelection,
     selectAll,
+    setAllSelected,
+    /** Props de sélection du tableau (TitlesTable) quand des cases sont affichées. */
+    tableSelection: selecting
+      ? { selectedIds, onToggle: toggleSelected, onSetAll: setAllSelected }
+      : undefined,
   };
 }

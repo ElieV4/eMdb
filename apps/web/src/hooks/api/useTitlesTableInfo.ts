@@ -1,6 +1,7 @@
 /**
  * Colonnes complémentaires de la vue tableau (POST /titles/table-info) :
- * réalisation, ma note, durée, nombre d'épisodes, pour les titres locaux
+ * réalisation, ma note, durée, nombre d'épisodes, titre
+ * français, genres, pays, pour les titres locaux
  * affichés. Les titres TMDB pas encore importés n'ont pas ces données.
  */
 
@@ -13,6 +14,9 @@ export type TitleTableInfo = {
   duree: number | null;
   nombreEpisodes: number | null;
   dateSortie: string | null;
+  titreVf: string | null;
+  genres: string[];
+  pays: { code: string; nom: string }[];
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
