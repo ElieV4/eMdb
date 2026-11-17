@@ -87,6 +87,8 @@ function ListDetailPageContent() {
   const [commentsItemId, setCommentsItemId] = useState<string | null>(null);
   const setItemVu = useSetItemVu();
   const [viewMode, setViewMode] = useViewMode("list");
+  // Module « Ajout rapide » : affiché par le bouton d'en-tête.
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   const filters = parseTitleFilters(searchParams);
   const listIdsByTitle = buildListIdsByTitle(allLists);
@@ -228,6 +230,7 @@ function ListDetailPageContent() {
                   role={list.role}
                   variant="buttons"
                   onEditContent={() => setEditMode(true)}
+                  quickAdd={{ open: quickAddOpen, onToggle: () => setQuickAddOpen((o) => !o) }}
                   onDeleted={() => router.push("/lists")}
                 />
               )}
@@ -235,7 +238,7 @@ function ListDetailPageContent() {
           ) : null}
         </div>
 
-        {list && list.capabilities.canAddItems && !editMode && !isLoading && !error && (
+        {quickAddOpen && list && list.capabilities.canAddItems && !editMode && !isLoading && !error && (
           <ListQuickAdd listId={list.id} existingTitleIds={new Set(items.map((i) => i.id))} />
         )}
 
@@ -337,7 +340,7 @@ function ListDetailPageContent() {
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {list?.capabilities.canAddItems
-              ? "Cette liste est vide. Ajoutez des titres avec l'ajout rapide ci-dessus ou depuis leur fiche."
+              ? "Cette liste est vide. Ajoutez des titres avec le bouton « + » (ajout rapide) ou depuis leur fiche."
               : "Cette liste est vide."}
           </p>
         ) : editMode ? (

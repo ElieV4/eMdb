@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Trash2 } from "lucide-react";
 
 type ListDialogProps = {
   open: boolean;
@@ -30,9 +31,12 @@ type ListDialogProps = {
     type: "watchlist" | "favoris" | "custom";
     description?: string | null;
   } | null;
+  /** Modification seulement : affiche « Supprimer la liste » dans le pied du
+   * dialogue (la confirmation est gérée par l'appelant). */
+  onDelete?: () => void;
 };
 
-export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
+export function ListDialog({ open, onOpenChange, list, onDelete }: ListDialogProps) {
   const [nom, setNom] = useState("");
   const [description, setDescription] = useState("");
 
@@ -103,7 +107,24 @@ export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
               rows={2}
             />
           </div>
-          <DialogFooter>
+          <DialogFooter className="sm:justify-between">
+            {list && onDelete ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-destructive hover:text-destructive sm:mr-auto"
+                onClick={() => {
+                  onOpenChange(false);
+                  onDelete();
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer la liste
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
             <Button
               type="button"
               variant="outline"
@@ -117,6 +138,7 @@ export function ListDialog({ open, onOpenChange, list }: ListDialogProps) {
             >
               {list ? "Enregistrer" : "Créer"}
             </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
