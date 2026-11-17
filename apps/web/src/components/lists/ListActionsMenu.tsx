@@ -22,7 +22,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreVertical, Pencil, ListVideo, Trash2, Share2, LogOut } from "lucide-react";
+import { MoreVertical, Pencil, ListVideo, Trash2, Share2, LogOut, Plus } from "lucide-react";
+import type { ReactNode } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -39,7 +41,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { ListDialog } from "./ListDialog";
 import { ListShareDialog } from "./ListShareDialog";
 import { useDeleteList } from "@/hooks/api/useDeleteList";
@@ -76,8 +77,50 @@ type ListActionsMenuProps = {
   /** Appelé après suppression réussie, ou après avoir quitté une liste
    * partagée (ex: rediriger vers /lists depuis la page détail). */
   onDeleted?: () => void;
+  /** En-tête de la page liste : bouton « Ajout rapide » (affiche / masque le module). */
+  quickAdd?: { open: boolean; onToggle: () => void };
   className?: string;
 };
+
+/** Bouton d'en-tête : icône seule, libellé au survol (et pour les lecteurs d'écran). */
+function HeaderIconButton({
+  label,
+  icon,
+  onClick,
+  pressed,
+  destructive,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  pressed?: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            onClick={onClick}
+            aria-label={label}
+            aria-pressed={pressed}
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-full border transition-colors",
+              pressed
+                ? "border-primary bg-primary text-white"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              destructive && "hover:text-destructive",
+            )}
+          >
+            {icon}
+          </button>
+        }
+      />
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function ListActionsMenu({
   list,
@@ -86,6 +129,7 @@ export function ListActionsMenu({
   variant = "icon",
   onEditContent,
   onDeleted,
+  quickAdd,
   className,
 }: ListActionsMenuProps) {
   const router = useRouter();
@@ -103,6 +147,7 @@ export function ListActionsMenu({
   const canEditContent = capabilities.canEditItems || capabilities.canRemoveItems;
   const canDelete = isCustom && capabilities.canDeleteList;
   const canShare = capabilities.canManageShares && isShareableListType(list.type);
+  const canAddItems = capabilities.canAddItems;
 
   const handleEditContent = () => {
     setMenuOpen(false);
@@ -175,41 +220,57 @@ export function ListActionsMenu({
     </AlertDialog>
   );
 
-  const editDialog = <ListDialog open={editOpen} onOpenChange={setEditOpen} list={list} />;
+  // Suppression : dans le dialogue « Modifier la liste » (plus de bouton dédié
+  // dans l'en-tête de la page liste).
+  const editDialog = (
+    <ListDialog
+      open={editOpen}
+      onOpenChange={setEditOpen}
+      list={list}
+      onDelete={canDelete ? () => setConfirmDeleteOpen(true) : undefined}
+    />
+  );
 
   if (variant === "buttons") {
     return (
       <>
         <div className={cn("flex flex-wrap items-center gap-2", className)}>
+          {quickAdd && canAddItems && (
+            <HeaderIconButton
+              label={quickAdd.open ? "Masquer l'ajout rapide" : "Ajout rapide"}
+              icon={<Plus className="h-4 w-4" />}
+              onClick={quickAdd.onToggle}
+              pressed={quickAdd.open}
+            />
+          )}
           {canShare && (
-            <Button variant="outline" size="sm" onClick={() => setShareOpen(true)}>
-              <Share2 className="h-4 w-4" />
-              Partager
-            </Button>
+            <HeaderIconButton
+              label="Partager"
+              icon={<Share2 className="h-4 w-4" />}
+              onClick={() => setShareOpen(true)}
+            />
           )}
           {canRename && (
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-              <Pencil className="h-4 w-4" />
-              Modifier la liste
-            </Button>
+            <HeaderIconButton
+              label="Modifier la liste"
+              icon={<Pencil className="h-4 w-4" />}
+              onClick={() => setEditOpen(true)}
+            />
           )}
           {canEditContent && (
-            <Button variant="outline" size="sm" onClick={handleEditContent}>
-              <ListVideo className="h-4 w-4" />
-              Modifier le contenu
-            </Button>
-          )}
-          {canDelete && (
-            <Button variant="outline" size="sm" onClick={() => setConfirmDeleteOpen(true)}>
-              <Trash2 className="h-4 w-4" />
-              Supprimer la liste
-            </Button>
+            <HeaderIconButton
+              label="Modifier le contenu"
+              icon={<ListVideo className="h-4 w-4" />}
+              onClick={handleEditContent}
+            />
           )}
           {isMember && (
-            <Button variant="outline" size="sm" onClick={() => setConfirmLeaveOpen(true)}>
-              <LogOut className="h-4 w-4" />
-              Quitter la liste
-            </Button>
+            <HeaderIconButton
+              label="Quitter la liste"
+              icon={<LogOut className="h-4 w-4" />}
+              onClick={() => setConfirmLeaveOpen(true)}
+              destructive
+            />
           )}
         </div>
         {editDialog}

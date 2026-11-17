@@ -86,7 +86,9 @@ import {
 } from "@/lib/watchContext";
 import { buildEntityUrl, cn } from "@/lib/utils";
 
-const HIDDEN_COLUMNS_STORAGE_KEY = "emdb.historyTable.hiddenColumns";
+// v2 : nouvelles colonnes par défaut (titre, réalisation, sortie, ma note) —
+// les choix enregistrés avec l'ancien jeu par défaut ne sont pas repris.
+const HIDDEN_COLUMNS_STORAGE_KEY = "emdb.historyTable.hiddenColumns.v2";
 
 function loadHiddenColumns(): ColumnId[] {
   try {

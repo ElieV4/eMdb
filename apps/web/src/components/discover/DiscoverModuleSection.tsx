@@ -20,6 +20,9 @@
 import { useSearchParams } from "next/navigation";
 import { TitleCard } from "@/components/titles/TitleCard";
 import { CardSlider } from "@/components/common/CardSlider";
+import { TitlesTable } from "@/components/titles/TitlesTable";
+import { ViewModeToggle } from "@/components/titles/ViewModeToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 import { useDiscoverModule, DiscoverModuleKey } from "@/hooks/api/useDiscover";
 import { useWatchedTitles, useListMembership, useLists } from "@/hooks/api";
 import { useAuth } from "@/hooks/auth/useAuth";
@@ -62,6 +65,8 @@ export function DiscoverModuleSection({
   );
   const { data: watchedTitles } = useWatchedTitles();
   const { watchlistIds, favoriteIds } = useListMembership();
+  // Bascule affiches / tableau : page dédiée d'un module seulement (grille).
+  const [viewMode, setViewMode] = useViewMode(`discover-${moduleKey}`);
   const { isAuthenticated } = useAuth();
   const { data: userLists } = useLists(isAuthenticated);
   const listIdsByTitle = buildListIdsByTitle(userLists);
@@ -87,9 +92,12 @@ export function DiscoverModuleSection({
 
   return (
     <section>
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold">{title}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">{title}</h2>
+          <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+        </div>
+        {variant === "grid" && <ViewModeToggle mode={viewMode} onChange={setViewMode} />}
       </div>
 
       {isLoading ? (
@@ -125,6 +133,15 @@ export function DiscoverModuleSection({
             />
           ))}
         </CardSlider>
+      ) : viewMode === "tableau" ? (
+        <TitlesTable
+          titles={filtered}
+          flagsOf={(t) => ({
+            watched: watchedTitles?.has(t.id),
+            inWatchlist: watchlistIds.has(t.id),
+            inFavorites: favoriteIds.has(t.id),
+          })}
+        />
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">

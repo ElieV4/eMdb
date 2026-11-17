@@ -12,6 +12,7 @@ Monorepo TypeScript : API REST (NestJS), worker asynchrone (BullMQ/Redis), front
 - Fiches personnes avec filmographie
 - Visionnages, notation, listes personnalisées avec sous-groupes imbriqués, partagées entre utilisateurs (modes lecture, collaboratif ou ouvert) avec un suivi « vu » commun et des fils de discussion ; ajout rapide de titres depuis la page d'une liste (recherche intégrée)
 - Historique par date ou en tableau (tri, filtres, colonnes masquables, regroupement par série, édition sur place)
+- Bascule affiches / tableau sur les pages de titres (listes, watchlist, continuer à regarder, recommandés, modules Découvrir)
 - Commentaire perso sur chaque titre (page du titre, historique, listes), visible des membres de ses listes partagées si on le souhaite
 - Suivi de séries avec calendrier des épisodes non vus
 - Découverte : tendances, sorties à venir, sélections festivals & cérémonies
